@@ -139,11 +139,14 @@ struct AccountView: View {
 
     // MARK: - Actions
 
-    /// Choices save one after another, so a slower earlier save can never land after a later one.
+    /// Choices save one after another, so a slower earlier save can never land after a later one, and
+    /// each save belongs to the account that chose it: a sign-out while one waits drops it.
     private func setVisibility(_ value: String) {
+        let account = session.profile?.id
         let previous = visibilitySave
         visibilitySave = Task { @MainActor in
             await previous?.value
+            guard account != nil, session.profile?.id == account else { return }
             do {
                 try await session.updateProfile(["hit_visibility": value])
             } catch {

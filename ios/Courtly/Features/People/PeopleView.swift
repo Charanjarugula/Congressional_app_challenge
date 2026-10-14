@@ -56,6 +56,7 @@ struct PeopleView: View {
                             .shadow(color: CourtlyColor.ink.opacity(0.08), radius: 4, y: 2)
                     )
             }
+            .accessibilityLabel("Add friends or start a group")
             if let card = session.profile?.card {
                 PlayerAvatar(card: card, size: 40)
                     .overlay(Circle().stroke(Color.white, lineWidth: 2))
@@ -80,6 +81,7 @@ struct PeopleView: View {
                         .foregroundStyle(CourtlyColor.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
         .padding(.horizontal, 12)

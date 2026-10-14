@@ -185,6 +185,7 @@ struct ChatThreadView: View {
                     .buttonStyle(.plain)
                     .disabled(!canSend)
                     .padding(.bottom, 2)
+                    .accessibilityLabel("Send")
                 }
             }
             .padding(.horizontal, 12)

@@ -37,6 +37,7 @@ struct CourtPickerView: View {
                                     .foregroundStyle(CourtlyColor.secondary)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("Clear search")
                         }
                     }
                     .padding(.top, 8)

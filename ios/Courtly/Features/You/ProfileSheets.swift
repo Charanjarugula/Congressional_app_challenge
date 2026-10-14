@@ -456,6 +456,7 @@ struct EditProfileSheet: View {
                                     .background(Circle().fill(CourtlyColor.blue))
                                     .overlay(Circle().stroke(CourtlyColor.groupedBackground, lineWidth: 4))
                             }
+                            .accessibilityLabel("Change photo")
                         }
                         PhotosPicker(selection: $pickerItem, matching: .images) {
                             Text("Change photo")

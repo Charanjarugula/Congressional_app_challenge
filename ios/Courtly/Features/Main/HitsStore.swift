@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 
 /// Everything the Play and My Hits tabs show. Actions update the lists right away and then
 /// refresh from the backend, so every screen sees the same hit.
@@ -40,6 +41,7 @@ final class HitsStore {
             feed = fresh
             feedError = nil
             SnapshotCache.save(fresh, key: "play_feed", account: owner)
+            try? await UNUserNotificationCenter.current().setBadgeCount(fresh.badge)
         } catch {
             feedError = error.localizedDescription
         }

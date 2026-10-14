@@ -51,6 +51,10 @@ struct JoinRequestView: View {
                         ActionButton(title: "Accept", isLoading: working == true) { respond(accept: true) }
                     }
                     .padding(.top, 16)
+                } else if hits.isLoadingFeed {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 80)
                 } else {
                     QuietCard(title: "This request was already answered", detail: "Nothing left to do here.")
                 }

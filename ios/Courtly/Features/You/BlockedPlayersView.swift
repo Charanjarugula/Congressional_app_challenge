@@ -5,6 +5,7 @@ struct BlockedPlayersView: View {
     @Environment(AppSession.self) private var session
     @State private var players: [PlayerCard]?
     @State private var unblocking: UUID?
+    @State private var loadError: String?
     @State private var errorMessage: String?
 
     var body: some View {
@@ -35,6 +36,8 @@ struct BlockedPlayersView: View {
                             .padding(.horizontal, 16)
                         }
                     }
+                } else if let loadError {
+                    QuietCard(title: "Couldn’t load blocked players", detail: loadError)
                 } else {
                     ProgressView()
                         .frame(maxWidth: .infinity)
@@ -50,7 +53,11 @@ struct BlockedPlayersView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .task {
-            players = (try? await API.People.blocked()) ?? []
+            do {
+                players = try await API.People.blocked()
+            } catch {
+                loadError = error.localizedDescription
+            }
         }
         .errorAlert($errorMessage)
     }

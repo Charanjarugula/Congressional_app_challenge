@@ -10,7 +10,12 @@ final class HitsStore {
     private(set) var myHits: MyHits?
     private(set) var isLoadingFeed = false
     private(set) var isLoadingMyHits = false
-    private(set) var lastError: String?
+    /// Why the last feed load failed, if it did; nil once one succeeds.
+    private(set) var feedError: String?
+    /// Why the last My Hits load failed, if it did.
+    private(set) var myHitsError: String?
+    /// The feed's error, which the Play tab shows.
+    var lastError: String? { feedError }
 
     /// Paints from the signed-in player's own snapshots; nothing of another account's is ever read.
     init(account: UUID?) {
@@ -34,11 +39,11 @@ final class HitsStore {
             let samePlayer = await SupabaseClient.shared.session?.userID == owner
             guard samePlayer, let owner else { return }
             feed = fresh
-            lastError = nil
+            feedError = nil
             SnapshotCache.save(fresh, key: "play_feed", account: owner)
             try? await UNUserNotificationCenter.current().setBadgeCount(fresh.badge)
         } catch {
-            lastError = error.localizedDescription
+            feedError = error.localizedDescription
         }
     }
 
@@ -52,9 +57,10 @@ final class HitsStore {
             let samePlayer = await SupabaseClient.shared.session?.userID == owner
             guard samePlayer, let owner else { return }
             myHits = fresh
+            myHitsError = nil
             SnapshotCache.save(fresh, key: "my_hits", account: owner)
         } catch {
-            lastError = error.localizedDescription
+            myHitsError = error.localizedDescription
         }
     }
 

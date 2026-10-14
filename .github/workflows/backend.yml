@@ -9,7 +9,7 @@ on:
         options: [dev, prod]
         default: dev
       steps:
-        description: Deploy steps, in order (reviewer, reviewer-remove, demo and demo-remove are optional extras)
+        description: Deploy steps, in order (reviewer, reviewer-remove, demo, demo-remove and status are optional extras)
         type: string
         default: check migrate seed settings auth secrets functions test
   push:

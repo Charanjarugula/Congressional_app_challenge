@@ -23,9 +23,11 @@ prep() {
     -e '/using gist/d' \
     "$1"
 }
+# Migrations are recorded the way the deploy records them, so the status report has its table.
+psql -v ON_ERROR_STOP=1 -qc "create schema if not exists private; create table private.app_migrations (name text primary key, applied_at timestamptz not null default now());"
 for f in "$ROOT"/migrations/*.sql; do
   echo "migrate $(basename "$f")"
-  prep "$f" | psql -v ON_ERROR_STOP=1 -q -o /dev/null || { echo "FAILED: $(basename "$f")"; exit 1; }
+  { prep "$f"; echo "insert into private.app_migrations (name) values ('$(basename "$f")');"; } | psql -v ON_ERROR_STOP=1 -q -o /dev/null || { echo "FAILED: $(basename "$f")"; exit 1; }
 done
 for f in "$ROOT"/seed/*.sql; do
   echo "seed    $(basename "$f")"
@@ -66,3 +68,7 @@ done
 left=$(psql -At -c "select (select count(*) from public.profiles) + (select count(*) from public.hits) + (select count(*) from public.chats) + (select count(*) from public.messages) + (select count(*) from public.notifications) + (select count(*) from auth.users)")
 if [ "$left" != "0" ]; then echo "demo removal left $left rows behind"; exit 1; fi
 echo "demo    removed without a trace"
+
+# The status report has to run against the schema as well; its lines are shown for a look.
+report=$(prep "$ROOT/tests/status.sql" | psql -v ON_ERROR_STOP=1 -qAt -F ' = ') || { echo "FAILED: tests/status.sql"; exit 1; }
+echo "$report" | sed 's/^/status  /'

@@ -16,6 +16,7 @@
 // players with hits between them and, when the reviewer account exists, everything the App Review
 // account is meant to see), then checks it from the reviewer's side; DEMO_PASSWORD, when set, is
 // the demo players' sign-in password. "demo-remove" takes the world and the demo players down.
+// "status" prints one line per fact about the deployed project (migrations, cron, grants, counts).
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -250,6 +251,10 @@ const steps = {
     await sqlFile("demo/reset.sql");
     await sqlFile("demo/remove.sql");
     console.log("demo world and players removed");
+  },
+
+  async status() {
+    for (const row of await sqlFile("tests/status.sql")) console.log(`status  ${row.k.padEnd(22)} ${row.v}`);
   },
 
   async test() {

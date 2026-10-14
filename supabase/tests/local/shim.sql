@@ -44,7 +44,11 @@ create function extensions.st_dwithin(a extensions.geography, b extensions.geogr
 $$;
 
 create schema cron;
-create function cron.schedule(job text, sched text, cmd text) returns bigint language sql as $$ select 1::bigint $$;
+create table cron.job (jobid bigserial primary key, jobname text, schedule text, command text);
+create table cron.job_run_details (jobid bigint, status text, start_time timestamptz);
+create function cron.schedule(job text, sched text, cmd text) returns bigint language sql as $$
+  insert into cron.job (jobname, schedule, command) values (job, sched, cmd) returning jobid
+$$;
 
 create schema net;
 create function net.http_post(url text, body jsonb default '{}'::jsonb, params jsonb default '{}'::jsonb, headers jsonb default '{}'::jsonb, timeout_milliseconds int default 5000)

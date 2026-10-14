@@ -197,6 +197,59 @@ begin
   if v_n < 2 then raise exception 'rls: player_cards should list the other active players (%)', v_n; end if;
   execute 'reset role';
 
+  -- Played hits and the day-after check. The reminder hit is moved into the past; the scheduler marks it played.
+  update public.hits set starts_at = now() - interval '3 hours' where id = (v_hit->>'id')::uuid;
+  perform public.run_hit_scheduler();
+  if (select status from public.hits where id = (v_hit->>'id')::uuid) <> 'played' then raise exception 'scheduler did not mark the hit played'; end if;
+  if (select hits_played from public.profiles where id = b) <> 1 then raise exception 'hits_played after play: %', (select hits_played from public.profiles where id = b); end if;
+  -- Maya says Jordan didn't show: one no-show, one automatic report, the play no longer counts. Saying it twice changes nothing.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.submit_attendance((v_hit->>'id')::uuid, b, false);
+  perform public.submit_attendance((v_hit->>'id')::uuid, b, false);
+  if (select no_shows from public.profiles where id = b) <> 1 then raise exception 'no_shows: %', (select no_shows from public.profiles where id = b); end if;
+  if (select hits_played from public.profiles where id = b) <> 0 then raise exception 'hits_played after no-show'; end if;
+  select count(*) into v_n from public.reports where reported_id = b and reason = 'no_show' and auto;
+  if v_n <> 1 then raise exception 'expected 1 automatic no-show report, got %', v_n; end if;
+  -- Jordan says Maya showed up and adds her as a friend in the same step; his past row no longer needs an answer.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.submit_attendance((v_hit->>'id')::uuid, a, true, true);
+  if public.relationship_to(b, a) <> 'requested' then raise exception 'attendance add_friend: %', public.relationship_to(b, a); end if;
+  v_feed := public.get_my_hits();
+  if not exists (select 1 from jsonb_array_elements(v_feed->'past') e where (e->>'id')::uuid = (v_hit->>'id')::uuid and (e->>'needs_attendance')::boolean = false) then
+    raise exception 'past row should be answered: %', v_feed->'past';
+  end if;
+  perform public.mark_request_seen((v_req->'viewer'->'request'->>'id')::uuid);
+  if (select seen_by_requester_at from public.join_requests where id = (v_req->'viewer'->'request'->>'id')::uuid) is null then raise exception 'mark_request_seen'; end if;
+
+  -- Report with a block in one step, then undo the block.
+  perform public.report_user(c, 'rude_or_unsafe', 'kept yelling at the next court', true);
+  if public.relationship_to(b, c) <> 'blocked' then raise exception 'report_user also_block'; end if;
+  select count(*) into v_n from public.reports where reporter_id = b and reported_id = c and also_blocked;
+  if v_n <> 1 then raise exception 'report row missing'; end if;
+  perform public.unblock_user(c);
+
+  -- Player profile, search, nearby courts.
+  v_feed := public.get_player(a);
+  if (v_feed->>'first_name') <> 'Maya' or (v_feed->>'relationship') <> 'requested' or (v_feed->>'hits_together')::int <> 1 then raise exception 'get_player: %', v_feed; end if;
+  v_feed := public.search_players('Al');
+  if not exists (select 1 from jsonb_array_elements(v_feed) e where (e->>'id')::uuid = c) then raise exception 'search_players: %', v_feed; end if;
+  v_feed := public.get_nearby_courts(5);
+  if jsonb_array_length(v_feed) < 1 or (v_feed->0->>'miles') is null then raise exception 'get_nearby_courts: %', v_feed; end if;
+
+  -- Group membership: Maya adds Jordan back, Jordan adds her to the group, she mutes it and then leaves.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_friend := public.add_friend(b);
+  if (v_friend->>'relationship') <> 'friend' then raise exception 'maya add back: %', v_friend; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_group := public.add_chat_members((v_group->>'id')::uuid, array[a]);
+  if (v_group->>'member_count')::int <> 3 then raise exception 'add_chat_members: %', v_group; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.set_chat_muted((v_group->>'id')::uuid, true);
+  if not (public.chat_json((v_group->>'id')::uuid, a)->>'muted')::boolean then raise exception 'mute not stored'; end if;
+  perform public.leave_chat((v_group->>'id')::uuid);
+  if (public.chat_json((v_group->>'id')::uuid, b)->>'member_count')::int <> 2 then raise exception 'leave_chat member count'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+
   -- Deletion anonymizes without touching others' threads.
   perform public.internal_delete_account(c, 'full');
   if (select first_name from public.profiles where id = c) <> 'Deleted' then raise exception 'delete did not anonymize'; end if;

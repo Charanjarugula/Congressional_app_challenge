@@ -57,6 +57,10 @@ struct HitDetailView: View {
             if hit == nil { hit = hits.cachedHit(hitID) }
             await reload()
         }
+        .onChange(of: hits.lastRefreshedAt) { _, _ in
+            // Something changed on another phone (a request, a claim, a cancel): show it here too.
+            Task { await reload() }
+        }
         .alert("Cancel this hit?", isPresented: $showsCancelAlert) {
             Button("Cancel hit", role: .destructive) {
                 Task { await perform { try await hits.cancel(hitID) } }

@@ -11,6 +11,8 @@ final class HitsStore {
     private(set) var isLoadingFeed = false
     private(set) var isLoadingMyHits = false
     private(set) var lastError: String?
+    /// Bumped after every successful load so open screens can re-fetch their own copy.
+    private(set) var lastRefreshedAt: Date?
 
     init() {
         feed = SnapshotCache.load(PlayFeed.self, key: "play_feed")
@@ -27,6 +29,7 @@ final class HitsStore {
             let fresh = try await API.Hits.feed()
             feed = fresh
             lastError = nil
+            lastRefreshedAt = .now
             SnapshotCache.save(fresh, key: "play_feed")
             try? await UNUserNotificationCenter.current().setBadgeCount(fresh.badge)
         } catch {
@@ -41,6 +44,7 @@ final class HitsStore {
         do {
             let fresh = try await API.Hits.mine()
             myHits = fresh
+            lastRefreshedAt = .now
             SnapshotCache.save(fresh, key: "my_hits")
         } catch {
             lastError = error.localizedDescription

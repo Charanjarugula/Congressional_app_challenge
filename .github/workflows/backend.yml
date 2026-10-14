@@ -9,7 +9,7 @@ on:
         options: [dev, prod]
         default: dev
       steps:
-        description: Deploy steps, in order (reviewer and reviewer-remove are optional extras)
+        description: Deploy steps, in order (reviewer, reviewer-remove, demo and demo-remove are optional extras)
         type: string
         default: check migrate seed settings auth secrets functions test
   push:
@@ -42,6 +42,7 @@ jobs:
       APPLE_CLIENT_ID: com.courtly.ios
       ADMIN_EMAIL: courtly.support@gmail.com
       REVIEWER_PASSWORD: ${{ secrets.REVIEWER_PASSWORD }}
+      DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: "587"

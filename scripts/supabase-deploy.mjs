@@ -7,10 +7,15 @@
 //   node scripts/supabase-deploy.mjs check migrate seed settings auth secrets functions test
 //
 // Steps run in the order given. Secrets for Edge Functions come from the environment and
-// are only sent when present (see SECRET_NAMES). The optional "reviewer" step creates or
-// updates the App Review account (reviewer@courtly.app) with REVIEWER_PASSWORD, an eight-digit
-// code the reviewer types where the app asks for the email code; "reviewer-remove" deletes it. The "auth" step
-// sets the email code template, SMTP and the sign-in providers when the token allows it.
+// are only sent when present (see SECRET_NAMES). The "auth" step sets the email code template,
+// SMTP and the sign-in providers when the token allows it.
+//
+// Optional extras: "reviewer" creates or updates the App Review account (reviewer@courtly.app)
+// with REVIEWER_PASSWORD, an eight-digit code the reviewer types where the app asks for the email
+// code; "reviewer-remove" deletes it. "demo" rebuilds the demo world (supabase/demo: four demo
+// players with hits between them and, when the reviewer account exists, everything the App Review
+// account is meant to see), then checks it from the reviewer's side; DEMO_PASSWORD, when set, is
+// the demo players' sign-in password. "demo-remove" takes the world and the demo players down.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -66,6 +71,13 @@ async function api(method, route, body, headers = {}) {
 }
 
 const sql = (query) => api("POST", `/projects/${REF}/database/query`, { query });
+
+/** Runs a file under supabase/, after handing it a value through a session setting when asked. */
+async function sqlFile(relative, setting, value = "") {
+  const text = await readFile(path.join(ROOT, relative), "utf8");
+  const prefix = setting ? `select set_config('${setting}', '${value.replace(/'/g, "''")}', false);\n` : "";
+  return sql(prefix + text);
+}
 
 async function sqlFiles(dir) {
   const names = (await readdir(dir)).filter((n) => n.endsWith(".sql")).sort();
@@ -208,47 +220,36 @@ const steps = {
     const password = process.env.REVIEWER_PASSWORD;
     if (!password) { console.log("reviewer REVIEWER_PASSWORD not set, skipped"); return; }
     if (!/^\d{8}$/.test(password)) fail("REVIEWER_PASSWORD must be exactly eight digits; the app enters it as a code");
-    const literal = password.replace(/'/g, "''");
-    await sql(`
-      do $body$
-      declare v_id uuid; v_email text := 'reviewer@courtly.app';
-      begin
-        select id into v_id from auth.users where email = v_email;
-        if v_id is null then
-          v_id := gen_random_uuid();
-          insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data,
-                                  raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change, is_sso_user)
-          values ('00000000-0000-0000-0000-000000000000', v_id, 'authenticated', 'authenticated', v_email,
-                  extensions.crypt('${literal}', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb,
-                  '{}'::jsonb, now(), now(), '', '', '', '', false);
-          insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
-          values (gen_random_uuid(), v_id, v_id::text, jsonb_build_object('sub', v_id::text, 'email', v_email, 'email_verified', true), 'email', now(), now(), now());
-        else
-          update auth.users set encrypted_password = extensions.crypt('${literal}', extensions.gen_salt('bf')), updated_at = now() where id = v_id;
-        end if;
-        update public.profiles set first_name = 'App', last_name = 'Reviewer', birthday = '1990-01-01', level = 'intermediate', formats = '{casual}',
-          zip = '33414', area_label = 'Wellington, FL',
-          home_point = extensions.st_setsrid(extensions.st_makepoint(-80.2416, 26.6618), 4326)::extensions.geography,
-          radius_mi = 15, availability_mask = 2097151, onboarding_completed_at = coalesce(onboarding_completed_at, now()), coach_marks_done = true
-        where id = v_id;
-      end $body$;
-    `);
+    await sqlFile("reviewer/account.sql", "courtly.reviewer_password", password);
     console.log("reviewer reviewer@courtly.app ready (password set, profile onboarded)");
   },
 
-  // After App Review: the account and everything it did go, the way an in-app deletion would.
   async "reviewer-remove"() {
-    await sql(`
-      do $body$
-      declare v_id uuid;
-      begin
-        select id into v_id from auth.users where email = 'reviewer@courtly.app';
-        if v_id is null then return; end if;
-        perform public.internal_delete_account(v_id, 'underage');
-        delete from auth.users where id = v_id;
-      end $body$;
-    `);
+    await sqlFile("reviewer/remove.sql");
     console.log("reviewer account removed");
+  },
+
+  async demo() {
+    for (const name of ["reset.sql", "players.sql", "world.sql", "reviewer.sql"]) {
+      console.log(`demo    ${name}`);
+      await sqlFile(`demo/${name}`, "courtly.demo_password", process.env.DEMO_PASSWORD ?? "");
+    }
+    const [{ reviewer }] = await sql(`select exists (select 1 from auth.users where email = 'reviewer@courtly.app') as reviewer`);
+    if (reviewer) {
+      await sqlFile("tests/demo.sql");
+      console.log("demo    checked from the App Review account's side");
+    } else {
+      console.log("demo    no reviewer account: the four players and their hits are in; run reviewer, then demo again, for the App Review world");
+    }
+    if (!process.env.DEMO_PASSWORD) {
+      console.log("demo    DEMO_PASSWORD not set: a new demo sign-in has a password nobody knows, an existing one keeps its own");
+    }
+  },
+
+  async "demo-remove"() {
+    await sqlFile("demo/reset.sql");
+    await sqlFile("demo/remove.sql");
+    console.log("demo world and players removed");
   },
 
   async test() {

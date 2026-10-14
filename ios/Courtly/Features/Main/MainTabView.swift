@@ -4,11 +4,17 @@ import SwiftUI
 /// and the bar hides while a tab has a screen pushed.
 struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @State private var hits = HitsStore()
-    @State private var inbox = InboxStore()
+    @State private var hits: HitsStore
+    @State private var inbox: InboxStore
     @State private var selected: MainTab = .play
     @State private var paths: [MainTab: [AppRoute]] = [:]
     @State private var isPlanning = false
+
+    /// The stores read and write only the signed-in player's own snapshots.
+    init(account: UUID?) {
+        _hits = State(initialValue: HitsStore(account: account))
+        _inbox = State(initialValue: InboxStore(account: account))
+    }
 
     private var isAtRoot: Bool { (paths[selected] ?? []).isEmpty }
 
@@ -44,6 +50,7 @@ struct MainTabView: View {
         .environment(hits)
         .environment(inbox)
         .task {
+            Task { await inbox.load() }   // the People dot is right from the start, not from the first visit
             await hits.refreshAll()
             await NotificationPermission.registerIfAuthorized()
         }
@@ -51,6 +58,7 @@ struct MainTabView: View {
             if phase == .active {
                 Task { await hits.refreshAll() }
                 Task { await inbox.load() }
+                Task { await API.Devices.retryPending() }   // a push token the server didn't take yet
             }
         }
     }

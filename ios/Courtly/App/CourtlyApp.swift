@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @main
 struct CourtlyApp: App {
@@ -14,8 +15,14 @@ struct CourtlyApp: App {
     }
 }
 
-/// Push token registration. The token is stored server-side so notifications can reach this device.
-final class AppDelegate: NSObject, UIApplicationDelegate {
+/// Push token registration and notification taps. The token is stored server-side so
+/// notifications can reach this device; taps become deep links the tab shell opens.
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
         Task {
@@ -25,5 +32,17 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         // Expected on the simulator. Nothing to do.
+    }
+
+    /// A push arrived while the app is open: show it, and let the lists refresh.
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        await DeepLinkCenter.shared.pushArrived()
+        return [.banner, .list, .sound, .badge]
+    }
+
+    /// The player tapped a notification.
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard let link = DeepLink(userInfo: response.notification.request.content.userInfo) else { return }
+        await DeepLinkCenter.shared.open(link)
     }
 }

@@ -3,12 +3,15 @@ import SwiftUI
 /// The four tabs behind a floating glass tab bar. Each tab keeps its own navigation stack,
 /// and the bar hides while a tab has a screen pushed.
 struct MainTabView: View {
+    @Environment(AppSession.self) private var session
     @Environment(\.scenePhase) private var scenePhase
     @State private var hits = HitsStore()
     @State private var inbox = InboxStore()
+    @State private var deepLinks = DeepLinkCenter.shared
     @State private var selected: MainTab = .play
     @State private var paths: [MainTab: [AppRoute]] = [:]
     @State private var isPlanning = false
+    @State private var coachStep: Int?
 
     private var isAtRoot: Bool { (paths[selected] ?? []).isEmpty }
 
@@ -27,10 +30,21 @@ struct MainTabView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            if isAtRoot && selected == .play && showsPlanPill {
+            if isAtRoot && selected == .play && (showsPlanPill || coachStep == 3) {
                 PlanHitPill { isPlanning = true }
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.35), lineWidth: 4)
+                            .opacity(coachStep == 3 ? 1 : 0)
+                    )
                     .padding(.trailing, 20)
                     .padding(.bottom, 16)
+            }
+        }
+        .overlay {
+            if let coachStep {
+                CoachMarksOverlay(step: coachStep, onNext: advanceCoachMarks)
+                    .zIndex(1)
             }
         }
         .sheet(isPresented: $isPlanning) {
@@ -46,12 +60,77 @@ struct MainTabView: View {
         .task {
             await hits.refreshAll()
             await NotificationPermission.registerIfAuthorized()
+            if let link = deepLinks.pending { await open(link) }
+            startCoachMarksIfNeeded()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await hits.refreshAll() }
                 Task { await inbox.load() }
             }
+        }
+        .onChange(of: deepLinks.pending) { _, link in
+            if let link { Task { await open(link) } }
+        }
+        .onChange(of: deepLinks.lastPushReceivedAt) { _, _ in
+            Task { await hits.refreshAll() }
+            Task { await inbox.load() }
+        }
+    }
+
+    // MARK: - Deep links
+
+    /// Lands on the screen a notification points at, with the data behind it loaded first.
+    @MainActor
+    private func open(_ link: DeepLink) async {
+        deepLinks.pending = nil
+        isPlanning = false
+        coachStep = nil
+        switch link {
+        case .play:
+            await hits.loadFeed()
+            selected = .play
+            paths[.play] = []
+        case let .hit(id), let .check(id, _):
+            selected = .myHits
+            paths[.myHits] = [.hit(id)]
+        case let .request(id):
+            await hits.loadFeed()
+            selected = .play
+            paths[.play] = [.request(id)]
+        case let .chat(id):
+            selected = .people
+            paths[.people] = [.chat(id)]
+        }
+    }
+
+    // MARK: - Coach marks
+
+    private func startCoachMarksIfNeeded() {
+        guard let profile = session.profile, !profile.coachMarksDone, coachStep == nil, deepLinks.pending == nil else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(700))
+            guard coachStep == nil, session.profile?.coachMarksDone == false else { return }
+            withAnimation(.easeInOut(duration: 0.25)) { coachStep = 1 }
+        }
+    }
+
+    private func advanceCoachMarks() {
+        guard let step = coachStep else { return }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            switch step {
+            case 1:
+                selected = .people
+                coachStep = 2
+            case 2:
+                selected = .play
+                coachStep = 3
+            default:
+                coachStep = nil
+            }
+        }
+        if step >= 3 {
+            Task { try? await session.updateProfile(["coach_marks_done": true]) }
         }
     }
 

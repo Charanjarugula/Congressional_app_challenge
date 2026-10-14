@@ -36,11 +36,11 @@ jobs:
       APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
       APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
       APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
-      APNS_BUNDLE_ID: com.courtly.ios
+      APNS_BUNDLE_ID: com.charanjarugula.courtly
       APPLE_SIWA_KEY_ID: ${{ secrets.APNS_KEY_ID }}
       APPLE_SIWA_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
       APPLE_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
-      APPLE_CLIENT_ID: com.courtly.ios
+      APPLE_CLIENT_ID: com.charanjarugula.courtly
       ADMIN_EMAIL: courtly.support@gmail.com
       REVIEWER_PASSWORD: ${{ secrets.REVIEWER_PASSWORD }}
       DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}

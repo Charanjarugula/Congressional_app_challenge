@@ -34,7 +34,7 @@ open ios/Courtly.xcodeproj
 
 Select an iPhone simulator and press Run. Debug builds talk to the `courtly-dev` Supabase project, Release builds to `courtly-prod` (see `ios/Courtly/Config/AppConfig.swift`). The project uses Xcode's synchronized folders, so new files added under `ios/Courtly` are picked up automatically.
 
-To run on a device, choose your team under Signing & Capabilities. The bundle id is `com.courtly.ios`.
+To run on a device, choose your team under Signing & Capabilities. The bundle id is `com.charanjarugula.courtly`.
 
 ## How the app talks to the backend
 

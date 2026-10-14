@@ -258,6 +258,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_CFBundleDisplayName = Courtly;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "We only read free/busy times to skip blocks you can't make. Event details stay private.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Courtly uses your contacts to find friends who already play. Only hashed numbers are sent, never stored.";
@@ -291,6 +292,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_CFBundleDisplayName = Courtly;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "We only read free/busy times to skip blocks you can't make. Event details stay private.";
 				INFOPLIST_KEY_NSContactsUsageDescription = "Courtly uses your contacts to find friends who already play. Only hashed numbers are sent, never stored.";

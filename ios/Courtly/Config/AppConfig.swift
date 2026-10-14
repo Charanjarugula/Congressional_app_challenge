@@ -28,7 +28,7 @@ enum AppConfig {
     static let reviewerEmail = "reviewer@courtly.app"
 
     /// The `site` folder deployed on Vercel. CI's config check fails while this is still the placeholder.
-    static let siteURL = URL(string: "https://courtly.app")!
+    static let siteURL = URL(string: "https://courtly-sage.vercel.app")!
     static var privacyURL: URL { siteURL.appending(path: "privacy") }
     static var termsURL: URL { siteURL.appending(path: "terms") }
     static let supportEmail = "courtly.support@gmail.com"

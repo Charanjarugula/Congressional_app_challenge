@@ -166,12 +166,13 @@ create policy avatars_update_own on storage.objects for update to authenticated
 create policy avatars_delete_own on storage.objects for delete to authenticated
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
--- Realtime: the inbox listens to chats, an open thread to messages and invite cards ------
+-- Realtime: the inbox listens to chats and messages, an open thread to messages and invite cards,
+-- and the Play / My Hits tabs to hits and join requests. Row-level security decides who sees what.
 
 do $$
 declare t text;
 begin
-  foreach t in array array['messages', 'chats', 'hit_invites'] loop
+  foreach t in array array['messages', 'chats', 'hit_invites', 'hits', 'join_requests'] loop
     if not exists (
       select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
     ) then

@@ -3,6 +3,8 @@ import SwiftUI
 /// Temporary shell for the four tabs so onboarding has somewhere to land.
 /// Each tab is replaced by its designed screens in later PRs.
 struct MainTabView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
         TabView {
             PlaceholderTab(
@@ -31,6 +33,11 @@ struct MainTabView: View {
         }
         .tint(CourtlyColor.blue)
         .preferredColorScheme(.light)
+        .task { await NotificationPermission.registerIfAuthorized() }
+        .onChange(of: scenePhase) { _, phase in
+            // A push token the server didn't take (offline, a hiccup) goes again when the app comes back.
+            if phase == .active { Task { await API.Devices.retryPending() } }
+        }
     }
 }
 
@@ -58,41 +65,46 @@ private struct PlaceholderTab: View {
     }
 }
 
-/// Shows what onboarding captured so it can be checked on device, plus a way to run it again.
+/// Shows the saved profile so it can be checked on device, plus a way to run onboarding again.
 private struct YouSummaryView: View {
     @Environment(AppSession.self) private var session
+    @State private var isSigningOut = false
 
     var body: some View {
         NavigationStack {
             List {
                 if let profile = session.profile {
-                    Section("From onboarding") {
+                    Section("Profile") {
                         LabeledContent("Name", value: profile.displayName)
                         LabeledContent("Shown to others as", value: profile.publicName)
-                        LabeledContent("Birthday", value: profile.birthday.formatted(date: .abbreviated, time: .omitted))
-                        LabeledContent("Gender", value: profile.gender.title)
-                        LabeledContent("Level", value: profile.level.title)
+                        LabeledContent("Birthday", value: profile.birthday ?? "—")
+                        LabeledContent("Gender", value: profile.gender?.title ?? "—")
+                        LabeledContent("Level", value: profile.level?.title ?? "—")
                         LabeledContent("What you play", value: profile.formats.map(\.shortTitle).joined(separator: ", "))
                         LabeledContent("Area", value: areaText(profile))
                         LabeledContent("Availability", value: profile.availability.shortDescription)
-                        LabeledContent("Calendar", value: profile.calendar?.detail ?? "Not connected")
-                        LabeledContent("Friends added", value: String(profile.addedPlayerIDs.count))
-                        LabeledContent("Notifications", value: profile.notificationsEnabled ? "On" : "Off")
-                        LabeledContent("Signed in with", value: profile.accountProvider.capitalized)
+                        LabeledContent("Calendar", value: profile.calendarProvider == .none ? "Not connected" : profile.calendarProvider.rawValue.capitalized)
+                        LabeledContent("Hits played", value: String(profile.hitsPlayed))
                     }
                 }
                 Section {
-                    Button("Sign out", role: .destructive) {
-                        session.signOut()
+                    Button(isSigningOut ? "Signing out…" : "Sign out", role: .destructive) {
+                        isSigningOut = true
+                        Task { @MainActor in
+                            await session.signOut()
+                            isSigningOut = false
+                        }
                     }
+                    .disabled(isSigningOut)
                 }
             }
             .navigationTitle("You")
+            .refreshable { await session.refreshProfile() }
         }
     }
 
-    private func areaText(_ profile: LocalProfile) -> String {
-        guard let area = profile.homeArea else { return "Not set" }
-        return "\(area.label) · \(profile.radius.title)"
+    private func areaText(_ profile: Profile) -> String {
+        guard let label = profile.areaLabel else { return "Not set" }
+        return "\(label) · \(profile.radius.title)"
     }
 }

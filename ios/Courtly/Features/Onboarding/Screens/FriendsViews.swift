@@ -44,14 +44,25 @@ struct FriendsIntroView: View {
     }
 }
 
-/// 14 · People to play with. Contacts already on Courtly, then recommendations.
+/// A row on the people list: the player, why they are suggested, and whether we already added them.
+struct PersonSuggestion: Identifiable {
+    let card: PlayerCard
+    let displayName: String     // the address-book name for contacts, otherwise "Priya S."
+    let detail: String
+    var id: UUID { card.id }
+}
+
+/// 14 · People to play with. Contacts already on Courtly, then recommendations. Adds happen immediately.
 struct PeopleToPlayWithView: View {
     @Bindable var draft: OnboardingDraft
     let onContinue: () -> Void
 
-    private var contacts: [SuggestedPlayer] {
-        draft.contactsGranted ? SampleData.contactsOnCourtly : []
-    }
+    @State private var contacts: [PersonSuggestion] = []
+    @State private var recommended: [PersonSuggestion] = []
+    @State private var added: Set<UUID> = []
+    @State private var busy: Set<UUID> = []   // one request per person at a time, so Add then Added can't cross
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
         OnboardingStepView(
@@ -59,47 +70,132 @@ struct PeopleToPlayWithView: View {
             title: "People to play with",
             subtitle: "Add a few now so your first hit is easy to set up."
         ) {
-            if !contacts.isEmpty {
-                HStack(alignment: .firstTextBaseline) {
-                    SectionLabel(title: "From your contacts")
-                    Spacer()
-                    ShareLink(item: "Join me on Courtly, the easiest way to find a tennis partner in Palm Beach County.") {
-                        Text("Invite more")
-                            .font(CourtlyFont.captionSemibold)
-                            .foregroundStyle(CourtlyColor.blue)
+            if isLoading {
+                ProgressView()
+                    .tint(CourtlyColor.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 48)
+            } else {
+                if !contacts.isEmpty {
+                    HStack(alignment: .firstTextBaseline) {
+                        SectionLabel(title: "From your contacts")
+                        Spacer()
+                        inviteLink
                     }
+                    .padding(.top, 24)
+                    .padding(.bottom, 4)
+                    playerList(contacts, style: .tint)
                 }
-                .padding(.top, 24)
-                .padding(.bottom, 4)
-                playerList(contacts, style: .tint)
-            }
 
-            SectionLabel(title: "Recommended for you")
-                .padding(.top, 24)
-                .padding(.bottom, 4)
-            playerList(SampleData.recommended, style: .muted)
+                if !recommended.isEmpty {
+                    SectionLabel(title: "Recommended for you")
+                        .padding(.top, 24)
+                        .padding(.bottom, 4)
+                    playerList(recommended, style: .muted)
+                }
+
+                if contacts.isEmpty && recommended.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(draft.contactsGranted ? "None of your contacts are on Courtly yet." : "No suggestions yet.")
+                            .font(CourtlyFont.bodySemibold)
+                            .foregroundStyle(CourtlyColor.ink)
+                        Text("You can add people from a hit or from People once you’re in.")
+                            .font(CourtlyFont.secondary)
+                            .foregroundStyle(CourtlyColor.secondary)
+                        inviteLink
+                            .padding(.top, 8)
+                    }
+                    .padding(.top, 28)
+                }
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(CourtlyFont.caption)
+                        .foregroundStyle(CourtlyColor.red)
+                        .padding(.top, 12)
+                }
+            }
         } footer: {
             PrimaryButton(title: "Continue", action: onContinue)
         }
+        .task { await load() }
     }
 
-    private func playerList(_ players: [SuggestedPlayer], style: InitialsAvatar.Style) -> some View {
+    private var inviteLink: some View {
+        ShareLink(item: "Join me on Courtly, the easiest way to find a tennis partner in Palm Beach County.") {
+            Text("Invite more")
+                .font(CourtlyFont.captionSemibold)
+                .foregroundStyle(CourtlyColor.blue)
+        }
+    }
+
+    private func playerList(_ people: [PersonSuggestion], style: InitialsAvatar.Style) -> some View {
         VStack(spacing: 0) {
-            ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
+            ForEach(Array(people.enumerated()), id: \.element.id) { index, person in
                 if index > 0 {
                     HairlineSeparator()
                 }
                 PlayerSuggestionRow(
-                    player: player,
+                    name: person.displayName,
+                    detail: person.detail,
+                    initials: person.card.initials,
                     avatarStyle: style,
-                    isAdded: draft.addedPlayerIDs.contains(player.id)
+                    isAdded: added.contains(person.id)
                 ) {
-                    if draft.addedPlayerIDs.contains(player.id) {
-                        draft.addedPlayerIDs.remove(player.id)
-                    } else {
-                        draft.addedPlayerIDs.insert(player.id)
-                    }
+                    toggle(person.card.id)
                 }
+            }
+        }
+    }
+
+    private func load() async {
+        var knownIDs: [UUID] = []
+        if draft.contactsGranted {
+            do {
+                let hashed = try ContactsService().hashedContacts()
+                let byHash = Dictionary(hashed.map { ($0.hash, $0.displayName) }, uniquingKeysWith: { first, _ in first })
+                let matches = try await API.People.matchContacts(hashes: hashed.map(\.hash))
+                var seen = Set<UUID>()
+                contacts = matches.compactMap { match in
+                    guard seen.insert(match.player.id).inserted else { return nil }
+                    return PersonSuggestion(
+                        card: match.player,
+                        displayName: byHash[match.hash] ?? match.player.displayName,
+                        detail: match.player.levelAndArea
+                    )
+                }
+                knownIDs = contacts.map(\.id)
+            } catch {
+                errorMessage = "Couldn’t check your contacts. \(error.localizedDescription)"
+            }
+        }
+        do {
+            let suggestions = try await API.People.suggestions(knownIDs: knownIDs)
+            recommended = suggestions
+                .filter { suggestion in !knownIDs.contains(suggestion.id) }
+                .map { PersonSuggestion(card: $0.card, displayName: $0.card.displayName, detail: $0.reason ?? $0.card.levelAndArea) }
+        } catch {
+            errorMessage = "Couldn’t load suggestions. \(error.localizedDescription)"
+        }
+        isLoading = false
+    }
+
+    private func toggle(_ id: UUID) {
+        guard !busy.contains(id) else { return }
+        busy.insert(id)
+        let wasAdded = added.contains(id)
+        if wasAdded { added.remove(id) } else { added.insert(id) }
+        Task { @MainActor in
+            defer { busy.remove(id) }
+            do {
+                if wasAdded {
+                    try await API.People.removeFriend(id)
+                } else {
+                    _ = try await API.People.addFriend(id)
+                }
+            } catch {
+                if wasAdded { added.insert(id) } else { added.remove(id) }
+                errorMessage = error.localizedDescription
             }
         }
     }
@@ -107,19 +203,21 @@ struct PeopleToPlayWithView: View {
 
 /// 64pt row: avatar, name + level · distance, Add/Added pill.
 struct PlayerSuggestionRow: View {
-    let player: SuggestedPlayer
+    let name: String
+    let detail: String
+    let initials: String
     var avatarStyle: InitialsAvatar.Style = .tint
     let isAdded: Bool
     let onToggle: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
-            InitialsAvatar(initials: player.initials, size: 44, style: avatarStyle)
+            InitialsAvatar(initials: initials, size: 44, style: avatarStyle)
             VStack(alignment: .leading, spacing: 1) {
-                Text(player.fullName)
+                Text(name)
                     .font(CourtlyFont.bodySemibold)
                     .foregroundStyle(CourtlyColor.ink)
-                Text(player.detail)
+                Text(detail)
                     .font(CourtlyFont.caption)
                     .foregroundStyle(CourtlyColor.secondary)
             }

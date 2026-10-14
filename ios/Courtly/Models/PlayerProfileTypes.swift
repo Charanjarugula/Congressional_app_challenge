@@ -1,7 +1,9 @@
 import Foundation
 
 enum Gender: String, CaseIterable, Codable, Identifiable {
-    case man, woman, nonBinary, preferNot
+    case man, woman
+    case nonBinary = "non_binary"
+    case preferNot = "prefer_not"
 
     var id: String { rawValue }
 
@@ -77,7 +79,7 @@ struct HomeArea: Codable, Equatable {
 }
 
 enum CalendarProvider: String, Codable {
-    case apple, google
+    case none, apple, google
 }
 
 struct CalendarConnection: Codable, Equatable {

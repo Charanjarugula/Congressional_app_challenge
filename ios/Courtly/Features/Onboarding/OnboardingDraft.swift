@@ -1,11 +1,9 @@
 import Foundation
 import Observation
 
-/// Everything the onboarding steps collect. One instance lives for the whole flow and is
-/// turned into a `LocalProfile` on the last screen.
+/// Everything the onboarding steps collect. Sent to the backend on the last screen.
 @Observable
 final class OnboardingDraft {
-    var account: AuthAccount?
     var firstName = ""
     var lastName = ""
     var birthday: Date = Calendar.current.date(byAdding: .year, value: -25, to: .now) ?? .now
@@ -18,7 +16,6 @@ final class OnboardingDraft {
     var busyThisWeek = AvailabilityMask()
     var calendar: CalendarConnection?
     var contactsGranted = false
-    var addedPlayerIDs: Set<String> = []
     var notificationsEnabled = false
 
     /// Players must be 13 or older: US law (COPPA) requires parental consent below that.
@@ -37,24 +34,55 @@ final class OnboardingDraft {
         lastName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    func makeProfile() -> LocalProfile {
-        LocalProfile(
-            accountID: account?.id ?? UUID().uuidString,
-            accountEmail: account?.email,
-            accountProvider: account?.provider ?? "unknown",
-            firstName: trimmedFirstName.isEmpty ? "Player" : trimmedFirstName,
-            lastName: trimmedLastName,
-            birthday: birthday,
-            gender: gender ?? .preferNot,
-            level: level ?? .intermediate,
-            formats: PlayFormat.allCases.filter { formats.contains($0) },
-            homeArea: homeArea,
-            radius: radius,
-            availability: availability,
-            busyThisWeek: busyThisWeek,
-            calendar: calendar,
-            addedPlayerIDs: Array(addedPlayerIDs).sorted(),
-            notificationsEnabled: notificationsEnabled
-        )
+    /// Prefill from a profile that was started on another device or before the app was killed.
+    func load(from profile: Profile) {
+        firstName = profile.firstName
+        lastName = profile.lastName
+        if let birthday = profile.birthday, let date = Self.dateFormatter.date(from: birthday) { self.birthday = date }
+        gender = profile.gender
+        level = profile.level
+        formats = Set(profile.formats)
+        homeArea = profile.homeArea
+        radius = profile.radius
+        availability = profile.availability
+        busyThisWeek = profile.busyThisWeek
+        if profile.calendarProvider != .none {
+            calendar = CalendarConnection(provider: profile.calendarProvider, detail: "Synced")
+        }
     }
+
+    /// The `update_profile` patch.
+    func makePatch(accountEmail: String?) -> [String: Any] {
+        var patch: [String: Any] = [
+            "first_name": trimmedFirstName,
+            "last_name": trimmedLastName,
+            "birthday": Self.dateFormatter.string(from: birthday),
+            "formats": PlayFormat.allCases.filter { formats.contains($0) }.map(\.rawValue),
+            "radius_mi": radius.rawValue,
+            "availability_mask": Int(availability.rawValue),
+            "busy_mask_week": Int(busyThisWeek.rawValue),
+            "calendar_provider": (calendar?.provider ?? CalendarProvider.none).rawValue,
+        ]
+        if let gender { patch["gender"] = gender.rawValue }
+        if let level { patch["level"] = level.rawValue }
+        if let homeArea {
+            patch["area_label"] = homeArea.label
+            patch["home_lat"] = homeArea.latitude
+            patch["home_lng"] = homeArea.longitude
+            if let zip = homeArea.zip { patch["zip"] = zip }
+        }
+        if let accountEmail, !accountEmail.isEmpty {
+            patch["email_hash"] = ContactsService.hash(accountEmail.lowercased())
+        }
+        return patch
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }

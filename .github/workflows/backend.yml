@@ -1,0 +1,59 @@
+name: Backend deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which project to deploy to
+        type: choice
+        options: [dev, prod]
+        default: dev
+      steps:
+        description: Deploy steps, in order
+        type: string
+        default: check migrate seed settings functions test
+      access_token:
+        description: Supabase access token (only if the SUPABASE_ACCESS_TOKEN secret is not set)
+        type: string
+        required: false
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - "scripts/supabase-deploy.mjs"
+      - ".github/workflows/backend.yml"
+
+concurrency:
+  group: backend-${{ inputs.target || 'prod' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.target || 'prod' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ inputs.access_token || secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ (inputs.target == 'dev') && 'letuvtazmtjkvivattfy' || 'jrlocgfyskutnusscenf' }}
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+      APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+      APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+      APNS_BUNDLE_ID: com.courtly.ios
+      APPLE_SIWA_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+      APPLE_SIWA_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+      APPLE_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+      APPLE_CLIENT_ID: com.courtly.ios
+      ADMIN_EMAIL: courtly.support@gmail.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mask token
+        run: echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Deploy
+        run: node scripts/supabase-deploy.mjs ${{ inputs.steps || 'check migrate seed settings functions' }}

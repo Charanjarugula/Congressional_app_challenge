@@ -33,6 +33,7 @@ enum BackendMessages {
         case "account_suspended": "This account has been suspended."
         case "account_deleted": "This account was deleted."
         case "too_many_hashes": "That’s more contacts than we can check at once."
+        case "invalid_phone": "Enter a US number with its area code."
         default: code.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }

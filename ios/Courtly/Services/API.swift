@@ -230,8 +230,10 @@ enum API {
             set { UserDefaults.standard.set(newValue, forKey: pendingKey) }
         }
 
-        /// A failure keeps the token for `retryPending` instead of losing this device's pushes.
+        /// The newest token is the one to keep trying: it is noted before it is sent, a failure leaves it for
+        /// `retryPending`, and a success clears it only when no newer token has arrived in the meantime.
         static func register(token: String, environment: String) async {
+            pendingToken = token
             do {
                 try await client.rpc("register_device", params: [
                     "p_token": token,
@@ -239,9 +241,8 @@ enum API {
                     "p_app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0",
                 ])
                 storedToken = token
-                pendingToken = nil
+                if pendingToken == token { pendingToken = nil }
             } catch {
-                pendingToken = token
                 #if DEBUG
                 print("register_device failed: \(error.localizedDescription)")
                 #endif

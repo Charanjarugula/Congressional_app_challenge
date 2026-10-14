@@ -102,13 +102,26 @@ const steps = {
         name text primary key,
         applied_at timestamptz not null default now()
       );
+      alter table private.app_migrations add column if not exists sha256 text;
     `);
-    const applied = new Set((await sql(`select name from private.app_migrations`)).map((r) => r.name));
+    // A recorded file must still read exactly as it did when it ran: migrations are append-only, and a
+    // change edited into an applied file would never reach the project. Files recorded before hashes
+    // were kept get theirs noted on the first run.
+    const applied = new Map((await sql(`select name, sha256 from private.app_migrations`)).map((r) => [r.name, r.sha256]));
     for (const file of await sqlFiles(path.join(ROOT, "migrations"))) {
-      if (applied.has(file.name)) { console.log(`skip    ${file.name}`); continue; }
-      console.log(`apply   ${file.name}`);
+      const digest = crypto.createHash("sha256").update(file.text.replace(/\r\n/g, "\n")).digest("hex");
       const literal = file.name.replace(/'/g, "''");
-      await sql(`${file.text}\n\ninsert into private.app_migrations (name) values ('${literal}');`);
+      if (applied.has(file.name)) {
+        const recorded = applied.get(file.name);
+        if (recorded && recorded !== digest) {
+          fail(`${file.name} is recorded as applied but its contents have changed; put the change in a new migration file`);
+        }
+        if (!recorded) await sql(`update private.app_migrations set sha256 = '${digest}' where name = '${literal}'`);
+        console.log(`skip    ${file.name}${recorded ? "" : " (hash noted)"}`);
+        continue;
+      }
+      console.log(`apply   ${file.name}`);
+      await sql(`${file.text}\n\ninsert into private.app_migrations (name, sha256) values ('${literal}', '${digest}');`);
     }
   },
 

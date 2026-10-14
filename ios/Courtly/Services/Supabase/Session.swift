@@ -7,6 +7,8 @@ struct Session: Codable, Equatable {
     var expiresAt: Date
     var userID: UUID
     var email: String?
+    /// "apple", "google" or "email"; shown on the Account screen.
+    var provider: String?
 
     var needsRefresh: Bool {
         expiresAt.timeIntervalSinceNow < 60
@@ -25,13 +27,14 @@ struct TokenResponse: Decodable {
     let expiresIn: Double
     let user: User
 
-    var session: Session {
+    func session(provider: String?) -> Session {
         Session(
             accessToken: accessToken,
             refreshToken: refreshToken,
             expiresAt: Date(timeIntervalSinceNow: expiresIn),
             userID: user.id,
-            email: user.email
+            email: user.email,
+            provider: provider
         )
     }
 }

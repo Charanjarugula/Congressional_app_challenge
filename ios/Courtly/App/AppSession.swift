@@ -68,6 +68,28 @@ final class AppSession {
         apply(me)
     }
 
+    /// Saves part of the profile (`update_profile` only touches the keys in the patch).
+    @MainActor
+    func updateProfile(_ patch: [String: Any]) async throws {
+        let me = try await API.Profile.update(patch)
+        profile = me
+        ProfileCache.save(me)
+    }
+
+    /// The server removes hits, chats, photos and the sign-in; then the device forgets everything.
+    @MainActor
+    func deleteAccount() async throws {
+        struct Receipt: Decodable {
+            let deleted: Bool?
+        }
+        let _: Receipt = try await client.invoke("delete-account", body: ["mode": "full"])
+        await signOut()
+    }
+
+    func currentSession() async -> Session? {
+        await client.session
+    }
+
     @MainActor
     func refreshProfile() async {
         if let me = try? await API.Profile.me() {

@@ -59,7 +59,7 @@ actor SupabaseClient {
     func signIn(provider: String, idToken: String, nonce: String?) async throws -> Session {
         var body: [String: Any] = ["provider": provider, "id_token": idToken]
         if let nonce { body["nonce"] = nonce }
-        return try await tokenGrant(path: "/auth/v1/token?grant_type=id_token", body: body)
+        return try await tokenGrant(path: "/auth/v1/token?grant_type=id_token", body: body, provider: provider)
     }
 
     func sendEmailCode(email: String) async throws {
@@ -67,11 +67,11 @@ actor SupabaseClient {
     }
 
     func verifyEmailCode(email: String, code: String) async throws -> Session {
-        try await tokenGrant(path: "/auth/v1/verify", body: ["type": "email", "email": email, "token": code])
+        try await tokenGrant(path: "/auth/v1/verify", body: ["type": "email", "email": email, "token": code], provider: "email")
     }
 
     func signInWithPassword(email: String, password: String) async throws -> Session {
-        try await tokenGrant(path: "/auth/v1/token?grant_type=password", body: ["email": email, "password": password])
+        try await tokenGrant(path: "/auth/v1/token?grant_type=password", body: ["email": email, "password": password], provider: "email")
     }
 
     func signOut() async {
@@ -89,7 +89,7 @@ actor SupabaseClient {
         let task = Task<Session, Error> {
             defer { refreshTask = nil }
             do {
-                return try await tokenGrant(path: "/auth/v1/token?grant_type=refresh_token", body: ["refresh_token": current.refreshToken])
+                return try await tokenGrant(path: "/auth/v1/token?grant_type=refresh_token", body: ["refresh_token": current.refreshToken], provider: current.provider)
             } catch let error as SupabaseError {
                 if case let .http(status, _) = error, status == 400 || status == 401 {
                     session = nil
@@ -102,7 +102,7 @@ actor SupabaseClient {
         return try await task.value
     }
 
-    private func tokenGrant(path: String, body: [String: Any]) async throws -> Session {
+    private func tokenGrant(path: String, body: [String: Any], provider: String?) async throws -> Session {
         let data = try await request(path, method: "POST", body: body, authorized: false)
         let token: TokenResponse
         do {
@@ -110,8 +110,9 @@ actor SupabaseClient {
         } catch {
             throw SupabaseError.decoding(String(describing: error))
         }
-        session = token.session
-        return token.session
+        let fresh = token.session(provider: provider)
+        session = fresh
+        return fresh
     }
 
     // MARK: - Database functions

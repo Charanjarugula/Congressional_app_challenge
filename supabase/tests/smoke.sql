@@ -340,6 +340,12 @@ begin
   if (public.chat_json((v_group->>'id')::uuid, b)->>'member_count')::int <> 2 then raise exception 'leave_chat member count'; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
 
+  -- Suspension closes the player's future hits the way a host cancel does, and lifting it leaves them closed.
+  perform private.suspend_user(c, true);
+  if exists (select 1 from public.hits where host_id = c and starts_at > now() and status <> 'cancelled') then raise exception 'suspension left a hit open'; end if;
+  perform private.suspend_user(c, false);
+  if (select suspended_at from public.profiles where id = c) is not null then raise exception 'suspension not lifted'; end if;
+
   -- Signing in with Apple again replaces the stored refresh token instead of colliding on the vault name.
   perform public.internal_store_apple_token(c, 'apple-refresh-1');
   perform public.internal_store_apple_token(c, 'apple-refresh-2');

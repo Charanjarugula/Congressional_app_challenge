@@ -400,27 +400,36 @@ begin
   return public.hit_json(p_hit, v_user);
 end $$;
 
+-- Closes a hit: pending requests and open invites are cancelled and every player is told why.
+-- The host's own cancel, a suspension and an account deletion all come through here.
+create or replace function public.close_hit(p_hit uuid, p_note text default '', p_actor uuid default null) returns void
+language plpgsql security definer set search_path = public as $$
+declare h public.hits; p record;
+begin
+  select * into h from public.hits where id = p_hit;
+  if not found or h.status not in ('open', 'confirmed') then return; end if;
+  update public.hits set status = 'cancelled', cancelled_at = now() where id = p_hit;
+  update public.join_requests set status = 'cancelled', responded_at = now() where hit_id = p_hit and status = 'pending';
+  update public.hit_invites set status = 'cancelled' where hit_id = p_hit and status = 'open';
+  for p in select user_id from public.hit_players where hit_id = p_hit and role = 'player' and left_at is null loop
+    perform public.notify(p.user_id, 'hit_cancelled', 'Courtly',
+      public.hit_push_label(p_hit) || ' is off.' || case when coalesce(p_note, '') = '' then '' else ' ' || p_note end,
+      'courtly://play', 'hit-' || p_hit, jsonb_build_object('hit_id', p_hit));
+  end loop;
+  if p_actor is not null and h.chat_id is not null then
+    perform public.system_message(h.chat_id, public.display_name(p_actor) || ' cancelled the hit',
+      jsonb_build_object('event', 'hit_cancelled', 'actor', p_actor));
+  end if;
+end $$;
+
 create or replace function public.cancel_hit(p_hit uuid) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare v_user uuid := public.assert_onboarded(); h public.hits; p record;
+declare v_user uuid := public.assert_onboarded(); h public.hits;
 begin
   select * into h from public.hits where id = p_hit for update;
   if not found or h.host_id <> v_user then raise exception 'not_host'; end if;
   if h.status not in ('open', 'confirmed') then raise exception 'hit_closed'; end if;
-
-  update public.hits set status = 'cancelled', cancelled_at = now() where id = p_hit;
-  update public.join_requests set status = 'cancelled', responded_at = now() where hit_id = p_hit and status = 'pending';
-  update public.hit_invites set status = 'cancelled' where hit_id = p_hit and status = 'open';
-
-  for p in select user_id from public.hit_players where hit_id = p_hit and role = 'player' and left_at is null loop
-    perform public.notify(p.user_id, 'hit_cancelled', 'Courtly',
-      public.hit_push_label(p_hit) || ' is off. ' || public.display_name(v_user) || ' cancelled.',
-      'courtly://play', 'hit-' || p_hit, jsonb_build_object('hit_id', p_hit));
-  end loop;
-  if h.chat_id is not null then
-    perform public.system_message(h.chat_id, public.display_name(v_user) || ' cancelled the hit',
-      jsonb_build_object('event', 'hit_cancelled', 'actor', v_user));
-  end if;
+  perform public.close_hit(p_hit, public.display_name(v_user) || ' cancelled.', v_user);
   return public.hit_json(p_hit, v_user);
 end $$;
 

@@ -133,12 +133,7 @@ begin
   update public.profiles set suspended_at = case when p_suspend then now() else null end where id = p_user;
   if p_suspend then
     for r in select id from public.hits where host_id = p_user and status in ('open', 'confirmed') and starts_at > now() loop
-      update public.hits set status = 'cancelled', cancelled_at = now() where id = r.id;
-      update public.join_requests set status = 'cancelled', responded_at = now() where hit_id = r.id and status = 'pending';
-      update public.hit_invites set status = 'cancelled' where hit_id = r.id and status = 'open';
-      perform public.notify(hp.user_id, 'hit_cancelled', 'Courtly', public.hit_push_label(r.id) || ' is off.',
-        'courtly://play', 'hit-' || r.id, jsonb_build_object('hit_id', r.id))
-      from public.hit_players hp where hp.hit_id = r.id and hp.role = 'player' and hp.left_at is null;
+      perform public.close_hit(r.id);
     end loop;
     delete from public.device_tokens where user_id = p_user;
   end if;
@@ -210,12 +205,7 @@ begin
 
   -- Future hits I host are cancelled; future hits I joined are left.
   for r in select id from public.hits where host_id = p_user and status in ('open', 'confirmed') and starts_at > now() loop
-    update public.hits set status = 'cancelled', cancelled_at = now() where id = r.id;
-    update public.join_requests set status = 'cancelled', responded_at = now() where hit_id = r.id and status = 'pending';
-    update public.hit_invites set status = 'cancelled' where hit_id = r.id and status = 'open';
-    perform public.notify(hp.user_id, 'hit_cancelled', 'Courtly', public.hit_push_label(r.id) || ' is off. The host left Courtly.',
-      'courtly://play', 'hit-' || r.id, jsonb_build_object('hit_id', r.id))
-    from public.hit_players hp where hp.hit_id = r.id and hp.role = 'player' and hp.left_at is null;
+    perform public.close_hit(r.id, 'The host left Courtly.');
   end loop;
   for r in select h.id, h.host_id, h.chat_id from public.hits h join public.hit_players hp on hp.hit_id = h.id
            where hp.user_id = p_user and hp.role = 'player' and hp.left_at is null and h.status in ('open', 'confirmed') and h.starts_at > now() loop

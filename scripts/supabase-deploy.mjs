@@ -8,8 +8,8 @@
 //
 // Steps run in the order given. Secrets for Edge Functions come from the environment and
 // are only sent when present (see SECRET_NAMES). The optional "reviewer" step creates or
-// updates the App Review account (reviewer@courtly.app) with REVIEWER_PASSWORD, a six- to
-// eight-digit code the reviewer types where the app asks for the email code. The "auth" step
+// updates the App Review account (reviewer@courtly.app) with REVIEWER_PASSWORD, an eight-digit
+// code the reviewer types where the app asks for the email code; "reviewer-remove" deletes it. The "auth" step
 // sets the email code template, SMTP and the sign-in providers when the token allows it.
 
 import { readdir, readFile } from "node:fs/promises";
@@ -207,7 +207,7 @@ const steps = {
   async reviewer() {
     const password = process.env.REVIEWER_PASSWORD;
     if (!password) { console.log("reviewer REVIEWER_PASSWORD not set, skipped"); return; }
-    if (!/^\d{6,8}$/.test(password)) fail("REVIEWER_PASSWORD must be six to eight digits; the app enters it as a code");
+    if (!/^\d{8}$/.test(password)) fail("REVIEWER_PASSWORD must be exactly eight digits; the app enters it as a code");
     const literal = password.replace(/'/g, "''");
     await sql(`
       do $body$
@@ -234,6 +234,21 @@ const steps = {
       end $body$;
     `);
     console.log("reviewer reviewer@courtly.app ready (password set, profile onboarded)");
+  },
+
+  // After App Review: the account and everything it did go, the way an in-app deletion would.
+  async "reviewer-remove"() {
+    await sql(`
+      do $body$
+      declare v_id uuid;
+      begin
+        select id into v_id from auth.users where email = 'reviewer@courtly.app';
+        if v_id is null then return; end if;
+        perform public.internal_delete_account(v_id, 'underage');
+        delete from auth.users where id = v_id;
+      end $body$;
+    `);
+    console.log("reviewer account removed");
   },
 
   async test() {

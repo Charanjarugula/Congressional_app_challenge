@@ -251,7 +251,11 @@ struct AreaSheet: View {
             zip = profile.zip ?? ""
             radius = profile.radius
         }
-        .onChange(of: zip) { _, newValue in lookUp(newValue) }
+        .onChange(of: zip) { _, newValue in
+            let digits = String(newValue.filter(\.isNumber).prefix(5))
+            if digits != newValue { zip = digits; return }   // a ZIP is five digits, nothing else gets in
+            lookUp(digits)
+        }
         .errorAlert($errorMessage)
     }
 

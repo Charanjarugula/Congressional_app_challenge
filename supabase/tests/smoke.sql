@@ -565,6 +565,18 @@ begin
   if (public.add_friend(c)->>'relationship') <> 'friend' then raise exception 'jordan and alex not friends again'; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
 
+  -- Every writer has a daily limit; the twenty-first group of the day is refused.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  insert into public.rate_limits (user_id, action, window_start, count) values (b, 'create_group_chat', date_trunc('day', now()), 20)
+  on conflict (user_id, action, window_start) do update set count = 20;
+  begin
+    perform public.create_group_chat('One too many', array[c]);
+    raise exception 'the daily group limit did not hold';
+  exception when others then
+    if sqlerrm <> 'rate_limited' then raise; end if;
+  end;
+  delete from public.rate_limits where user_id = b and action = 'create_group_chat';
+
   -- The daily purge drops reports older than 90 days (their moderator notices go too) and stale rate-limit rows;
   -- the push sweep sends what the webhook didn't deliver to the stored function URL.
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);

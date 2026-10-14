@@ -53,18 +53,53 @@ echo "coverage every function ran"
 # then removed, so those scripts are proven against the current schema as well. The settings stand
 # in for the passwords the deploy step passes.
 apply() { { echo "select set_config('$1', '$2', false);"; prep "$3"; } | psql -v ON_ERROR_STOP=1 -q -o /dev/null; }
+run_sql() { prep "$ROOT/$1.sql" | psql -v ON_ERROR_STOP=1 -q -o /dev/null || { echo "FAILED: $1.sql"; exit 1; }; }
+build_demo() {
+  for f in "$@"; do apply courtly.demo_password demo-local "$ROOT/demo/$f.sql" || { echo "FAILED: demo/$f.sql"; exit 1; }; done
+  run_sql tests/demo
+}
 echo "reviewer reviewer/account.sql"
 apply courtly.reviewer_password 12345678 "$ROOT/reviewer/account.sql" || { echo "FAILED: reviewer/account.sql"; exit 1; }
-for round in 1 2; do
-  for f in reset players world reviewer; do
-    apply courtly.demo_password demo-local "$ROOT/demo/$f.sql" || { echo "FAILED: demo/$f.sql (round $round)"; exit 1; }
-  done
-  prep "$ROOT/tests/demo.sql" | psql -v ON_ERROR_STOP=1 -q -o /dev/null || { echo "FAILED: tests/demo.sql (round $round)"; exit 1; }
-done
+build_demo reset players world reviewer
+build_demo reset players world reviewer
 echo "demo    built twice, checked from the reviewer's side"
-for f in demo/reset demo/remove reviewer/remove; do
-  prep "$ROOT/$f.sql" | psql -v ON_ERROR_STOP=1 -q -o /dev/null || { echo "FAILED: $f.sql"; exit 1; }
-done
+
+# A demo player holding a seat in someone else's hit: the reset gives the seat back, under a lock, and
+# only once. Sam, who is not part of the demo, hosts; Ana joins; the reset runs; Sam's hit is open again.
+psql -v ON_ERROR_STOP=1 -q <<'SQL'
+do $$
+declare v_sam uuid := '00000000-0000-4000-8000-00000000005a'; v_ana uuid; v_court uuid; v_hit jsonb; v_req jsonb;
+begin
+  insert into public.profiles (id, first_name, last_name, birthday, level, formats, zip, area_label, home_point, onboarding_completed_at)
+  values (v_sam, 'Sam', 'Host', '1991-01-01', 'intermediate', '{casual}', '33414', 'Wellington, FL', extensions.st_setsrid(extensions.st_makepoint(-80.2414, 26.6618), 4326), now());
+  select id into v_ana from auth.users where email = 'demo.ana@courtly.app';
+  select id into v_court from public.courts where name = 'Wellington Tennis Center';
+  perform set_config('request.jwt.claims', json_build_object('sub', v_sam, 'role', 'authenticated')::text, true);
+  v_hit := public.create_hit(v_court, now() + interval '4 days', 60, 'casual', 1, 'anyone');
+  perform set_config('request.jwt.claims', json_build_object('sub', v_ana, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join((v_hit->>'id')::uuid);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_sam, 'role', 'authenticated')::text, true);
+  perform public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+end $$;
+SQL
+run_sql demo/reset
+seat=$(psql -At -c "select status || '/' || spots_open || '/' || (select count(*) from public.hit_players hp where hp.hit_id = h.id and hp.role = 'player' and hp.left_at is null) from public.hits h where host_id = '00000000-0000-4000-8000-00000000005a'")
+[ "$seat" = "open/1/0" ] || { echo "reset left Sam's hit at $seat (wanted open/1/0)"; exit 1; }
+psql -v ON_ERROR_STOP=1 -qc "delete from public.chats where hit_id in (select id from public.hits where host_id = '00000000-0000-4000-8000-00000000005a'); delete from public.hits where host_id = '00000000-0000-4000-8000-00000000005a'; delete from public.profiles where id = '00000000-0000-4000-8000-00000000005a';"
+echo "demo    reset gives back a seat held in someone else's hit"
+
+# Removing the review account on its own, with the world still up, gives back the seat it held in Ana's
+# one-seat hit and leaves nothing of the account.
+build_demo players world reviewer
+run_sql reviewer/remove
+seat=$(psql -At -c "select h.status || '/' || h.spots_open from public.hits h join public.profiles p on p.id = h.host_id where p.first_name = 'Ana' and h.status <> 'cancelled' order by h.starts_at limit 1")
+[ "$seat" = "open/1" ] || { echo "reviewer removal left Ana's hit at $seat (wanted open/1)"; exit 1; }
+left=$(psql -At -c "select (select count(*) from auth.users where email = 'reviewer@courtly.app') + (select count(*) from public.profiles where first_name = 'App')")
+[ "$left" = "0" ] || { echo "reviewer removal left $left rows of the account"; exit 1; }
+echo "reviewer removed on its own; the seat it held is open again"
+
+run_sql demo/reset
+run_sql demo/remove
 left=$(psql -At -c "select (select count(*) from public.profiles) + (select count(*) from public.hits) + (select count(*) from public.chats) + (select count(*) from public.messages) + (select count(*) from public.notifications) + (select count(*) from auth.users)")
 if [ "$left" != "0" ]; then echo "demo removal left $left rows behind"; exit 1; fi
 echo "demo    removed without a trace"

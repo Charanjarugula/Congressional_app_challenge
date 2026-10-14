@@ -15,7 +15,7 @@ enum AppConfig {
     static let apnsEnvironment = "production"
     #endif
 
-    static let bundleID = "com.courtly.ios"
+    static let bundleID = "com.charanjarugula.courtly"
 
     /// Google OAuth iOS client id from the Courtly Google Cloud project. Public, like the bundle id.
     /// Leave it empty to hide Google behind the "not set up yet" message.

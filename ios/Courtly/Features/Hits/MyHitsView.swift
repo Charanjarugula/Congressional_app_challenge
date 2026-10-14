@@ -34,7 +34,7 @@ struct MyHitsView: View {
     private var content: some View {
         let list = segment == 0 ? (hits.myHits?.upcoming ?? []) : (hits.myHits?.past ?? [])
         if list.isEmpty {
-            if hits.myHits == nil && hits.isLoadingMyHits {
+            if hits.myHits == nil {
                 ProgressView()
                     .frame(maxWidth: .infinity)
                     .padding(.top, 80)

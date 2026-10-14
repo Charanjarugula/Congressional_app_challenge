@@ -108,12 +108,12 @@ struct PeopleView: View {
                     .buttonStyle(.plain)
                 }
             }
-        } else if inbox.isLoading {
+        } else if let error = inbox.lastError, !inbox.isLoading {
+            QuietCard(title: "Couldn’t load chats", detail: error)
+        } else {
             ProgressView()
                 .frame(maxWidth: .infinity)
                 .padding(.top, 80)
-        } else {
-            QuietCard(title: "Couldn’t load chats", detail: inbox.lastError ?? "Pull down to try again.")
         }
     }
 

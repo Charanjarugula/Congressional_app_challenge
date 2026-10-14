@@ -37,13 +37,13 @@ jobs:
             -sdk iphonesimulator \
             -destination "generic/platform=iOS Simulator" \
             -configuration ${{ matrix.configuration }} \
-            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
+            SYMROOT="$PWD/build" \
             | tee build.log | grep -E "^(\*\*|error:|warning:|.*: error:|.*: warning:|BUILD)" || true
           grep -q "BUILD SUCCEEDED" build.log
 
       - name: Privacy manifest is bundled
-        run: test -f "build/Build/Products/${{ matrix.configuration }}-iphonesimulator/Courtly.app/PrivacyInfo.xcprivacy"
+        run: test -f "build/${{ matrix.configuration }}-iphonesimulator/Courtly.app/PrivacyInfo.xcprivacy"
 
       - name: Show errors
         if: failure()

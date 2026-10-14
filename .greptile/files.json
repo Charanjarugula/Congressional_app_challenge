@@ -1,0 +1,12 @@
+{
+  "files": [
+    {
+      "path": "README.md",
+      "description": "Repository layout, how the app talks to the backend, deploy workflow and secrets."
+    },
+    {
+      "path": ".github/pull_request_template.md",
+      "description": "Required pull request sections."
+    }
+  ]
+}

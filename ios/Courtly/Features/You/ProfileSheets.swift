@@ -35,6 +35,7 @@ struct SheetScaffold<Content: View>: View {
                     Button("Cancel") { dismiss() }
                         .font(CourtlyFont.body)
                         .foregroundStyle(CourtlyColor.blue)
+                        .disabled(isSaving)   // a save already under way lands either way, so the sheet stays until it finishes
                     Spacer()
                 }
             }
@@ -435,6 +436,7 @@ struct EditProfileSheet: View {
                     Button("Cancel") { dismiss() }
                         .font(CourtlyFont.body)
                         .foregroundStyle(CourtlyColor.blue)
+                        .disabled(isSaving)
                     Spacer()
                     Button(isSaving ? "Saving…" : "Save", action: save)
                         .font(CourtlyFont.bodySemibold)

@@ -185,13 +185,14 @@ struct MainTabView: View {
 
     // MARK: - Coach marks
 
-    /// Remembered on the device as well, so tips finished offline stay finished; the server hears next time.
-    static let coachMarksDoneKey = "coach_marks_done_local"
+    /// Remembered on the device as well, under the player's own account, so tips finished offline stay
+    /// finished for that player and no one else; the server hears next time.
+    static func coachMarksDoneKey(for account: UUID) -> String { "coach_marks_done_local.\(account.uuidString)" }
 
     /// Only over the Play root: a pushed screen or another tab is not where the tips point.
     private func startCoachMarksIfNeeded() {
         guard let profile = session.profile, !profile.coachMarksDone, coachStep == nil else { return }
-        if UserDefaults.standard.bool(forKey: Self.coachMarksDoneKey) {
+        if UserDefaults.standard.bool(forKey: Self.coachMarksDoneKey(for: profile.id)) {
             Task { try? await session.updateProfile(["coach_marks_done": true]) }   // finished before; the save hadn't landed
             return
         }
@@ -217,7 +218,7 @@ struct MainTabView: View {
             }
         }
         if step >= 3 {
-            UserDefaults.standard.set(true, forKey: Self.coachMarksDoneKey)
+            if let account = session.profile?.id { UserDefaults.standard.set(true, forKey: Self.coachMarksDoneKey(for: account)) }
             Task { try? await session.updateProfile(["coach_marks_done": true]) }
         }
     }

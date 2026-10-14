@@ -153,7 +153,6 @@ final class AppSession {
         ProfileCache.save(nil)
         SnapshotCache.clear()
         DeepLinkCenter.shared.pending = nil
-        UserDefaults.standard.removeObject(forKey: MainTabView.coachMarksDoneKey)   // the next player gets the tips
         try? await UNUserNotificationCenter.current().setBadgeCount(0)
         stage = .onboarding(resume: false)
     }

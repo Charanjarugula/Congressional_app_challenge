@@ -24,6 +24,7 @@ final class AppSession {
     private let client = SupabaseClient.shared
 
     private var sessionLostObserver: NSObjectProtocol?
+    private var draftSaveTask: Task<Void, Never>?
 
     init() {
         profile = ProfileCache.load()
@@ -48,17 +49,30 @@ final class AppSession {
         } catch SupabaseError.notSignedIn {
             await signOut()
         } catch SupabaseError.http(status: 401, message: _) {
-            await signOut()
+            // The token is stale before its clock says so, or the gateway said no. One refresh decides:
+            // a session the server still honors carries on; one it rejects ends here.
+            if (try? await client.refreshNow()) != nil, let me = try? await API.Profile.me() {
+                apply(me)
+            } else if await client.session == nil {
+                await signOut()
+            } else {
+                keepWhatTheDeviceHas()
+            }
         } catch let SupabaseError.backend(code) where ["account_suspended", "account_deleted", "no_profile"].contains(code) {
             await signOut()
             alert = AppAlert(title: "Signed out", message: BackendMessages.text(for: code))
         } catch {
-            // Offline or backend hiccup: keep going with what the device has.
-            if let cached = profile, cached.isOnboarded {
-                stage = .main
-            } else {
-                stage = .onboarding(resume: profile != nil)
-            }
+            keepWhatTheDeviceHas()
+        }
+    }
+
+    /// Offline or a backend hiccup: carry on with the cached profile.
+    @MainActor
+    private func keepWhatTheDeviceHas() {
+        if let cached = profile, cached.isOnboarded {
+            stage = .main
+        } else {
+            stage = .onboarding(resume: profile != nil)
         }
     }
 
@@ -76,15 +90,22 @@ final class AppSession {
 
     @MainActor
     func completeOnboarding(with draft: OnboardingDraft) async throws {
+        await draftSaveTask?.value   // earlier step saves land first, so none can overwrite the final answers
         _ = try await API.Profile.update(draft.makePatch())
         let me = try await API.Profile.completeOnboarding()
         apply(me)
     }
 
     /// Saves what onboarding has collected so far, so a player who quits picks up where they left off.
+    /// Saves run one after another, in the order the steps were answered.
+    @MainActor
     func saveDraft(_ draft: OnboardingDraft) {
         let patch = draft.makePatch()
-        Task { _ = try? await API.Profile.update(patch) }
+        let previous = draftSaveTask
+        draftSaveTask = Task {
+            await previous?.value
+            _ = try? await API.Profile.update(patch)
+        }
     }
 
     /// Saves part of the profile (`update_profile` only touches the keys in the patch).

@@ -34,7 +34,7 @@ struct MyHitsView: View {
     private var content: some View {
         let list = segment == 0 ? (hits.myHits?.upcoming ?? []) : (hits.myHits?.past ?? [])
         if list.isEmpty {
-            if hits.myHits == nil, let error = hits.lastError, !hits.isLoadingMyHits {
+            if hits.myHits == nil, let error = hits.myHitsError, !hits.isLoadingMyHits {
                 QuietCard(title: "Couldn’t load your hits", detail: error)
             } else if hits.myHits == nil {
                 ProgressView()

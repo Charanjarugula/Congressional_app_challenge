@@ -83,9 +83,10 @@ struct ChatThreadView: View {
             subscription = RealtimeHub.shared.subscribe(table: "messages", filter: "chat_id=eq.\(chatID.uuidString.lowercased())") {
                 Task { await refresh() }
             }
-            // Polling is the fallback: quick while Realtime is down, slow once it delivers.
+            // Polling is the fallback: quick until this chat's channel is delivering, slow after.
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(RealtimeHub.shared.isConnected ? 20 : 5))
+                let live = subscription.map { RealtimeHub.shared.isDelivering($0) } ?? false
+                try? await Task.sleep(for: .seconds(live ? 20 : 5))
                 guard !Task.isCancelled else { break }
                 await refresh()
             }

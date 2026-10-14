@@ -10,7 +10,12 @@ final class HitsStore {
     private(set) var myHits: MyHits?
     private(set) var isLoadingFeed = false
     private(set) var isLoadingMyHits = false
-    private(set) var lastError: String?
+    /// Why the last feed load failed, if it did; nil once one succeeds.
+    private(set) var feedError: String?
+    /// Why the last My Hits load failed, if it did.
+    private(set) var myHitsError: String?
+    /// The feed's error, which the Play tab shows.
+    var lastError: String? { feedError }
     /// Bumped after every successful load so open screens can re-fetch their own copy.
     private(set) var lastRefreshedAt: Date?
 
@@ -18,7 +23,7 @@ final class HitsStore {
     // never puts the list back the way it was.
     private var feedGeneration = 0
     private var myHitsGeneration = 0
-    private var refreshInFlight = false
+    private var refreshTask: Task<Void, Never>?
     private var refreshQueued = false
 
     init() {
@@ -38,12 +43,12 @@ final class HitsStore {
             let fresh = try await API.Hits.feed()
             guard generation == feedGeneration else { return }
             feed = fresh
-            lastError = nil
+            feedError = nil
             SnapshotCache.save(fresh, key: "play_feed")
             try? await UNUserNotificationCenter.current().setBadgeCount(fresh.badge)
         } catch {
-            guard generation == feedGeneration else { return }
-            lastError = error.localizedDescription
+            guard generation == feedGeneration, !Self.isCancellation(error) else { return }
+            feedError = error.localizedDescription
         }
     }
 
@@ -57,31 +62,42 @@ final class HitsStore {
             let fresh = try await API.Hits.mine()
             guard generation == myHitsGeneration else { return }
             myHits = fresh
-            lastError = nil
+            myHitsError = nil
             SnapshotCache.save(fresh, key: "my_hits")
         } catch {
-            guard generation == myHitsGeneration else { return }
-            lastError = error.localizedDescription
+            guard generation == myHitsGeneration, !Self.isCancellation(error) else { return }
+            myHitsError = error.localizedDescription
         }
     }
 
-    /// Both lists. A refresh asked for while one runs makes it run once more afterwards, so a
-    /// change that landed in between is not missed and two refreshes never race.
+    /// Both lists. The loads run in their own task, so a caller that goes away (a cancelled
+    /// debounce, a screen popped) never cuts them short. A refresh asked for while one runs makes
+    /// it run once more afterwards, so a change that landed in between is not missed, and every
+    /// caller waits for that final round.
     @MainActor
     func refreshAll() async {
-        if refreshInFlight {
+        if let refreshTask {
             refreshQueued = true
+            await refreshTask.value
             return
         }
-        refreshInFlight = true
-        repeat {
-            refreshQueued = false
-            async let feedLoad: () = loadFeed()
-            async let mineLoad: () = loadMyHits()
-            _ = await (feedLoad, mineLoad)
-        } while refreshQueued
-        refreshInFlight = false
-        lastRefreshedAt = .now
+        let task = Task { @MainActor in
+            repeat {
+                refreshQueued = false
+                async let feedLoad: () = loadFeed()
+                async let mineLoad: () = loadMyHits()
+                _ = await (feedLoad, mineLoad)
+            } while refreshQueued
+            lastRefreshedAt = .now
+            refreshTask = nil
+        }
+        refreshTask = task
+        await task.value
+    }
+
+    /// A load that was cut short by its caller going away is not a failure worth showing.
+    private static func isCancellation(_ error: Error) -> Bool {
+        error is CancellationError || (error as? URLError)?.code == .cancelled
     }
 
     // MARK: - Lookups

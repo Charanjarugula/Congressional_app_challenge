@@ -24,11 +24,20 @@ final class RealtimeHub {
     private var reconnect: Task<Void, Never>?
     private var channels: [String: Channel] = [:]
     private var joined: Set<String> = []
+    /// Channels whose join the server has acknowledged; only these deliver.
+    private var acknowledged: Set<String> = []
+    private var pendingJoins: [String: String] = [:]   // join ref → topic
+    private var rejoinAttempts: [String: Int] = [:]
     private var nextRef = 0
     private var accessToken: String?
 
     /// True while the socket is open; screens poll slower then.
     var isConnected: Bool { socket != nil }
+
+    /// True once the server has accepted this subscription's channel and is delivering on it.
+    func isDelivering(_ subscription: Subscription) -> Bool {
+        acknowledged.contains(subscription.topic)
+    }
 
     /// `filter` is a PostgREST-style condition such as `chat_id=eq.<uuid>`; nil means every row the
     /// signed-in player is allowed to see. `events` is `INSERT` (default), `UPDATE` or `*`.
@@ -55,6 +64,7 @@ final class RealtimeHub {
     /// never inherits channels joined with someone else's token.
     func reset() {
         channels = [:]
+        rejoinAttempts = [:]
         dropSocket()
         reconnect?.cancel()
         reconnect = nil
@@ -69,7 +79,9 @@ final class RealtimeHub {
             if joined.contains(subscription.topic) {
                 send(event: "phx_leave", topic: subscription.topic, payload: [:])
                 joined.remove(subscription.topic)
+                acknowledged.remove(subscription.topic)
             }
+            rejoinAttempts[subscription.topic] = nil
             if channels.isEmpty { dropSocket() }
         } else {
             channels[subscription.topic] = channel
@@ -117,12 +129,18 @@ final class RealtimeHub {
         }
     }
 
-    /// The server closed one channel (token expiry, a rejected join): join it again with a fresh token.
+    /// The server closed or refused one channel: join it again with a fresh token, waiting longer each
+    /// time (1, 2, 4, 8, 16 s) and giving up after five tries. Polling covers the screen meanwhile; the
+    /// next connect (a new subscriber, a reconnect, the app coming back) starts the count over.
     private func rejoin(_ topic: String) {
         joined.remove(topic)
+        acknowledged.remove(topic)
         guard channels[topic] != nil else { return }
+        let attempt = rejoinAttempts[topic, default: 0]
+        guard attempt < 5 else { return }
+        rejoinAttempts[topic] = attempt + 1
         Task { [weak self] in
-            try? await Task.sleep(for: .seconds(1))
+            try? await Task.sleep(for: .seconds(1 << attempt))
             await self?.connectAndJoin()
         }
     }
@@ -130,7 +148,8 @@ final class RealtimeHub {
     private func joinPending(accessToken: String) {
         for topic in channels.keys where !joined.contains(topic) {
             guard let channel = channels[topic] else { continue }
-            send(event: "phx_join", topic: topic, payload: ["config": channel.config, "access_token": accessToken])
+            let ref = send(event: "phx_join", topic: topic, payload: ["config": channel.config, "access_token": accessToken])
+            pendingJoins[ref] = topic
             joined.insert(topic)
         }
     }
@@ -180,15 +199,22 @@ final class RealtimeHub {
         socket?.cancel(with: .goingAway, reason: nil)
         socket = nil
         joined = []
+        acknowledged = []
+        pendingJoins = [:]
     }
 
     // MARK: - Frames
 
-    private func send(event: String, topic: String, payload: [String: Any]) {
+    /// Sends one frame and returns its ref, which the server echoes in its reply.
+    @discardableResult
+    private func send(event: String, topic: String, payload: [String: Any]) -> String {
         nextRef += 1
-        let frame: [String: Any] = ["topic": topic, "event": event, "payload": payload, "ref": String(nextRef)]
-        guard let data = try? JSONSerialization.data(withJSONObject: frame), let text = String(data: data, encoding: .utf8) else { return }
-        socket?.send(.string(text)) { _ in }
+        let ref = String(nextRef)
+        let frame: [String: Any] = ["topic": topic, "event": event, "payload": payload, "ref": ref]
+        if let data = try? JSONSerialization.data(withJSONObject: frame), let text = String(data: data, encoding: .utf8) {
+            socket?.send(.string(text)) { _ in }
+        }
+        return ref
     }
 
     private func handle(_ message: URLSessionWebSocketTask.Message) {
@@ -205,7 +231,13 @@ final class RealtimeHub {
             if topic != "phoenix" { rejoin(topic) }
         case "phx_reply":
             let payload = object["payload"] as? [String: Any]
-            if payload?["status"] as? String == "error", topic != "phoenix" { rejoin(topic) }
+            let isJoinReply = (object["ref"] as? String).flatMap { pendingJoins.removeValue(forKey: $0) } != nil
+            if payload?["status"] as? String == "error", topic != "phoenix" {
+                rejoin(topic)
+            } else if isJoinReply {
+                acknowledged.insert(topic)
+                rejoinAttempts[topic] = nil
+            }
         case "system":
             let payload = object["payload"] as? [String: Any]
             if payload?["status"] as? String == "error", topic != "phoenix" { rejoin(topic) }

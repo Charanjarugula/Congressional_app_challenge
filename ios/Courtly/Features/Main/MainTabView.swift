@@ -88,10 +88,11 @@ struct MainTabView: View {
             if let link { Task { await open(link) } }
         }
         .onChange(of: deepLinks.lastPush) { _, arrival in
-            // Refresh only what the push is about; Realtime covers the rest.
+            // Refresh what the push can have changed: everything but a message touches the hit lists,
+            // and anything that adds a chat or a system line touches the inbox.
             guard let kind = arrival?.kind else { scheduleHitsRefresh(); scheduleInboxRefresh(); return }
-            if kind == "message" || kind == "hit_invite" { scheduleInboxRefresh() }
             if kind != "message" { scheduleHitsRefresh() }
+            if !["join_request", "request_declined", "reminder_day", "reminder_hour", "day_after_check"].contains(kind) { scheduleInboxRefresh() }
         }
     }
 

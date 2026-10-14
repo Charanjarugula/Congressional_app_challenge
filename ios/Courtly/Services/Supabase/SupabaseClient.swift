@@ -91,6 +91,17 @@ actor SupabaseClient {
     func validSession() async throws -> Session {
         guard let current = session else { throw SupabaseError.notSignedIn }
         guard current.needsRefresh else { return current }
+        return try await refresh(current)
+    }
+
+    /// Refreshes now, whatever the token's own expiry says: for a 401 the server gave an access
+    /// token the device still thought was good. Throws `notSignedIn` once the refresh token is rejected.
+    func refreshNow() async throws -> Session {
+        guard let current = session else { throw SupabaseError.notSignedIn }
+        return try await refresh(current)
+    }
+
+    private func refresh(_ current: Session) async throws -> Session {
         if let refreshTask { return try await refreshTask.value }
         let task = Task<Session, Error> {
             defer { refreshTask = nil }

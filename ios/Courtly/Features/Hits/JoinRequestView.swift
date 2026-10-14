@@ -56,7 +56,7 @@ struct JoinRequestView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.top, 80)
-                } else if let error = hits.lastError {
+                } else if let error = hits.feedError {
                     QuietCard(title: "Couldn’t load this request", detail: error)
                     ActionButton(title: "Try again", style: .grouped) { Task { await hits.loadFeed() } }
                         .padding(.top, 12)

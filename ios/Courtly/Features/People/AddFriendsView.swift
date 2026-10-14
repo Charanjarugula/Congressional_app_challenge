@@ -7,6 +7,7 @@ struct AddFriendsView: View {
     @State private var query = ""
     @State private var results: [SearchedPlayer] = []
     @State private var isSearching = false
+    @State private var searchError: String?
     @State private var searchTask: Task<Void, Never>?
     @State private var contactMatches: [ContactMatch] = []
     @State private var suggestions: [SuggestedPlayer] = []
@@ -27,7 +28,9 @@ struct AddFriendsView: View {
                 if !trimmedQuery.isEmpty {
                     SectionHeader(title: isSearching ? "Searching…" : "Results", top: 20)
                     if results.isEmpty {
-                        if !isSearching {
+                        if let searchError {
+                            QuietCard(title: "Couldn’t search", detail: searchError)
+                        } else if !isSearching {
                             QuietCard(title: "No one named “\(trimmedQuery)”", detail: "Players show up by first name once they’ve joined Courtly.")
                         }
                     } else {
@@ -180,6 +183,7 @@ struct AddFriendsView: View {
     private func scheduleSearch(_ text: String) {
         searchTask?.cancel()
         let trimmed = text.trimmingCharacters(in: .whitespaces)
+        searchError = nil
         guard trimmed.count >= 2 else {
             results = []
             isSearching = false
@@ -196,7 +200,7 @@ struct AddFriendsView: View {
             } catch {
                 guard !Task.isCancelled else { return }
                 results = []
-                errorMessage = error.localizedDescription
+                searchError = error.localizedDescription   // inline, under the field; a modal per keystroke would be noise
             }
             isSearching = false
         }

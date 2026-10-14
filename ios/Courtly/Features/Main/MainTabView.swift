@@ -12,6 +12,7 @@ struct MainTabView: View {
     @State private var paths: [MainTab: [AppRoute]] = [:]
     @State private var isPlanning = false
     @State private var coachStep: Int?
+    @State private var openGeneration = 0   // the newest deep link is the one that lands
 
     /// The stores read and write only the signed-in player's own snapshots.
     init(account: UUID?) {
@@ -94,9 +95,12 @@ struct MainTabView: View {
         deepLinks.pending = nil
         isPlanning = false
         coachStep = nil
+        openGeneration += 1
+        let generation = openGeneration
         switch link {
         case .play:
             await hits.loadFeed()
+            guard generation == openGeneration else { return }   // a later tap landed while the feed loaded
             selected = .play
             paths[.play] = []
         case let .hit(id), let .check(id, _):
@@ -104,6 +108,7 @@ struct MainTabView: View {
             paths[.myHits] = [.hit(id)]
         case let .request(id):
             await hits.loadFeed()
+            guard generation == openGeneration else { return }   // a later tap landed while the feed loaded
             selected = .play
             paths[.play] = [.request(id)]
         case let .chat(id):
@@ -114,8 +119,15 @@ struct MainTabView: View {
 
     // MARK: - Coach marks
 
+    /// Remembered on the device as well, so tips finished offline stay finished; the server hears next time.
+    static let coachMarksDoneKey = "coach_marks_done_local"
+
     private func startCoachMarksIfNeeded() {
         guard let profile = session.profile, !profile.coachMarksDone, coachStep == nil, deepLinks.pending == nil else { return }
+        if UserDefaults.standard.bool(forKey: Self.coachMarksDoneKey) {
+            Task { try? await session.updateProfile(["coach_marks_done": true]) }   // finished before; the save hadn't landed
+            return
+        }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(700))
             guard coachStep == nil, session.profile?.coachMarksDone == false else { return }
@@ -138,6 +150,7 @@ struct MainTabView: View {
             }
         }
         if step >= 3 {
+            UserDefaults.standard.set(true, forKey: Self.coachMarksDoneKey)
             Task { try? await session.updateProfile(["coach_marks_done": true]) }
         }
     }

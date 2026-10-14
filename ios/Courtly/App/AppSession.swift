@@ -106,6 +106,7 @@ final class AppSession {
         profile = nil
         ProfileCache.save(nil)
         SnapshotCache.clear()
+        UserDefaults.standard.removeObject(forKey: MainTabView.coachMarksDoneKey)   // the next player gets the tips
         stage = .onboarding(resume: false)
     }
 

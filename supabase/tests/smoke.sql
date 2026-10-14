@@ -498,9 +498,77 @@ begin
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
 
-  -- Suspension closes the player's future hits the way a host cancel does, and lifting it leaves them closed.
+  -- A withdrawn "No" hands its report to a player still saying it; the absence counts once throughout.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_hit := public.create_hit(v_court, now() + interval '2 days', 60, 'casual', 2, 'anyone');
+  v_hit_id := (v_hit->>'id')::uuid;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+  update public.hits set starts_at = now() - interval '3 hours' where id = v_hit_id;
+  perform public.run_hit_scheduler();
+  if (select status from public.hits where id = v_hit_id) is distinct from 'played' then raise exception 'three-player hit not marked played'; end if;
+  select no_shows into v_n from public.profiles where id = b;
+  perform public.submit_attendance(v_hit_id, b, false);
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  perform public.submit_attendance(v_hit_id, b, false);
+  if (select no_shows from public.profiles where id = b) <> v_n + 1 then raise exception 'two "No" answers counted twice'; end if;
+  if (select count(*) from public.reports where hit_id = v_hit_id and reported_id = b and auto) <> 1 then raise exception 'expected one automatic report'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.submit_attendance(v_hit_id, b, true);
+  if (select reporter_id from public.reports where hit_id = v_hit_id and reported_id = b and auto) is distinct from c then raise exception 'report did not pass to the player still saying no'; end if;
+  if (select no_shows from public.profiles where id = b) <> v_n + 1 then raise exception 'absence lifted while alex still says no'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  perform public.submit_attendance(v_hit_id, b, true);
+  if exists (select 1 from public.reports where hit_id = v_hit_id and reported_id = b and auto) then raise exception 'report kept after both took it back'; end if;
+  if (select no_shows from public.profiles where id = b) <> v_n then raise exception 'absence not lifted'; end if;
+
+  -- Nearby courts put the one played at first, whatever its distance.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  if (public.get_nearby_courts(1)->0->>'played_count')::int < 1 then raise exception 'nearby courts: the court played at should come first: %', public.get_nearby_courts(1); end if;
+
+  -- The inbox entry describes the newest message the viewer may see: a blocked member's last word stays out of the preview and the type.
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  v_msg := public.send_message((v_group->>'id')::uuid, gen_random_uuid(), 'last word');
+  update public.messages set created_at = created_at - interval '10 minutes' where chat_id = (v_group->>'id')::uuid and id <> (v_msg->>'id')::uuid;   -- one transaction clock: spread them out by hand
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  if public.get_chat((v_group->>'id')::uuid)->>'preview' not like '%last word%' then raise exception 'preview before block: %', public.get_chat((v_group->>'id')::uuid); end if;
+  perform public.block_user(c);
+  v_feed := public.get_chat((v_group->>'id')::uuid);
+  if v_feed->>'preview' like '%last word%' or v_feed->>'last_message_type' is null then raise exception 'blocked member''s last word in the inbox entry: %', v_feed; end if;
+  perform public.unblock_user(c);
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  perform public.add_friend(b);
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  if (public.add_friend(c)->>'relationship') <> 'friend' then raise exception 'jordan and alex not friends again'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+
+  -- Suspension closes the player's future hits the way a host cancel does, cancels what they had pending,
+  -- refuses them a spot, shows them nothing, and lifting it leaves the hits closed.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_hit := public.create_hit(v_court, now() + interval '6 days', 60, 'casual', 1, 'anyone');
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join((v_hit->>'id')::uuid);
   perform private.suspend_user(c, true);
   if exists (select 1 from public.hits where host_id = c and starts_at > now() and status <> 'cancelled') then raise exception 'suspension left a hit open'; end if;
+  if (select status from public.join_requests where id = (v_req->'viewer'->'request'->>'id')::uuid) is distinct from 'cancelled' then raise exception 'suspension left a request pending'; end if;
+  begin
+    perform public.add_player((v_hit->>'id')::uuid, c, 'ask');
+    raise exception 'a suspended player got a spot';
+  exception when others then
+    if sqlerrm <> 'player_unavailable' then raise; end if;
+  end;
+  execute 'set local role authenticated';
+  select count(*) into v_n from public.hits;
+  if v_n <> 0 then raise exception 'rls: suspended player still sees % hits', v_n; end if;
+  select count(*) into v_n from public.messages;
+  if v_n <> 0 then raise exception 'rls: suspended player still reads % messages', v_n; end if;
+  execute 'reset role';
   perform private.suspend_user(c, false);
   if (select suspended_at from public.profiles where id = c) is not null then raise exception 'suspension not lifted'; end if;
 
@@ -517,7 +585,11 @@ begin
   if has_function_privilege('authenticated', 'public.find_dm_chat(uuid, uuid)', 'execute') then raise exception 'find_dm_chat is callable by the app role'; end if;
   if has_function_privilege('anon', 'public.get_me()', 'execute') then raise exception 'get_me is callable by anon'; end if;
   if not has_function_privilege('authenticated', 'public.get_me()', 'execute') then raise exception 'get_me is not callable by the app role'; end if;
-  if not has_function_privilege('authenticated', 'public.can_see_hit(uuid, uuid)', 'execute') then raise exception 'can_see_hit must stay callable for policies'; end if;
+  if not has_function_privilege('authenticated', 'public.viewer_can_see_hit(uuid)', 'execute') then raise exception 'viewer_can_see_hit must stay callable for policies'; end if;
+  if has_function_privilege('authenticated', 'public.is_blocked_either(uuid, uuid)', 'execute') then raise exception 'is_blocked_either answers about any two players'; end if;
+  if has_function_privilege('authenticated', 'public.is_chat_member(uuid, uuid)', 'execute') then raise exception 'is_chat_member answers about any player'; end if;
+  if has_table_privilege('authenticated', 'public.chats', 'select') then raise exception 'chats rows are readable raw'; end if;
+  if not has_table_privilege('authenticated', 'public.messages', 'select') then raise exception 'messages must stay readable for realtime'; end if;
   if not has_function_privilege('service_role', 'public.internal_delete_account(uuid, text)', 'execute') then raise exception 'service role lost internal_delete_account'; end if;
 
   -- Underage deletion removes a half-onboarded account outright, with the friend request and DM it opened.
@@ -529,9 +601,11 @@ begin
   if exists (select 1 from public.friendships where d in (user_a, user_b)) then raise exception 'underage friendship kept'; end if;
   if exists (select 1 from public.chats where id = (v_friend->>'dm_chat_id')::uuid) then raise exception 'underage dm kept'; end if;
 
-  -- Deletion anonymizes without touching others' threads, and drops the Apple secret.
-  perform public.internal_delete_account(c, 'full');
-  if (select first_name from public.profiles where id = c) <> 'Deleted' then raise exception 'delete did not anonymize'; end if;
+  -- Deletion anonymizes without touching others' threads, drops the Apple secret and keeps the day-after
+  -- answers the player gave. An onboarded account asking for the underage path gets this one.
+  perform public.internal_delete_account(c, 'underage');
+  if (select first_name from public.profiles where id = c) is distinct from 'Deleted' then raise exception 'delete did not anonymize'; end if;
+  if not exists (select 1 from public.attendance_checks where user_id = c) then raise exception 'deletion removed the answers the player gave'; end if;
   if exists (select 1 from vault.secrets where name = 'apple-refresh-' || c::text) then raise exception 'vault secret kept after deletion'; end if;
   select count(*) into v_n from public.messages where chat_id = (v_group->>'id')::uuid;
   if v_n < 1 then raise exception 'group thread lost after deletion'; end if;

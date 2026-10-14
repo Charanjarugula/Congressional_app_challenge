@@ -39,7 +39,9 @@ Deno.serve(async (req) => {
     return json({ skipped: "in_app_only" });
   }
 
-  const { data: devices } = await supabase.from("device_tokens").select("token, environment").eq("user_id", n.user_id);
+  const { data: devices, error: deviceError } = await supabase.from("device_tokens").select("token, environment").eq("user_id", n.user_id);
+  // A lookup that failed is not "no devices": the notification stays pending for the retry sweep.
+  if (deviceError) return json({ error: deviceError.message }, 500);
   const { data: badge } = await supabase.rpc("badge_count", { p_user: n.user_id });
 
   const results: Record<string, string> = {};

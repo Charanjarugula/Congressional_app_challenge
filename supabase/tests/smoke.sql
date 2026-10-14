@@ -106,6 +106,8 @@ begin
   v_hit := public.create_hit(v_court, now() + interval '3 days', 60, 'drills', 1, 'invite_only', (v_group->>'id')::uuid, null);
   v_invite := (select public.invite_json(i.id, b) from public.hit_invites i where i.hit_id = (v_hit->>'id')::uuid);
   if (v_invite->>'status') <> 'open' then raise exception 'invite not open: %', v_invite; end if;
+  if not public.can_see_hit((v_hit->>'id')::uuid, c) then raise exception 'the invitee cannot see the invite-only hit'; end if;
+  if public.can_see_hit((v_hit->>'id')::uuid, a) then raise exception 'an uninvited player sees the invite-only hit'; end if;
   if public.get_chat((v_group->>'id')::uuid)->>'last_message_type' <> 'hit_invite' then raise exception 'last_message_type: %', public.get_chat((v_group->>'id')::uuid); end if;
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   begin
@@ -246,6 +248,10 @@ begin
   if v_n <> 0 then raise exception 'rls: cancelled hit of a stranger is visible'; end if;
   select count(*) into v_n from public.player_cards;
   if v_n < 2 then raise exception 'rls: player_cards should list the other active players (%)', v_n; end if;
+  select count(*) into v_n from public.join_requests;
+  if v_n <> 0 then raise exception 'rls: alex sees % requests that are neither his nor on his hits', v_n; end if;
+  select count(*) into v_n from public.hit_invites;
+  if v_n < 1 then raise exception 'rls: alex should see the invite sent to his group'; end if;
   execute 'reset role';
 
   -- Played hits and the day-after check. The reminder hit is moved into the past; the scheduler marks it played.
@@ -329,6 +335,12 @@ begin
   v_feed := public.get_friend_suggestions();
   if not exists (select 1 from jsonb_array_elements(v_feed) e where (e->>'id')::uuid = c and e->>'source' = 'mutual' and e->>'reason' = 'Friends with Jordan') then
     raise exception 'mutual suggestion: %', v_feed;
+  end if;
+  -- A friend with every block marked free shows under "free this week" (unless the week has no block left).
+  update public.profiles set availability_mask = (1 << 21) - 1, busy_mask_week = null where id = b;
+  if public.remaining_week_mask() <> 0
+     and not exists (select 1 from jsonb_array_elements(public.get_play_feed()->'free_this_week') e where (e->>'id')::uuid = b) then
+    raise exception 'free_this_week missing jordan: %', public.get_play_feed()->'free_this_week';
   end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   v_group := public.add_chat_members((v_group->>'id')::uuid, array[a]);
@@ -552,6 +564,25 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   if (public.add_friend(c)->>'relationship') <> 'friend' then raise exception 'jordan and alex not friends again'; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+
+  -- The daily purge drops reports older than 90 days (their moderator notices go too) and stale rate-limit rows;
+  -- the push sweep sends what the webhook didn't deliver to the stored function URL.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  insert into public.reports (reporter_id, reported_id, reason, details) values (b, c, 'rude_or_unsafe', 'long ago');
+  update public.reports set created_at = now() - interval '100 days' where reporter_id = b and details = 'long ago';
+  if not exists (select 1 from public.notifications n join public.reports r on n.collapse_id = 'report-' || r.id::text
+                 where r.details = 'long ago' and n.user_id = a) then raise exception 'moderator not told about the old report'; end if;
+  perform public.check_rate_limit('purge_probe', 5, interval '1 minute');
+  update public.rate_limits set window_start = now() - interval '3 days' where user_id = b and action = 'purge_probe';
+  perform public.purge_old_reports();
+  if exists (select 1 from public.reports where details = 'long ago') then raise exception 'purge kept a 100-day-old report'; end if;
+  if exists (select 1 from public.notifications n where n.kind = 'report'
+             and not exists (select 1 from public.reports r where 'report-' || r.id::text = n.collapse_id)) then raise exception 'a report notice outlived its report'; end if;
+  if exists (select 1 from public.rate_limits where user_id = b and action = 'purge_probe') then raise exception 'purge kept a stale rate-limit row'; end if;
+  delete from private.settings where key in ('functions_url', 'webhook_secret');
+  insert into private.settings (key, value) values ('functions_url', 'https://functions.test'), ('webhook_secret', 'test-secret');
+  update public.notifications set created_at = now() - interval '3 minutes' where user_id = a and pushed_at is null;
+  perform public.resend_unpushed();
 
   -- Suspension closes the player's future hits the way a host cancel does, cancels what they had pending,
   -- refuses them a spot, shows them nothing, and lifting it leaves the hits closed.

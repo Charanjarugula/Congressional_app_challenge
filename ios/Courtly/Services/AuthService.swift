@@ -71,7 +71,8 @@ final class SupabaseAuthService: AuthService {
             .init(name: "scope", value: "openid email profile"),
             .init(name: "code_challenge", value: challenge),
             .init(name: "code_challenge_method", value: "S256"),
-            .init(name: "nonce", value: rawNonce),
+            // Supabase hashes the nonce it receives and compares it with the token, so Google gets the hash.
+            .init(name: "nonce", value: Self.sha256(rawNonce)),
         ]
         let callback = try await web.authenticate(url: components.url!, callbackScheme: scheme)
         guard let code = URLComponents(url: callback, resolvingAgainstBaseURL: false)?

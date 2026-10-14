@@ -4,7 +4,7 @@ do $$
 declare
   a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid(); d uuid := gen_random_uuid(); v_pat uuid := gen_random_uuid();
   v_court uuid; v_hit jsonb; v_hit_id uuid; v_req jsonb; v_req_id uuid; v_chat uuid; v_msg jsonb;
-  v_feed jsonb; v_inbox jsonb; v_friend jsonb; v_invite jsonb; v_group jsonb; v_n integer;
+  v_feed jsonb; v_inbox jsonb; v_friend jsonb; v_invite jsonb; v_group jsonb; v_n integer; v_dm uuid; v_page jsonb;
 begin
   -- Three players, onboarded, in Wellington.
   insert into public.profiles (id, first_name, last_name, birthday, level, formats, zip, area_label, home_point, onboarding_completed_at)
@@ -338,6 +338,163 @@ begin
   if not (public.chat_json((v_group->>'id')::uuid, a)->>'muted')::boolean then raise exception 'mute not stored'; end if;
   perform public.leave_chat((v_group->>'id')::uuid);
   if (public.chat_json((v_group->>'id')::uuid, b)->>'member_count')::int <> 2 then raise exception 'leave_chat member count'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+
+  -- Device tokens: a token registered twice keeps one row, moves with the phone, and only its owner can take it back.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.register_device('tok-1', 'sandbox', '1.0');
+  perform public.register_device('tok-1', 'sandbox', '1.1');
+  select count(*) into v_n from public.device_tokens where token = 'tok-1' and user_id = a and app_version = '1.1';
+  if v_n <> 1 then raise exception 'register_device twice: % rows', v_n; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.unregister_device('tok-1');
+  if not exists (select 1 from public.device_tokens where token = 'tok-1' and user_id = a) then raise exception 'unregister_device removed another player''s token'; end if;
+  perform public.register_device('tok-1', 'sandbox');
+  if (select user_id from public.device_tokens where token = 'tok-1') <> b then raise exception 'register_device did not move the token to its new owner'; end if;
+  perform public.unregister_device('tok-1');
+  if exists (select 1 from public.device_tokens where token = 'tok-1') then raise exception 'unregister_device kept the token'; end if;
+
+  -- Courts: a court added where a seeded one stands is that court; a new one is created once and found again by its Apple place id.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_feed := public.add_court('Wellington Tennis Centre', '3100 Forest Hill Blvd', 'Wellington', 26.6536, -80.2493);
+  if (v_feed->>'id')::uuid <> v_court then raise exception 'add_court did not reuse the seeded court: %', v_feed; end if;
+  v_feed := public.add_court('Backyard Court', '1 Private Rd', 'Loxahatchee', 26.75, -80.30, 'apple-place-1', 'hard', true);
+  if (v_feed->>'id')::uuid = v_court or v_feed->>'name' <> 'Backyard Court' or not (v_feed->>'lights')::boolean then raise exception 'add_court new court: %', v_feed; end if;
+  if (public.add_court('Somewhere else', null, null, 26.9, -80.0, 'apple-place-1')->>'id')::uuid <> (v_feed->>'id')::uuid then raise exception 'add_court did not match the Apple place id'; end if;
+  select count(*) into v_n from public.courts where created_by = a;
+  if v_n <> 1 then raise exception 'expected one court added by maya, got %', v_n; end if;
+  begin
+    perform public.add_court('   ', null, null, 26.75, -80.30);
+    raise exception 'add_court accepted an empty name';
+  exception when others then
+    if sqlerrm <> 'missing_name' then raise; end if;
+  end;
+
+  -- A joiner takes a pending request back: it leaves My Hits, the host can't take it back for them, and it can't go twice.
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  v_hit := public.create_hit(v_court, now() + interval '3 days', 60, 'singles', 1, 'anyone');
+  v_hit_id := (v_hit->>'id')::uuid;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  v_req_id := (v_req->'viewer'->'request'->>'id')::uuid;
+  if not exists (select 1 from jsonb_array_elements(public.get_my_hits()->'upcoming') e where (e->>'id')::uuid = v_hit_id and e->>'state' = 'pending') then
+    raise exception 'pending request missing from my hits';
+  end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  begin
+    perform public.cancel_request(v_req_id);
+    raise exception 'host took back a joiner''s request';
+  exception when others then
+    if sqlerrm <> 'request_not_found' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.cancel_request(v_req_id);
+  if (select status from public.join_requests where id = v_req_id) <> 'cancelled' then raise exception 'cancel_request left the request pending'; end if;
+  if exists (select 1 from jsonb_array_elements(public.get_my_hits()->'upcoming') e where (e->>'id')::uuid = v_hit_id) then raise exception 'cancelled request still in my hits'; end if;
+  begin
+    perform public.cancel_request(v_req_id);
+    raise exception 'request taken back twice';
+  exception when others then
+    if sqlerrm <> 'request_not_found' then raise; end if;
+  end;
+
+  -- The host offers the spot to a friend in their DM; only the invitee can decline, only once, and a declined invite can't be claimed.
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  v_dm := public.find_dm_chat(b, c);
+  if v_dm is null then raise exception 'jordan and alex have no dm'; end if;
+  v_invite := public.send_hit_invite(v_hit_id, v_dm, b);
+  if (v_invite->>'status') <> 'open' then raise exception 'dm invite: %', v_invite; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  begin
+    perform public.decline_invite((v_invite->>'id')::uuid);
+    raise exception 'someone else declined an invite';
+  exception when others then
+    if sqlerrm <> 'invite_not_found' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.decline_invite((v_invite->>'id')::uuid);
+  if (select status from public.hit_invites where id = (v_invite->>'id')::uuid) <> 'cancelled' then raise exception 'decline_invite left the invite open'; end if;
+  if (select spots_open from public.hits where id = v_hit_id) <> 1 then raise exception 'declining changed the spot count'; end if;
+  begin
+    perform public.decline_invite((v_invite->>'id')::uuid);
+    raise exception 'invite declined twice';
+  exception when others then
+    if sqlerrm <> 'invite_not_found' then raise; end if;
+  end;
+  begin
+    perform public.claim_invite((v_invite->>'id')::uuid);
+    raise exception 'claimed a declined invite';
+  exception when others then
+    if sqlerrm <> 'invite_closed' then raise; end if;
+  end;
+
+  -- Friend lists read from each side with the DM attached; removing a friend clears both lists and keeps the thread for an add-back.
+  v_feed := public.get_friends();
+  if jsonb_array_length(v_feed) <> 2 or v_feed->0->>'first_name' <> 'Alex' or v_feed->1->>'first_name' <> 'Maya' then raise exception 'jordan''s friends: %', v_feed; end if;
+  if not exists (select 1 from jsonb_array_elements(v_feed) e where (e->>'id')::uuid = a and e->>'relationship' = 'friend'
+                 and e->>'dm_chat_id' is not distinct from public.find_dm_chat(a, b)::text) then
+    raise exception 'get_friends row for maya: %', v_feed;
+  end if;
+  v_dm := public.find_dm_chat(a, b);
+  perform public.remove_friend(a);
+  if exists (select 1 from jsonb_array_elements(public.get_friends()) e where (e->>'id')::uuid = a) then raise exception 'remove_friend left maya on jordan''s list'; end if;
+  if public.relationship_to(a, b) <> 'none' then raise exception 'relationship after removal: %', public.relationship_to(a, b); end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  if exists (select 1 from jsonb_array_elements(public.get_friends()) e where (e->>'id')::uuid = b) then raise exception 'remove_friend left jordan on maya''s list'; end if;
+  v_friend := public.add_friend(b);
+  if (v_friend->>'relationship') <> 'requested' then raise exception 'add after removal: %', v_friend; end if;
+  if v_dm is not null and (v_friend->>'dm_chat_id')::uuid <> v_dm then raise exception 'add-back opened a second dm'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  if (public.add_friend(a)->>'relationship') <> 'friend' then raise exception 'add back after removal'; end if;
+
+  -- The blocked list is the blocker's own and empties on unblock.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  if jsonb_array_length(public.get_blocked_players()) <> 0 then raise exception 'maya has blocked no one yet'; end if;
+  perform public.block_user(c);
+  v_feed := public.get_blocked_players();
+  if jsonb_array_length(v_feed) <> 1 or (v_feed->0->>'id')::uuid <> c or v_feed->0->>'first_name' <> 'Alex' then raise exception 'get_blocked_players: %', v_feed; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  if jsonb_array_length(public.get_blocked_players()) <> 0 then raise exception 'a block shows on the blocked player''s own list'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.unblock_user(c);
+  if jsonb_array_length(public.get_blocked_players()) <> 0 then raise exception 'unblock left the list'; end if;
+
+  -- Thread pages walk back through the cursor; reading marks the chat read for the caller alone. Timestamps are spread
+  -- out by hand because everything here shares one transaction clock.
+  v_dm := public.find_dm_chat(b, c);
+  update public.messages set created_at = created_at - interval '10 minutes' where chat_id = v_dm;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_msg := public.send_message(v_dm, gen_random_uuid(), 'first');
+  update public.messages set created_at = now() - interval '3 minutes' where id = (v_msg->>'id')::uuid;
+  v_msg := public.send_message(v_dm, gen_random_uuid(), 'second');
+  update public.messages set created_at = now() - interval '2 minutes' where id = (v_msg->>'id')::uuid;
+  v_msg := public.send_message(v_dm, gen_random_uuid(), 'third');
+  update public.messages set created_at = now() - interval '1 minute' where id = (v_msg->>'id')::uuid;
+  v_page := public.get_chat_page(v_dm, null, null, 2);
+  if (v_page->'chat'->>'id')::uuid <> v_dm then raise exception 'page chat: %', v_page->'chat'; end if;
+  if jsonb_array_length(v_page->'messages') <> 2 or v_page->'messages'->0->>'body' <> 'second' or v_page->'messages'->1->>'body' <> 'third' then
+    raise exception 'newest page: %', v_page->'messages';
+  end if;
+  v_page := public.get_chat_page(v_dm, (v_page->'messages'->0->>'created_at')::timestamptz, (v_page->'messages'->0->>'id')::uuid, 2);
+  if jsonb_array_length(v_page->'messages') <> 2 or v_page->'messages'->1->>'body' <> 'first' or v_page->'messages'->0->>'body' = 'second' then
+    raise exception 'earlier page: %', v_page->'messages';
+  end if;
+  v_n := (public.get_chat(v_dm)->>'unread_count')::int;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  if (public.get_chat(v_dm)->>'unread_count')::int < 3 then raise exception 'alex unread: %', public.get_chat(v_dm); end if;
+  perform public.mark_chat_read(v_dm);
+  if (public.get_chat(v_dm)->>'unread_count')::int <> 0 then raise exception 'mark_chat_read left messages unread'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  if (public.get_chat(v_dm)->>'unread_count')::int <> v_n then raise exception 'alex''s read mark changed jordan''s unread count'; end if;
+  perform public.mark_chat_read(v_dm);
+  if (public.get_chat(v_dm)->>'unread_count')::int <> 0 then raise exception 'jordan still unread after marking'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  begin
+    perform public.get_chat_page(v_dm);
+    raise exception 'non-member read a thread page';
+  exception when others then
+    if sqlerrm <> 'not_a_member' then raise; end if;
+  end;
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
 
   -- Suspension closes the player's future hits the way a host cancel does, and lifting it leaves them closed.

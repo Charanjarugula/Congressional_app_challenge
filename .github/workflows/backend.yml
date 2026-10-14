@@ -56,4 +56,4 @@ jobs:
           node-version: "22"
 
       - name: Deploy
-        run: node scripts/supabase-deploy.mjs ${{ inputs.steps || 'check migrate seed settings auth secrets functions' }}
+        run: node scripts/supabase-deploy.mjs ${{ inputs.steps || 'check migrate seed settings auth secrets functions test' }}

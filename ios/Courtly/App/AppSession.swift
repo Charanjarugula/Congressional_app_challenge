@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 
 struct AppAlert: Identifiable, Equatable {
     let id = UUID()
@@ -109,6 +110,8 @@ final class AppSession {
         profile = nil
         ProfileCache.save(nil)
         SnapshotCache.clear()
+        DeepLinkCenter.shared.pending = nil
+        try? await UNUserNotificationCenter.current().setBadgeCount(0)
         stage = .onboarding(resume: false)
     }
 

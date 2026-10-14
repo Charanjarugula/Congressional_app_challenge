@@ -102,21 +102,26 @@ struct MainTabView: View {
         let generation = openGeneration
         switch link {
         case .play:
-            await hits.loadFeed()
-            guard generation == openGeneration else { return }   // a later tap landed while the feed loaded
             selected = .play
             paths[.play] = []
+            await hits.refreshAll()
         case let .hit(id), let .check(id, _):
             selected = .myHits
             paths[.myHits] = [.hit(id)]
+            Task { await hits.refreshAll() }
         case let .request(id):
-            await hits.loadFeed()
+            // A request already on hand opens at once; one that isn't waits for the feed. Either way the
+            // lists refresh behind the screen, without loading the feed twice when it was just loaded.
+            let cached = hits.needsReplyItem(requestID: id) != nil
+            if !cached { await hits.loadFeed() }
             guard generation == openGeneration else { return }   // a later tap landed while the feed loaded
             selected = .play
             paths[.play] = [.request(id)]
+            Task { if cached { await hits.refreshAll() } else { await hits.loadMyHits() } }
         case let .chat(id):
             selected = .people
             paths[.people] = [.chat(id)]
+            Task { await hits.refreshAll() }
         }
     }
 
@@ -134,7 +139,8 @@ struct MainTabView: View {
         }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(700))
-            guard coachStep == nil, session.profile?.coachMarksDone == false else { return }
+            // Only over the Play root: a pushed screen or another tab is not where the tips point.
+            guard coachStep == nil, session.profile?.coachMarksDone == false, isAtRoot, selected == .play, deepLinks.pending == nil else { return }
             withAnimation(.easeInOut(duration: 0.25)) { coachStep = 1 }
         }
     }

@@ -12,6 +12,7 @@ struct AccountView: View {
     @State private var isDeleting = false
     @State private var isSigningOut = false
     @State private var errorMessage: String?
+    @State private var visibilitySave: Task<Void, Never>?   // saves run in the order chosen
 
     var body: some View {
         ScrollView {
@@ -138,8 +139,11 @@ struct AccountView: View {
 
     // MARK: - Actions
 
+    /// Choices save one after another, so a slower earlier save can never land after a later one.
     private func setVisibility(_ value: String) {
-        Task { @MainActor in
+        let previous = visibilitySave
+        visibilitySave = Task { @MainActor in
+            await previous?.value
             do {
                 try await session.updateProfile(["hit_visibility": value])
             } catch {
@@ -188,7 +192,7 @@ struct PhoneSheet: View {
                     .keyboardType(.phonePad)
                     .textContentType(.telephoneNumber)
             }
-            Text("Friends who have your number can find you. Only a hashed version is stored.")
+            Text("Your number is stored with your profile. A hashed version is used to help friends who have your number find you.")
                 .font(CourtlyFont.caption)
                 .foregroundStyle(CourtlyColor.secondary)
                 .padding(.top, 10)

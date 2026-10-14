@@ -7,18 +7,19 @@ struct HitInviteCard: View {
     @Environment(HitsStore.self) private var hits
     @Environment(AppSession.self) private var session
     @Environment(\.navigate) private var navigate
-    @State private var hit: Hit
+    /// The hit as returned by the player's own claim, until the next refresh brings the server's copy.
+    @State private var claimed: Hit?
     @State private var isClaiming = false
     @State private var errorMessage: String?
 
-    init(invite: HitInvite) {
-        self.invite = invite
-        _hit = State(initialValue: invite.hit)
-    }
-
     private var me: UUID? { session.profile?.id }
+    private var hit: Hit { claimed ?? invite.hit }
 
     var body: some View {
+        card.onChange(of: invite) { _, _ in claimed = nil }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Hit request")
@@ -91,7 +92,7 @@ struct HitInviteCard: View {
         isClaiming = true
         Task { @MainActor in
             do {
-                hit = try await hits.claimInvite(invite.id)
+                claimed = try await hits.claimInvite(invite.id)
             } catch {
                 errorMessage = error.localizedDescription
             }

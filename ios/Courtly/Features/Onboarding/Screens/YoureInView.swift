@@ -42,9 +42,7 @@ struct YoureInView: View {
                 .frame(maxWidth: 280)
                 .padding(.top, 10)
             if let errorMessage {
-                Text(errorMessage)
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.red)
+                ErrorCaption(text: errorMessage)
                     .multilineTextAlignment(.center)
                     .padding(.top, 16)
             }

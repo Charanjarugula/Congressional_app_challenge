@@ -7,6 +7,7 @@ struct AddFriendsView: View {
     @State private var query = ""
     @State private var results: [SearchedPlayer] = []
     @State private var isSearching = false
+    @State private var searchError: String?
     @State private var searchTask: Task<Void, Never>?
     @State private var contactMatches: [ContactMatch] = []
     @State private var suggestions: [SuggestedPlayer] = []
@@ -27,7 +28,9 @@ struct AddFriendsView: View {
                 if !trimmedQuery.isEmpty {
                     SectionHeader(title: isSearching ? "Searching…" : "Results", top: 20)
                     if results.isEmpty {
-                        if !isSearching {
+                        if let searchError {
+                            QuietCard(title: "Couldn’t search", detail: searchError)
+                        } else if !isSearching {
                             QuietCard(title: "No one named “\(trimmedQuery)”", detail: "Players show up by first name once they’ve joined Courtly.")
                         }
                     } else {
@@ -180,6 +183,7 @@ struct AddFriendsView: View {
     private func scheduleSearch(_ text: String) {
         searchTask?.cancel()
         let trimmed = text.trimmingCharacters(in: .whitespaces)
+        searchError = nil
         guard trimmed.count >= 2 else {
             results = []
             isSearching = false
@@ -189,9 +193,15 @@ struct AddFriendsView: View {
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            let found = try? await API.People.search(trimmed)
-            guard !Task.isCancelled else { return }
-            results = found ?? []
+            do {
+                let found = try await API.People.search(trimmed)
+                guard !Task.isCancelled else { return }
+                results = found
+            } catch {
+                guard !Task.isCancelled else { return }
+                results = []
+                searchError = error.localizedDescription   // inline, under the field; a modal per keystroke would be noise
+            }
             isSearching = false
         }
     }
@@ -219,7 +229,8 @@ struct AddFriendsView: View {
     }
 
     private func matchContacts() async {
-        guard let hashed = try? ContactsService().hashedContacts(), !hashed.isEmpty else { return }
+        let hashed = (try? await Task.detached(priority: .userInitiated) { try ContactsService().hashedContacts() }.value) ?? []
+        guard !hashed.isEmpty else { return }
         if let matches = try? await API.People.matchContacts(hashes: hashed.map(\.hash)) {
             var seen = Set<UUID>()
             contactMatches = matches.filter { seen.insert($0.player.id).inserted }

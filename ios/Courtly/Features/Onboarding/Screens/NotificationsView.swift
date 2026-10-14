@@ -32,10 +32,7 @@ struct NotificationsView: View {
         } footer: {
             VStack(spacing: 4) {
                 PrimaryButton(title: "Turn on notifications", isLoading: isRequesting, action: turnOn)
-                TextActionButton(title: "Not now") {
-                    draft.notificationsEnabled = false
-                    onContinue()
-                }
+                TextActionButton(title: "Not now", action: onContinue)
             }
         }
     }
@@ -44,7 +41,7 @@ struct NotificationsView: View {
         guard !isRequesting else { return }
         isRequesting = true
         Task { @MainActor in
-            draft.notificationsEnabled = await NotificationPermission.request()
+            _ = await NotificationPermission.request()
             isRequesting = false
             onContinue()
         }

@@ -21,7 +21,8 @@ enum AuthError: LocalizedError {
 
 /// Sign-in boundary used by the onboarding screens.
 protocol AuthService {
-    func signInWithApple() async throws
+    /// Returns the name Apple shares on the first sign-in, so onboarding can prefill it.
+    func signInWithApple() async throws -> PersonNameComponents?
     func signInWithGoogle() async throws
     func sendEmailCode(to email: String) async throws
     func verifyEmailCode(email: String, code: String) async throws
@@ -35,7 +36,7 @@ final class SupabaseAuthService: AuthService {
 
     // MARK: Apple
 
-    func signInWithApple() async throws {
+    func signInWithApple() async throws -> PersonNameComponents? {
         let rawNonce = Self.randomString(length: 32)
         let credential = try await apple.signIn(nonceHash: Self.sha256(rawNonce))
         guard let tokenData = credential.identityToken, let idToken = String(data: tokenData, encoding: .utf8) else {
@@ -48,6 +49,7 @@ final class SupabaseAuthService: AuthService {
         if let codeData = credential.authorizationCode, let code = String(data: codeData, encoding: .utf8) {
             Task { try? await API.Account.exchangeAppleCode(code) }
         }
+        return credential.fullName
     }
 
     // MARK: Google (OAuth with PKCE through the system web session; no SDK)

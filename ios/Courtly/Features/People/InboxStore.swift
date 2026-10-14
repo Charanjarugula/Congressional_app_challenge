@@ -38,7 +38,7 @@ final class InboxStore {
             lastError = nil
             SnapshotCache.save(fresh, key: "inbox", account: owner)
         } catch {
-            guard mine == generation else { return }
+            guard mine == generation, !(error is CancellationError), (error as? URLError)?.code != .cancelled else { return }
             lastError = error.localizedDescription
         }
     }
@@ -47,12 +47,7 @@ final class InboxStore {
     @MainActor
     func markRead(_ chatID: UUID) {
         guard var list = chats, let index = list.firstIndex(where: { $0.id == chatID }), list[index].unreadCount > 0 else { return }
-        list[index] = Chat(
-            id: list[index].id, type: list[index].type, name: list[index].name, hitId: list[index].hitId,
-            members: list[index].members, memberCount: list[index].memberCount, lastMessageAt: list[index].lastMessageAt,
-            preview: list[index].preview, unreadCount: 0, muted: list[index].muted, friendship: list[index].friendship,
-            hit: list[index].hit
-        )
+        list[index].unreadCount = 0
         chats = list
     }
 }

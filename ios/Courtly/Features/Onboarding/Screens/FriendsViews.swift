@@ -15,7 +15,7 @@ struct FriendsIntroView: View {
         OnboardingStepView(
             progress: 0.9,
             title: "Tennis is better with friends.",
-            subtitle: "See which of your contacts already play, and invite the ones who should."
+            subtitle: "See which of your contacts already play (matched by email, and by phone once you add your number), and invite the ones who should."
         ) {
             HStack(spacing: -8) {
                 ForEach(Array(sampleInitials.enumerated()), id: \.offset) { _, item in
@@ -109,9 +109,7 @@ struct PeopleToPlayWithView: View {
                 }
 
                 if let errorMessage {
-                    Text(errorMessage)
-                        .font(CourtlyFont.caption)
-                        .foregroundStyle(CourtlyColor.red)
+                    ErrorCaption(text: errorMessage)
                         .padding(.top, 12)
                 }
             }
@@ -152,7 +150,7 @@ struct PeopleToPlayWithView: View {
         var knownIDs: [UUID] = []
         if draft.contactsGranted {
             do {
-                let hashed = try ContactsService().hashedContacts()
+                let hashed = try await Task.detached(priority: .userInitiated) { try ContactsService().hashedContacts() }.value
                 let byHash = Dictionary(hashed.map { ($0.hash, $0.displayName) }, uniquingKeysWith: { first, _ in first })
                 let matches = try await API.People.matchContacts(hashes: hashed.map(\.hash))
                 var seen = Set<UUID>()

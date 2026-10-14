@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// 02b · Email code. Six digits from the email; the same step for new and returning players.
+/// 02b · Email code. The code from the email (six digits, or eight if the project still sends
+/// the default length); the same step for new and returning players.
 struct EmailCodeView: View {
     let email: String
-    let onSignedIn: () -> Void
+    /// Runs after the session exists; the button keeps spinning until it returns.
+    let onSignedIn: () async -> Void
 
     @State private var code = ""
     @State private var isVerifying = false
@@ -13,13 +15,13 @@ struct EmailCodeView: View {
     @FocusState private var isFocused: Bool
 
     private var digits: String { code.filter(\.isNumber) }
-    private var canContinue: Bool { digits.count == 6 }
+    private var canContinue: Bool { (6...8).contains(digits.count) }
 
     var body: some View {
         OnboardingStepView(
             progress: 0.1,
             title: "Check your email",
-            subtitle: "We sent a 6-digit code to \(email).",
+            subtitle: "We sent a code to \(email).",
             scrolls: false
         ) {
             FieldBox {
@@ -30,9 +32,9 @@ struct EmailCodeView: View {
                     .textContentType(.oneTimeCode)
                     .focused($isFocused)
                     .onChange(of: code) { _, newValue in
-                        let trimmed = String(newValue.filter(\.isNumber).prefix(6))
+                        let trimmed = String(newValue.filter(\.isNumber).prefix(8))
                         if trimmed != newValue { code = trimmed }
-                        if trimmed.count == 6 { verify() }
+                        if trimmed.count == 8 { verify() }
                     }
             }
             .padding(.top, 28)
@@ -68,8 +70,8 @@ struct EmailCodeView: View {
         Task { @MainActor in
             do {
                 try await AppEnvironment.auth.verifyEmailCode(email: email, code: digits)
+                await onSignedIn()
                 isVerifying = false
-                onSignedIn()
             } catch {
                 isVerifying = false
                 messageIsError = true

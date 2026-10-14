@@ -18,13 +18,13 @@ struct PlayView: View {
 
                 if let feed = hits.feed {
                     content(feed)
-                } else if hits.isLoadingFeed {
+                } else if let error = hits.lastError, !hits.isLoadingFeed {
+                    QuietCard(title: "Couldn’t load hits", detail: error)
+                        .padding(.top, 22)
+                } else {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.top, 80)
-                } else {
-                    QuietCard(title: "Couldn’t load hits", detail: hits.lastError ?? "Pull down to try again.")
-                        .padding(.top, 22)
                 }
             }
             .padding(.horizontal, CourtlyMetrics.screenPadding)

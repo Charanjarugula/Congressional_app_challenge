@@ -27,44 +27,73 @@ struct OnboardingFlow: View {
     @Environment(AppSession.self) private var session
     @State private var draft = OnboardingDraft()
     @State private var path: [OnboardingRoute]
+    @State private var showsWelcomeScheme: Bool
 
     private let resumeProfile: Bool
 
     init(resumeProfile: Bool) {
         self.resumeProfile = resumeProfile
         _path = State(initialValue: resumeProfile ? [.name] : [])
+        _showsWelcomeScheme = State(initialValue: !resumeProfile)
+    }
+
+    /// Pushes once, however fast Continue is tapped.
+    private func push(_ route: OnboardingRoute) {
+        guard path.last != route else { return }
+        path.append(route)
+    }
+
+    /// Profile answers are saved as they are given, so quitting mid-way loses nothing.
+    private func save(then route: OnboardingRoute) {
+        session.saveDraft(draft)
+        push(route)
     }
 
     var body: some View {
         NavigationStack(path: $path) {
             WelcomeView(
-                onGetStarted: { path.append(.createAccount(.signUp)) },
-                onSignIn: { path.append(.createAccount(.signIn)) }
+                onGetStarted: { push(.createAccount(.signUp)) },
+                onSignIn: { push(.createAccount(.signIn)) }
             )
             .navigationDestination(for: OnboardingRoute.self) { route in
                 destination(for: route)
             }
         }
         // Welcome is blue with white status-bar text; every other screen is light. The root
-        // view's preference wins inside a NavigationStack, so it has to change with the path.
-        .preferredColorScheme(path.isEmpty ? .dark : .light)
+        // view's preference wins inside a NavigationStack, so it follows the path, switching
+        // once the push animation has carried Welcome off screen.
+        .preferredColorScheme(showsWelcomeScheme ? .dark : .light)
+        .onChange(of: path.isEmpty) { _, atWelcome in
+            if atWelcome {
+                showsWelcomeScheme = true
+            } else {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    if !path.isEmpty { showsWelcomeScheme = false }
+                }
+            }
+        }
         .onAppear {
             if resumeProfile, let profile = session.profile { draft.load(from: profile) }
         }
     }
 
-    /// After any successful sign-in: into the app if the profile is finished, otherwise on to the name step.
-    private func continueAfterSignIn() {
-        Task { @MainActor in
-            do {
-                let onboarded = try await session.handleSignedIn()
-                if !onboarded {
-                    if let profile = session.profile { draft.load(from: profile) }
-                    path.append(.name)
+    /// After any successful sign-in: into the app if the profile is finished, otherwise on to the
+    /// name step, prefilled with what the profile or Apple already knows.
+    @MainActor
+    private func continueAfterSignIn(name: PersonNameComponents?) async {
+        do {
+            let onboarded = try await session.handleSignedIn()
+            if !onboarded {
+                if let profile = session.profile { draft.load(from: profile) }
+                if draft.trimmedFirstName.isEmpty, let given = name?.givenName {
+                    draft.firstName = given
+                    draft.lastName = name?.familyName ?? ""
                 }
-            } catch {
-                session.show(error, title: "Couldn’t load your profile")
+                push(.name)
             }
+        } catch {
+            session.show(error, title: "Couldn’t load your profile")
         }
     }
 
@@ -74,40 +103,40 @@ struct OnboardingFlow: View {
         case let .createAccount(mode):
             CreateAccountView(
                 mode: mode,
-                onSignedIn: continueAfterSignIn,
-                onEmailSent: { email in path.append(.emailCode(email)) }
+                onSignedIn: { name in await continueAfterSignIn(name: name) },
+                onEmailSent: { email in push(.emailCode(email)) }
             )
         case let .emailCode(email):
-            EmailCodeView(email: email, onSignedIn: continueAfterSignIn)
+            EmailCodeView(email: email, onSignedIn: { await continueAfterSignIn(name: nil) })
         case .name:
-            NameView(draft: draft) { path.append(.birthday) }
+            NameView(draft: draft) { save(then: .birthday) }
         case .birthday:
-            BirthdayView(draft: draft) { path.append(.gender) }
+            BirthdayView(draft: draft) { save(then: .gender) }
         case .gender:
-            GenderView(draft: draft) { path.append(.level) }
+            GenderView(draft: draft) { save(then: .level) }
         case .level:
-            LevelView(draft: draft) { path.append(.formats) }
+            LevelView(draft: draft) { save(then: .formats) }
         case .formats:
-            FormatsView(draft: draft) { path.append(.location) }
+            FormatsView(draft: draft) { save(then: .location) }
         case .location:
-            LocationView(draft: draft) { path.append(.availability) }
+            LocationView(draft: draft) { save(then: .availability) }
         case .availability:
-            AvailabilityView(draft: draft) { path.append(.friends) }
+            AvailabilityView(draft: draft) { save(then: .friends) }
         case .friends:
             FriendsIntroView(
                 onFindFriends: { granted in
                     draft.contactsGranted = granted
-                    path.append(.people)
+                    push(.people)
                 },
-                onSkip: { path.append(.notifications) }
+                onSkip: { push(.notifications) }
             )
         case .people:
-            PeopleToPlayWithView(draft: draft) { path.append(.notifications) }
+            PeopleToPlayWithView(draft: draft) { push(.notifications) }
         case .notifications:
-            NotificationsView(draft: draft) { path.append(.done) }
+            NotificationsView(draft: draft) { push(.done) }
         case .done:
             YoureInView(firstName: draft.trimmedFirstName) {
-                try await session.completeOnboarding(with: draft, accountEmail: nil)
+                try await session.completeOnboarding(with: draft)
             }
         }
     }

@@ -12,7 +12,10 @@ struct MainTabView: View {
     @State private var paths: [MainTab: [AppRoute]] = [:]
     @State private var isPlanning = false
     @State private var coachStep: Int?
+    @State private var liveUpdates: [RealtimeHub.Subscription] = []
+    @State private var refreshDebounce: Task<Void, Never>?
     @State private var openGeneration = 0   // the newest deep link is the one that lands
+    @State private var inboxDebounce: Task<Void, Never>?
 
     /// The stores read and write only the signed-in player's own snapshots.
     init(account: UUID?) {
@@ -31,11 +34,7 @@ struct MainTabView: View {
                     .accessibilityHidden(selected != tab)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if isAtRoot {
-                GlassTabBar(selected: $selected, dots: dots)
-            }
-        }
+        // Placed before the inset so the pill floats above the tab bar instead of over it.
         .overlay(alignment: .bottomTrailing) {
             if isAtRoot && selected == .play && (showsPlanPill || coachStep == 3) {
                 PlanHitPill { isPlanning = true }
@@ -44,14 +43,27 @@ struct MainTabView: View {
                             .stroke(Color.white.opacity(0.35), lineWidth: 4)
                             .opacity(coachStep == 3 ? 1 : 0)
                     )
+                    .anchorPreference(key: CoachAnchorKey.self, value: .bounds) { ["pill": $0] }
                     .padding(.trailing, 20)
                     .padding(.bottom, 16)
             }
         }
-        .overlay {
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isAtRoot {
+                GlassTabBar(selected: $selected, dots: dots)
+            }
+        }
+        .overlayPreferenceValue(CoachAnchorKey.self) { anchors in
             if let coachStep {
-                CoachMarksOverlay(step: coachStep, onNext: advanceCoachMarks)
-                    .zIndex(1)
+                GeometryReader { proxy in
+                    CoachMarksOverlay(
+                        step: coachStep,
+                        pillFrame: anchors["pill"].map { proxy[$0] },
+                        containerHeight: proxy.size.height,
+                        onNext: advanceCoachMarks
+                    )
+                }
+                .zIndex(1)
             }
         }
         .sheet(isPresented: $isPlanning) {
@@ -73,20 +85,69 @@ struct MainTabView: View {
                 startCoachMarksIfNeeded()
             }
             await NotificationPermission.registerIfAuthorized()
+            startLiveUpdates()
         }
+        .onDisappear { stopLiveUpdates() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
+            switch phase {
+            case .active:
                 Task { await hits.refreshAll() }
                 Task { await inbox.load() }
-                Task { await API.Devices.retryPending() }   // a push token the server didn't take yet
+                Task { await API.Devices.retryPending() }
+                startLiveUpdates()
+            case .background:
+                stopLiveUpdates()
+            default:
+                break
             }
         }
         .onChange(of: deepLinks.pending) { _, link in
             if let link { Task { await open(link) } }
         }
-        .onChange(of: deepLinks.lastPushReceivedAt) { _, _ in
-            Task { await hits.refreshAll() }
-            Task { await inbox.load() }
+        .onChange(of: deepLinks.lastPush) { _, arrival in
+            // Refresh what the push can have changed: everything but a message touches the hit lists,
+            // and anything that adds a chat or a system line touches the inbox.
+            guard let kind = arrival?.kind else { scheduleHitsRefresh(); scheduleInboxRefresh(); return }
+            if kind != "message" { scheduleHitsRefresh() }
+            if !["join_request", "request_declined", "reminder_day", "reminder_hour", "day_after_check"].contains(kind) { scheduleInboxRefresh() }
+        }
+    }
+
+    // MARK: - Live updates
+
+    /// Hits, requests and messages change on other phones. Refresh when they do instead of waiting
+    /// for a poll; row-level security means each player only hears about rows they can see.
+    private func startLiveUpdates() {
+        guard liveUpdates.isEmpty else { return }   // launch fires both the task and the active phase
+        let hub = RealtimeHub.shared
+        liveUpdates = [
+            hub.subscribe(table: "hits", events: "*") { scheduleHitsRefresh() },
+            hub.subscribe(table: "join_requests", events: "*") { scheduleHitsRefresh() },
+            hub.subscribe(table: "messages") { scheduleInboxRefresh() },
+        ]
+    }
+
+    private func stopLiveUpdates() {
+        liveUpdates.forEach { RealtimeHub.shared.unsubscribe($0) }
+        liveUpdates = []
+    }
+
+    /// Several rows often change in one action (a request, the hit, the chat); refresh once.
+    private func scheduleHitsRefresh() {
+        refreshDebounce?.cancel()
+        refreshDebounce = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            await hits.refreshAll()   // coalesces with one already running
+        }
+    }
+
+    private func scheduleInboxRefresh() {
+        inboxDebounce?.cancel()
+        inboxDebounce = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            await inbox.load()
         }
     }
 
@@ -131,15 +192,15 @@ struct MainTabView: View {
     /// finished for that player and no one else; the server hears next time.
     static func coachMarksDoneKey(for account: UUID) -> String { "coach_marks_done_local.\(account.uuidString)" }
 
+    /// Only over the Play root: a pushed screen or another tab is not where the tips point.
     private func startCoachMarksIfNeeded() {
-        guard let profile = session.profile, !profile.coachMarksDone, coachStep == nil, deepLinks.pending == nil else { return }
+        guard let profile = session.profile, !profile.coachMarksDone, coachStep == nil else { return }
         if UserDefaults.standard.bool(forKey: Self.coachMarksDoneKey(for: profile.id)) {
             Task { try? await session.updateProfile(["coach_marks_done": true]) }   // finished before; the save hadn't landed
             return
         }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(700))
-            // Only over the Play root: a pushed screen or another tab is not where the tips point.
             guard coachStep == nil, session.profile?.coachMarksDone == false, isAtRoot, selected == .play, deepLinks.pending == nil else { return }
             withAnimation(.easeInOut(duration: 0.25)) { coachStep = 1 }
         }
@@ -219,7 +280,8 @@ struct MainTabView: View {
         case let .hit(id): HitDetailView(hitID: id)
         case let .request(id): JoinRequestView(requestID: id)
         case let .chat(id): ChatThreadView(chatID: id)
-        case let .player(id): PlayerProfileView(playerID: id)
+        case let .groupInfo(id): GroupInfoView(chatID: id)
+        case let .player(id, hitID): PlayerProfileView(playerID: id, hitID: hitID)
         case .addFriends: AddFriendsView()
         case .newGroup: NewGroupView()
         case .account: AccountView()

@@ -60,6 +60,10 @@ struct AccountView: View {
                             SettingsRow(title: "Privacy Policy") { UIApplication.shared.open(AppConfig.privacyURL) }
                             HairlineSeparator()
                             SettingsRow(title: "Terms of Service") { UIApplication.shared.open(AppConfig.termsURL) }
+                            HairlineSeparator()
+                            SettingsRow(title: "Contact support") {
+                                if let url = URL(string: "mailto:\(AppConfig.supportEmail)") { UIApplication.shared.open(url) }
+                            }
                         }
                     }
 
@@ -95,7 +99,7 @@ struct AccountView: View {
             Button("Delete", role: .destructive) { deleteAccount() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Your profile, chats and hits will be deleted. This can’t be undone.")
+            Text("Your profile, photo, friendships, direct messages and sign-in are deleted right away. Messages you sent in group or hit chats stay for the other players, without your name. This can’t be undone.")
         }
         .sheet(isPresented: $showsPhone) { PhoneSheet() }
         .overlay {
@@ -218,7 +222,7 @@ struct PhoneSheet: View {
         isSaving = true
         Task { @MainActor in
             do {
-                try await session.updateProfile(["phone_e164": normalized, "phone_hash": ContactsService.hash(normalized)])
+                try await session.updateProfile(["phone_e164": normalized])   // the server hashes it for contact matching
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription
@@ -231,7 +235,7 @@ struct PhoneSheet: View {
         isSaving = true
         Task { @MainActor in
             do {
-                try await session.updateProfile(["phone_e164": NSNull(), "phone_hash": NSNull()])
+                try await session.updateProfile(["phone_e164": NSNull()])
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription

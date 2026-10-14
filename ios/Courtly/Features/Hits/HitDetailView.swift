@@ -9,6 +9,7 @@ struct HitDetailView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.navigate) private var navigate
     @State private var hit: Hit?
+    @State private var hitVersion = 0   // bumped by every reload and action; only the latest may write
     @State private var loadFailed = false
     @State private var isWorking = false
     @State private var showsCancelAlert = false
@@ -57,6 +58,10 @@ struct HitDetailView: View {
             if hit == nil { hit = hits.cachedHit(hitID) }
             await reload()
         }
+        .onChange(of: hits.lastRefreshedAt) { _, _ in
+            // Something changed on another phone (a request, a claim, a cancel): show it here too.
+            Task { await reload() }
+        }
         .alert("Cancel this hit?", isPresented: $showsCancelAlert) {
             Button("Cancel hit", role: .destructive) {
                 Task { await perform { try await hits.cancel(hitID) } }
@@ -68,8 +73,9 @@ struct HitDetailView: View {
         .alert("Leave this hit?", isPresented: $showsLeaveAlert) {
             Button("Leave", role: .destructive) {
                 Task {
-                    await perform { try await hits.leave(hitID) }
-                    navigate.pop()
+                    if await perform({ try await hits.leave(hitID) }) {
+                        navigate.pop()
+                    }
                 }
             }
             Button("Stay", role: .cancel) {}
@@ -162,7 +168,7 @@ struct HitDetailView: View {
             SectionHeader(title: "Host", top: 24)
             Card {
                 Button {
-                    navigate(.player(hit.host.id))
+                    navigate(.player(hit.host.id, hitID: hit.id))
                 } label: {
                     HStack(spacing: 14) {
                         PlayerAvatar(card: hit.host, size: 48)
@@ -200,7 +206,7 @@ struct HitDetailView: View {
                     ActionButton(title: "No", style: attendance[player.id] == false ? .blue : .grouped) {
                         answer(player, showedUp: false, hit: hit)
                     }
-                    ActionButton(title: "Yes", style: attendance[player.id] == false ? .grouped : .blue) {
+                    ActionButton(title: "Yes", style: attendance[player.id] == true ? .blue : .grouped) {
                         answer(player, showedUp: true, hit: hit)
                     }
                 }
@@ -262,22 +268,35 @@ struct HitDetailView: View {
     // MARK: - Actions
 
     private func reload() async {
+        hitVersion += 1
+        let version = hitVersion
         do {
-            hit = try await API.Hits.get(hitID)
+            var fresh = try await API.Hits.get(hitID)
+            guard version == hitVersion else { return }   // an action or a newer reload answered meanwhile
+            // `get_hit` carries no My Hits extras; keep the ones the list told us about.
+            let known = hit ?? hits.cachedHit(hitID)
+            fresh.needsAttendance = fresh.needsAttendance ?? known?.needsAttendance
+            hit = fresh
             loadFailed = false
         } catch {
             if hit == nil { loadFailed = true }
         }
     }
 
+    /// Runs an action that returns the updated hit. Returns false when it failed (the alert shows why).
     @MainActor
-    private func perform(_ work: () async throws -> Hit) async {
+    @discardableResult
+    private func perform(_ work: () async throws -> Hit) async -> Bool {
         isWorking = true
         defer { isWorking = false }
         do {
-            hit = try await work()
+            let updated = try await work()
+            hitVersion += 1   // a reload fetched before this action must not put the old state back
+            hit = updated
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 

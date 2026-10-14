@@ -1,5 +1,10 @@
 import Foundation
 
+extension Notification.Name {
+    /// Posted when a refresh is rejected and the stored session is gone; the app returns to Welcome.
+    static let courtlySessionLost = Notification.Name("courtly.sessionLost")
+}
+
 enum SupabaseError: LocalizedError, Equatable {
     case notSignedIn
     case http(status: Int, message: String)
@@ -75,8 +80,9 @@ actor SupabaseClient {
     }
 
     func signOut() async {
+        refreshTask?.cancel()
         if session != nil {
-            _ = try? await request("/auth/v1/logout", method: "POST", body: nil, authorized: true)
+            _ = try? await request("/auth/v1/logout?scope=local", method: "POST", body: nil, authorized: true)   // this device only
         }
         session = nil
     }
@@ -85,14 +91,31 @@ actor SupabaseClient {
     func validSession() async throws -> Session {
         guard let current = session else { throw SupabaseError.notSignedIn }
         guard current.needsRefresh else { return current }
+        return try await refresh(current)
+    }
+
+    /// Refreshes now, whatever the token's own expiry says: for a 401 the server gave an access
+    /// token the device still thought was good. Throws `notSignedIn` once the refresh token is rejected.
+    func refreshNow() async throws -> Session {
+        guard let current = session else { throw SupabaseError.notSignedIn }
+        return try await refresh(current)
+    }
+
+    private func refresh(_ current: Session) async throws -> Session {
         if let refreshTask { return try await refreshTask.value }
         let task = Task<Session, Error> {
             defer { refreshTask = nil }
             do {
-                return try await tokenGrant(path: "/auth/v1/token?grant_type=refresh_token", body: ["refresh_token": current.refreshToken], provider: current.provider)
+                let fresh = try await tokenGrant(path: "/auth/v1/token?grant_type=refresh_token", body: ["refresh_token": current.refreshToken], provider: current.provider, store: false)
+                // The player may have signed out while the refresh was in flight.
+                guard session?.userID == current.userID else { throw SupabaseError.notSignedIn }
+                session = fresh
+                return fresh
             } catch let error as SupabaseError {
                 if case let .http(status, _) = error, status == 400 || status == 401 {
+                    // The refresh token was revoked or rotated away: the app has to sign the player out.
                     session = nil
+                    NotificationCenter.default.post(name: .courtlySessionLost, object: nil)
                     throw SupabaseError.notSignedIn
                 }
                 throw error
@@ -102,7 +125,7 @@ actor SupabaseClient {
         return try await task.value
     }
 
-    private func tokenGrant(path: String, body: [String: Any], provider: String?) async throws -> Session {
+    private func tokenGrant(path: String, body: [String: Any], provider: String?, store: Bool = true) async throws -> Session {
         let data = try await request(path, method: "POST", body: body, authorized: false)
         let token: TokenResponse
         do {
@@ -111,7 +134,7 @@ actor SupabaseClient {
             throw SupabaseError.decoding(String(describing: error))
         }
         let fresh = token.session(provider: provider)
-        session = fresh
+        if store { session = fresh }
         return fresh
     }
 
@@ -169,7 +192,9 @@ actor SupabaseClient {
         return try await request(path, method: method, rawBody: raw, headers: allHeaders, authorized: authorized)
     }
 
-    private func request(_ path: String, method: String, rawBody: Data?, headers: [String: String], authorized: Bool) async throws -> Data {
+    /// `expecting` names the account a retry must still be signed in as; any other answer is theirs alone.
+    private func request(_ path: String, method: String, rawBody: Data?, headers: [String: String], authorized: Bool,
+                         retried: Bool = false, expecting: UUID? = nil) async throws -> Data {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
             throw SupabaseError.http(status: 0, message: "bad path \(path)")
         }
@@ -178,8 +203,11 @@ actor SupabaseClient {
         urlRequest.httpBody = rawBody
         urlRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        var sentAs: UUID?
         if authorized {
             let current = try await validSession()
+            if let expecting, current.userID != expecting { throw SupabaseError.notSignedIn }
+            sentAs = current.userID
             urlRequest.setValue("Bearer \(current.accessToken)", forHTTPHeaderField: "Authorization")
         } else {
             urlRequest.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
@@ -191,6 +219,15 @@ actor SupabaseClient {
         let (data, response) = try await urlSession.data(for: urlRequest)
         guard let http = response as? HTTPURLResponse else {
             throw SupabaseError.http(status: 0, message: "no response")
+        }
+        if http.statusCode == 401, authorized, !retried {
+            // The server stopped honoring a token the device still thought was good (clock skew, a
+            // revoked session): refresh once and try again. A rejected refresh signs the player out.
+            // Only the player who sent the request may retry it: after a sign-out, or with someone
+            // else signed in by now, the answer is theirs alone.
+            guard let now = session, now.userID == sentAs else { throw SupabaseError.notSignedIn }
+            _ = try await refreshNow()
+            return try await request(path, method: method, rawBody: rawBody, headers: headers, authorized: true, retried: true, expecting: sentAs)
         }
         guard (200..<300).contains(http.statusCode) else {
             throw Self.error(status: http.statusCode, data: data)
@@ -211,6 +248,13 @@ actor SupabaseClient {
             ?? (object["error_description"] as? String)
             ?? (object["error"] as? String)
             ?? "unknown error"
+        // The gateway rejects the whole request when the anon key does not belong to the project.
+        if message.localizedCaseInsensitiveContains("invalid api key") || message.localizedCaseInsensitiveContains("no api key") {
+            #if DEBUG
+            print("Supabase: the key in AppConfig.swift is not this project's. Paste the sb_publishable key from Project Settings → API Keys.")
+            #endif
+            return .http(status: status, message: "Courtly can’t reach its server right now.")
+        }
         return .http(status: status, message: message)
     }
 }

@@ -9,8 +9,9 @@ struct LocationView: View {
     @State private var isLocating = false
     @State private var isSearching = false
     @State private var errorMessage: String?
-    @State private var locationService = LocationService()
-    @State private var completer = PlaceSearchCompleter()
+    // @StateObject builds these once per screen; @State would build them on every re-init of the view.
+    @StateObject private var locationService = LocationService()
+    @StateObject private var completer = PlaceSearchCompleter()
     @FocusState private var isEditing: Bool
 
     var body: some View {
@@ -42,9 +43,7 @@ struct LocationView: View {
                         .padding(.top, 8)
                 }
                 if let errorMessage {
-                    Text(errorMessage)
-                        .font(CourtlyFont.caption)
-                        .foregroundStyle(CourtlyColor.red)
+                    ErrorCaption(text: errorMessage)
                         .padding(.top, 10)
                 }
             }

@@ -27,8 +27,9 @@ struct PeopleView: View {
         .task(id: isActive) {
             guard isActive else { return }
             await inbox.load()
+            // Realtime (in the tab shell) refreshes on new messages; this is the fallback.
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(15))
                 guard !Task.isCancelled else { break }
                 await inbox.load()
             }
@@ -56,6 +57,7 @@ struct PeopleView: View {
                             .shadow(color: CourtlyColor.ink.opacity(0.08), radius: 4, y: 2)
                     )
             }
+            .accessibilityLabel("Add friends or start a group")
             if let card = session.profile?.card {
                 PlayerAvatar(card: card, size: 40)
                     .overlay(Circle().stroke(Color.white, lineWidth: 2))
@@ -80,6 +82,7 @@ struct PeopleView: View {
                         .foregroundStyle(CourtlyColor.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
         .padding(.horizontal, 12)
@@ -108,12 +111,12 @@ struct PeopleView: View {
                     .buttonStyle(.plain)
                 }
             }
-        } else if inbox.isLoading {
+        } else if let error = inbox.lastError, !inbox.isLoading {
+            QuietCard(title: "Couldn’t load chats", detail: error)
+        } else {
             ProgressView()
                 .frame(maxWidth: .infinity)
                 .padding(.top, 80)
-        } else {
-            QuietCard(title: "Couldn’t load chats", detail: inbox.lastError ?? "Pull down to try again.")
         }
     }
 
@@ -201,11 +204,12 @@ struct ChatRow: View {
     }
 
     private var isHitRequest: Bool {
-        chat.preview?.hasPrefix(Self.hitPrefix) == true
+        chat.lastMessageType == .hitInvite || chat.preview?.hasPrefix(Self.hitPrefix) == true
     }
 
+    /// Someone added you and is waiting for the add-back.
     private var isCallToAction: Bool {
-        chat.unreadCount > 0 && (chat.preview?.contains("added you back") == true)
+        chat.friendship == "requested_me"
     }
 
     private var previewText: String {

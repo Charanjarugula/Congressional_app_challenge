@@ -26,6 +26,7 @@ struct PlanHitView: View {
     @State private var customExpiry: Date?
     @State private var showsExpiryPicker = false
     @State private var showsCourtPicker = false
+    @State private var courtsError: String?
     @State private var isPosting = false
     @State private var didSeed = false
     @State private var errorMessage: String?
@@ -48,13 +49,19 @@ struct PlanHitView: View {
 
     /// When the request card stops taking claims: 8 PM the evening before, or two hours before
     /// the hit, whichever comes first. Never in the past.
+    /// Only an expiry the host picked is sent; otherwise the server applies the same default rule.
+    private var chosenExpiry: Date? {
+        guard let customExpiry, customExpiry > .now, customExpiry < startsAt else { return nil }
+        return customExpiry
+    }
+
     private var inviteExpiry: Date {
         if let customExpiry, customExpiry > .now, customExpiry < startsAt { return customExpiry }
         let calendar = Calendar.current
         let eveningBefore = calendar.date(bySettingHour: 20, minute: 0, second: 0, of: calendar.date(byAdding: .day, value: -1, to: startsAt) ?? startsAt) ?? startsAt
         var expiry = min(startsAt.addingTimeInterval(-2 * 3600), eveningBefore)
         if expiry <= .now {
-            expiry = min(startsAt.addingTimeInterval(-30 * 60), Date.now.addingTimeInterval(12 * 3600))
+            expiry = min(startsAt.addingTimeInterval(-5 * 60), Date.now.addingTimeInterval(12 * 3600))
         }
         return expiry
     }
@@ -72,6 +79,11 @@ struct PlanHitView: View {
                     whenCard
                     label("Where")
                     whereRow
+                    if let courtsError, courts.isEmpty {
+                        ErrorCaption(text: courtsError)
+                            .padding(.top, 8)
+                            .padding(.horizontal, 4)
+                    }
                     label("What")
                     HStack(spacing: 8) {
                         ForEach(PlayFormat.allCases) { option in
@@ -223,7 +235,7 @@ struct PlanHitView: View {
             }
             .padding(.horizontal, 4)
             .padding(.top, 12)
-            if showsExpiryPicker {
+            if showsExpiryPicker, startsAt > Date.now.addingTimeInterval(60) {
                 DatePicker(
                     "Open until",
                     selection: Binding(get: { inviteExpiry }, set: { customExpiry = $0 }),
@@ -291,11 +303,16 @@ struct PlanHitView: View {
                 spots = Self.defaultSpots(for: first)
             }
         }
-        guard let list = try? await API.Courts.nearby(limit: 30) else { return }
-        courts = list
-        if court == nil {
-            let lastID = UserDefaults.standard.string(forKey: Self.lastCourtKey).flatMap { UUID(uuidString: $0) }
-            court = list.first { $0.id == lastID } ?? list.first
+        do {
+            let list = try await API.Courts.nearby(limit: 30)
+            courts = list
+            courtsError = nil
+            if court == nil {
+                let lastID = UserDefaults.standard.string(forKey: Self.lastCourtKey).flatMap { UUID(uuidString: $0) }
+                court = list.first { $0.id == lastID } ?? list.first
+            }
+        } catch {
+            courtsError = "Couldn’t load nearby courts. \(error.localizedDescription)"
         }
     }
 
@@ -307,7 +324,7 @@ struct PlanHitView: View {
                 let hit = try await hits.create(
                     courtID: court.id, startsAt: startsAt, durationMin: duration,
                     format: format, spots: spots, visibility: visibility,
-                    inviteChatID: inviteChat?.id, inviteExpiresAt: inviteChat == nil ? nil : inviteExpiry
+                    inviteChatID: inviteChat?.id, inviteExpiresAt: inviteChat == nil ? nil : chosenExpiry
                 )
                 isPosting = false
                 dismiss()

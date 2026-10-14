@@ -1,15 +1,17 @@
 import Foundation
 
 /// Environment-specific values. Debug builds talk to courtly-dev, release builds to courtly-prod.
-/// The anon key is a public client key by design; row-level security protects the data.
+/// The key below is the project's public client key (Project Settings → API Keys). Both projects
+/// were created with the new key format, so use the `sb_publishable_…` key there, not the legacy
+/// `eyJ…` one; row-level security protects the data either way.
 enum AppConfig {
     #if DEBUG
     static let supabaseURL = URL(string: "https://letuvtazmtjkvivattfy.supabase.co")!
-    static let supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxldHV2dGF6bXRqa3ZpdmF0dGZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NTA5NTYsImV4cCI6MjEwNzUyNjk1Nn0.yOJ36Knjz5SrnCJTlMze28Vbkbfd-XSZirwexanaxa8"
+    static let supabaseAnonKey = "sb_publishable_2om3uiw5HBgQxNaBFEUZYA_g8Wfkxp6"
     static let apnsEnvironment = "sandbox"
     #else
     static let supabaseURL = URL(string: "https://jrlocgfyskutnusscenf.supabase.co")!
-    static let supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpybG9jZ2Z5c2t1dG51c3NjZW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NTEwMzYsImV4cCI6MjEwNzUyNzAzNn0.jOQERNP3OuIehtTxt-gellqX1SvIjnFfLKH7sFs2wKg"
+    static let supabaseAnonKey = "sb_publishable_gt6oatTEPQt7rP3xHjHpKw_vPL2jtI3"
     static let apnsEnvironment = "production"
     #endif
 
@@ -25,8 +27,9 @@ enum AppConfig {
     /// App Review signs in with this address and a fixed code, which is that account's password.
     static let reviewerEmail = "reviewer@courtly.app"
 
-    /// Policy pages from the `site` folder. Point these at the Vercel domain once it exists.
-    static let privacyURL = URL(string: "https://courtly.app/privacy")!
-    static let termsURL = URL(string: "https://courtly.app/terms")!
+    /// The `site` folder deployed on Vercel. CI's config check fails while this is still the placeholder.
+    static let siteURL = URL(string: "https://courtly-sage.vercel.app")!
+    static var privacyURL: URL { siteURL.appending(path: "privacy") }
+    static var termsURL: URL { siteURL.appending(path: "terms") }
     static let supportEmail = "courtly.support@gmail.com"
 }

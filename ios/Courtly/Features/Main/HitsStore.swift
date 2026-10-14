@@ -16,6 +16,15 @@ final class HitsStore {
     private(set) var myHitsError: String?
     /// The feed's error, which the Play tab shows.
     var lastError: String? { feedError }
+    /// Bumped after every successful load so open screens can re-fetch their own copy.
+    private(set) var lastRefreshedAt: Date?
+
+    // Loads that overlap: only the newest one may write, so an answer that left before an action
+    // never puts the list back the way it was.
+    private var feedGeneration = 0
+    private var myHitsGeneration = 0
+    private var refreshTask: Task<Void, Never>?
+    private var refreshQueued = false
 
     /// Paints from the signed-in player's own snapshots; nothing of another account's is ever read.
     init(account: UUID?) {
@@ -28,47 +37,77 @@ final class HitsStore {
 
     @MainActor
     func loadFeed() async {
+        feedGeneration += 1
+        let generation = feedGeneration
         isLoadingFeed = true
-        defer { isLoadingFeed = false }
+        defer { if generation == feedGeneration { isLoadingFeed = false } }
         let owner = await SupabaseClient.shared.session?.userID
         do {
             let fresh = try await API.Hits.feed()
-            // Still the same player: after a sign-out or a switch the answer belongs to someone else and
-            // must not reach the lists. The file goes under the account that fetched it, so even a write
-            // that slipped through could not be read by the next player.
+            // Still the same player (after a sign-out or a switch the answer belongs to someone else and
+            // must not reach the lists), and, checked last with no await in between, still the newest
+            // load. The file goes under the account that fetched it, so even a write that slipped
+            // through could not be read by the next player.
             let samePlayer = await SupabaseClient.shared.session?.userID == owner
-            guard samePlayer, let owner else { return }
+            guard samePlayer, generation == feedGeneration, let owner else { return }
             feed = fresh
             feedError = nil
             SnapshotCache.save(fresh, key: "play_feed", account: owner)
             try? await UNUserNotificationCenter.current().setBadgeCount(fresh.badge)
         } catch {
+            guard generation == feedGeneration, !Self.isCancellation(error) else { return }
             feedError = error.localizedDescription
         }
     }
 
     @MainActor
     func loadMyHits() async {
+        myHitsGeneration += 1
+        let generation = myHitsGeneration
         isLoadingMyHits = true
-        defer { isLoadingMyHits = false }
+        defer { if generation == myHitsGeneration { isLoadingMyHits = false } }
         let owner = await SupabaseClient.shared.session?.userID
         do {
             let fresh = try await API.Hits.mine()
             let samePlayer = await SupabaseClient.shared.session?.userID == owner
-            guard samePlayer, let owner else { return }
+            guard samePlayer, generation == myHitsGeneration, let owner else { return }
             myHits = fresh
             myHitsError = nil
             SnapshotCache.save(fresh, key: "my_hits", account: owner)
         } catch {
+            guard generation == myHitsGeneration, !Self.isCancellation(error) else { return }
             myHitsError = error.localizedDescription
         }
     }
 
+    /// Both lists. The loads run in their own task, so a caller that goes away (a cancelled
+    /// debounce, a screen popped) never cuts them short. A refresh asked for while one runs makes
+    /// it run once more afterwards, so a change that landed in between is not missed, and every
+    /// caller waits for that final round.
     @MainActor
     func refreshAll() async {
-        async let feedLoad: () = loadFeed()
-        async let mineLoad: () = loadMyHits()
-        _ = await (feedLoad, mineLoad)
+        if let refreshTask {
+            refreshQueued = true
+            await refreshTask.value
+            return
+        }
+        let task = Task { @MainActor in
+            repeat {
+                refreshQueued = false
+                async let feedLoad: () = loadFeed()
+                async let mineLoad: () = loadMyHits()
+                _ = await (feedLoad, mineLoad)
+            } while refreshQueued
+            lastRefreshedAt = .now
+            refreshTask = nil
+        }
+        refreshTask = task
+        await task.value
+    }
+
+    /// A load that was cut short by its caller going away is not a failure worth showing.
+    private static func isCancellation(_ error: Error) -> Bool {
+        error is CancellationError || (error as? URLError)?.code == .cancelled
     }
 
     // MARK: - Lookups

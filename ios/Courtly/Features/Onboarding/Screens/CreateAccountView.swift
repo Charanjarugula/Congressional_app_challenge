@@ -7,7 +7,8 @@ struct CreateAccountView: View {
     }
 
     let mode: AccountMode
-    let onSignedIn: () -> Void
+    /// Runs after the session exists; the button keeps spinning until it returns.
+    let onSignedIn: (PersonNameComponents?) async -> Void
     let onEmailSent: (String) -> Void
 
     @State private var email = ""
@@ -16,7 +17,7 @@ struct CreateAccountView: View {
 
     private var isValidEmail: Bool {
         let trimmed = email.trimmingCharacters(in: .whitespaces)
-        return trimmed.contains("@") && trimmed.contains(".") && trimmed.count >= 6
+        return trimmed.range(of: #"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$"#, options: .regularExpression) != nil
     }
 
     private var normalizedEmail: String {
@@ -26,8 +27,12 @@ struct CreateAccountView: View {
     var body: some View {
         OnboardingStepView(progress: 0.1, title: mode == .signUp ? "Create your account" : "Welcome back") {
             VStack(spacing: 12) {
-                SocialSignInButton(kind: .google, isLoading: busy == .google) { run(.google) { try await AppEnvironment.auth.signInWithGoogle(); onSignedIn() } }
-                SocialSignInButton(kind: .apple, isLoading: busy == .apple) { run(.apple) { try await AppEnvironment.auth.signInWithApple(); onSignedIn() } }
+                SocialSignInButton(kind: .google, isLoading: busy == .google) {
+                    run(.google) { try await AppEnvironment.auth.signInWithGoogle(); await onSignedIn(nil) }
+                }
+                SocialSignInButton(kind: .apple, isLoading: busy == .apple) {
+                    run(.apple) { let name = try await AppEnvironment.auth.signInWithApple(); await onSignedIn(name) }
+                }
             }
             .padding(.top, 32)
 
@@ -61,9 +66,7 @@ struct CreateAccountView: View {
                 .padding(.top, 16)
 
             if let errorMessage {
-                Text(errorMessage)
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.red)
+                ErrorCaption(text: errorMessage)
                     .padding(.top, 12)
             }
 

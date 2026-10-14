@@ -38,6 +38,7 @@ struct NeedsReplyCard: View {
                 ActionButton(title: "Accept", height: 40, isLoading: working == "accept") { respond(accept: true) }
                 ActionButton(title: "Decline", style: .grouped, height: 40, isLoading: working == "decline") { respond(accept: false) }
             }
+            .disabled(working != nil)
         }
     }
 
@@ -57,6 +58,7 @@ struct NeedsReplyCard: View {
                 ActionButton(title: "I’m in", height: 40, isLoading: working == "claim") { claim() }
                 ActionButton(title: "Not now", style: .grouped, height: 40, isLoading: working == "decline") { declineInvite() }
             }
+            .disabled(working != nil)
         }
     }
 
@@ -135,6 +137,7 @@ struct NeedsReplyCard: View {
     }
 
     private func run(_ label: String, _ work: @escaping () async throws -> Void) {
+        guard working == nil else { return }
         working = label
         Task { @MainActor in
             do {

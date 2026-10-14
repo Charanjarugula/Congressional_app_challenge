@@ -10,7 +10,6 @@ ROOT=$(cd "$HERE/../.." && pwd)
 DB=${PGDATABASE:-courtly_test}
 export PGDATABASE=postgres
 psql -v ON_ERROR_STOP=1 -qc "drop database if exists $DB;" && psql -v ON_ERROR_STOP=1 -qc "create database $DB;"
-psql -qc "drop role if exists anon; drop role if exists authenticated; drop role if exists service_role;" >/dev/null 2>&1 || true
 export PGDATABASE=$DB
 psql -v ON_ERROR_STOP=1 -q -f "$HERE/shim.sql" || { echo "shim failed"; exit 1; }
 

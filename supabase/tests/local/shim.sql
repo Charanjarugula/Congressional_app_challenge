@@ -1,7 +1,13 @@
 -- Local stand-ins for what a Supabase project provides. Test harness only.
-create role anon nologin;
-create role authenticated nologin;
-create role service_role nologin;
+do $$ begin
+  create role anon nologin;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create role authenticated nologin;
+exception when duplicate_object then null; end $$;
+do $$ begin
+  create role service_role nologin;
+exception when duplicate_object then null; end $$;
 
 create schema auth;
 create table auth.users (id uuid primary key default gen_random_uuid(), email text, created_at timestamptz default now());

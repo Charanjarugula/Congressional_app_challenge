@@ -389,7 +389,7 @@ begin
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   perform public.cancel_request(v_req_id);
-  if (select status from public.join_requests where id = v_req_id) <> 'cancelled' then raise exception 'cancel_request left the request pending'; end if;
+  if (select status from public.join_requests where id = v_req_id) is distinct from 'cancelled' then raise exception 'cancel_request left the request pending'; end if;
   if exists (select 1 from jsonb_array_elements(public.get_my_hits()->'upcoming') e where (e->>'id')::uuid = v_hit_id) then raise exception 'cancelled request still in my hits'; end if;
   begin
     perform public.cancel_request(v_req_id);
@@ -413,8 +413,8 @@ begin
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   perform public.decline_invite((v_invite->>'id')::uuid);
-  if (select status from public.hit_invites where id = (v_invite->>'id')::uuid) <> 'cancelled' then raise exception 'decline_invite left the invite open'; end if;
-  if (select spots_open from public.hits where id = v_hit_id) <> 1 then raise exception 'declining changed the spot count'; end if;
+  if (select status from public.hit_invites where id = (v_invite->>'id')::uuid) is distinct from 'cancelled' then raise exception 'decline_invite left the invite open'; end if;
+  if (select spots_open from public.hits where id = v_hit_id) is distinct from 1 then raise exception 'declining changed the spot count'; end if;
   begin
     perform public.decline_invite((v_invite->>'id')::uuid);
     raise exception 'invite declined twice';
@@ -436,6 +436,7 @@ begin
     raise exception 'get_friends row for maya: %', v_feed;
   end if;
   v_dm := public.find_dm_chat(a, b);
+  if v_dm is null then raise exception 'maya and jordan have no dm'; end if;
   perform public.remove_friend(a);
   if exists (select 1 from jsonb_array_elements(public.get_friends()) e where (e->>'id')::uuid = a) then raise exception 'remove_friend left maya on jordan''s list'; end if;
   if public.relationship_to(a, b) <> 'none' then raise exception 'relationship after removal: %', public.relationship_to(a, b); end if;
@@ -443,7 +444,7 @@ begin
   if exists (select 1 from jsonb_array_elements(public.get_friends()) e where (e->>'id')::uuid = b) then raise exception 'remove_friend left jordan on maya''s list'; end if;
   v_friend := public.add_friend(b);
   if (v_friend->>'relationship') <> 'requested' then raise exception 'add after removal: %', v_friend; end if;
-  if v_dm is not null and (v_friend->>'dm_chat_id')::uuid <> v_dm then raise exception 'add-back opened a second dm'; end if;
+  if (v_friend->>'dm_chat_id')::uuid is distinct from v_dm then raise exception 'add-back opened a second dm: %', v_friend; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   if (public.add_friend(a)->>'relationship') <> 'friend' then raise exception 'add back after removal'; end if;
 

@@ -21,9 +21,12 @@ final class OnboardingDraft {
     var addedPlayerIDs: Set<String> = []
     var notificationsEnabled = false
 
-    var isAdult: Bool {
+    /// Players must be 13 or older: US law (COPPA) requires parental consent below that.
+    static let minimumAge = 13
+
+    var meetsMinimumAge: Bool {
         let years = Calendar.current.dateComponents([.year], from: birthday, to: .now).year ?? 0
-        return years >= 18
+        return years >= Self.minimumAge
     }
 
     var trimmedFirstName: String {

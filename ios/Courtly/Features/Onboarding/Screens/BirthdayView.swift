@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 04 · Birthday. Wheel picker; Continue is held until the player is 18.
+/// 04 · Birthday. Wheel picker; Continue is held until the player meets the minimum age.
 struct BirthdayView: View {
     @Bindable var draft: OnboardingDraft
     let onContinue: () -> Void
@@ -24,14 +24,14 @@ struct BirthdayView: View {
                 .frame(height: 216)
                 .padding(.top, 32)
 
-            if !draft.isAdult {
-                Text("Courtly is for players 18 and over.")
+            if !draft.meetsMinimumAge {
+                Text("Courtly is for players \(OnboardingDraft.minimumAge) and over.")
                     .font(CourtlyFont.caption)
                     .foregroundStyle(CourtlyColor.red)
                     .padding(.top, 12)
             }
         } footer: {
-            PrimaryButton(title: "Continue", isEnabled: draft.isAdult, action: onContinue)
+            PrimaryButton(title: "Continue", isEnabled: draft.meetsMinimumAge, action: onContinue)
         }
     }
 }

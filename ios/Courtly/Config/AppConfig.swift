@@ -17,9 +17,9 @@ enum AppConfig {
 
     static let bundleID = "com.courtly.ios"
 
-    /// Google OAuth iOS client id ("1234-abc.apps.googleusercontent.com"). Empty until the Google Cloud
-    /// project exists; the Google button explains that it is not set up yet.
-    static let googleClientID = ""
+    /// Google OAuth iOS client id from the Courtly Google Cloud project. Public, like the bundle id.
+    /// Leave it empty to hide Google behind the "not set up yet" message.
+    static let googleClientID = "336892358128-vsl2u53dk74upp983s1rqgckho8qr9r1.apps.googleusercontent.com"
 
     /// Key used to hash phone numbers and emails on the phone before matching. Only hashes are sent.
     static let contactsPepper = "courtly-contacts-v1"

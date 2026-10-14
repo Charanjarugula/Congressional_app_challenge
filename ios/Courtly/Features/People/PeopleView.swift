@@ -8,7 +8,6 @@ struct PeopleView: View {
     let isActive: Bool
 
     @State private var query = ""
-    @State private var realtime: RealtimeListener?
 
     private var me: UUID? { session.profile?.id }
 
@@ -26,14 +25,9 @@ struct PeopleView: View {
         .toolbar(.hidden, for: .navigationBar)
         .refreshable { await inbox.load() }
         .task(id: isActive) {
-            realtime?.disconnect()
-            realtime = nil
             guard isActive else { return }
             await inbox.load()
-            // Any new message in one of my chats refreshes the list; polling stays as the fallback.
-            let live = RealtimeListener(table: "messages") { Task { await inbox.load() } }
-            realtime = live
-            await live.connect()
+            // Realtime (in the tab shell) refreshes on new messages; this is the fallback.
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))
                 guard !Task.isCancelled else { break }

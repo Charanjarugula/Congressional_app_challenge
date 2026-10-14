@@ -1,0 +1,148 @@
+import SwiftUI
+
+/// A request to answer, an invite to claim, or an accepted ask that opens the chat.
+struct NeedsReplyCard: View {
+    let item: NeedsReplyItem
+
+    @Environment(HitsStore.self) private var hits
+    @Environment(\.navigate) private var navigate
+    @State private var working: String?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Card(padding: 16) {
+            switch item.kind {
+            case .joinRequest: joinRequest
+            case .invite: invite
+            case .accepted: accepted
+            }
+        }
+        .errorAlert($errorMessage)
+    }
+
+    // MARK: - Variants
+
+    private var joinRequest: some View {
+        VStack(spacing: 12) {
+            Button {
+                if let requestID = item.requestId { navigate(.request(requestID)) }
+            } label: {
+                personRow(
+                    title: "\(item.person.displayName) asked to join",
+                    subtitle: "\(item.hit.shortTimeLabel) · \(item.hit.format.shortTitle) · \(item.hit.court.shortName)"
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            HStack(spacing: 8) {
+                ActionButton(title: "Accept", height: 40, isLoading: working == "accept") { respond(accept: true) }
+                ActionButton(title: "Decline", style: .grouped, height: 40, isLoading: working == "decline") { respond(accept: false) }
+            }
+        }
+    }
+
+    private var invite: some View {
+        VStack(spacing: 12) {
+            Button {
+                navigate(.hit(item.hit.id))
+            } label: {
+                personRow(
+                    title: "\(item.person.displayName) invited you",
+                    subtitle: "\(item.hit.shortTimeLabel) · \(item.hit.format.shortTitle) · \(item.hit.court.shortName)"
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            HStack(spacing: 8) {
+                ActionButton(title: "I’m in", height: 40, isLoading: working == "claim") { claim() }
+                ActionButton(title: "Not now", style: .grouped, height: 40, isLoading: working == "decline") { declineInvite() }
+            }
+        }
+    }
+
+    private var accepted: some View {
+        HStack(spacing: 14) {
+            PlayerAvatar(card: item.person, size: 44)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("\(item.person.firstName) accepted you")
+                    .font(CourtlyFont.bodySemibold)
+                    .foregroundStyle(CourtlyColor.ink)
+                Text("\(item.hit.shortTimeLabel) · \(item.hit.court.shortName)")
+                    .font(CourtlyFont.caption)
+                    .foregroundStyle(CourtlyColor.secondary)
+            }
+            Spacer(minLength: 8)
+            Button(action: openChat) {
+                Text("Chat")
+                    .font(CourtlyFont.secondarySemibold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Capsule().fill(CourtlyColor.blue))
+            }
+            .buttonStyle(PressableButtonStyle())
+        }
+    }
+
+    private func personRow(title: String, subtitle: String) -> some View {
+        HStack(spacing: 14) {
+            PlayerAvatar(card: item.person, size: 44)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(CourtlyFont.bodySemibold)
+                    .foregroundStyle(CourtlyColor.ink)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(CourtlyFont.secondary)
+                    .foregroundStyle(CourtlyColor.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            ChevronMark()
+        }
+    }
+
+    // MARK: - Actions
+
+    private func respond(accept: Bool) {
+        guard let requestID = item.requestId else { return }
+        run(accept ? "accept" : "decline") {
+            let hit = try await hits.respond(requestID: requestID, accept: accept)
+            if accept { navigate(.hit(hit.id)) }
+        }
+    }
+
+    private func claim() {
+        guard let inviteID = item.inviteId else { return }
+        run("claim") {
+            let hit = try await hits.claimInvite(inviteID)
+            navigate(.hit(hit.id))
+        }
+    }
+
+    private func declineInvite() {
+        guard let inviteID = item.inviteId else { return }
+        run("decline") { try await hits.declineInvite(inviteID) }
+    }
+
+    private func openChat() {
+        hits.dismissAccepted(item)
+        if let chatID = item.hit.chatId {
+            navigate(.chat(chatID))
+        } else {
+            navigate(.hit(item.hit.id))
+        }
+    }
+
+    private func run(_ label: String, _ work: @escaping () async throws -> Void) {
+        working = label
+        Task { @MainActor in
+            do {
+                try await work()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            working = nil
+        }
+    }
+}

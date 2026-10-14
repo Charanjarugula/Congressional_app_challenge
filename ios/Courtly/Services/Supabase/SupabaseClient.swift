@@ -11,7 +11,7 @@ enum SupabaseError: LocalizedError, Equatable {
         switch self {
         case .notSignedIn: "You’re signed out."
         case let .http(status, message): "Request failed (\(status)): \(message)"
-        case let .backend(code): code.replacingOccurrences(of: "_", with: " ").capitalized
+        case let .backend(code): BackendMessages.text(for: code)
         case let .decoding(detail): "Unexpected response: \(detail)"
         }
     }

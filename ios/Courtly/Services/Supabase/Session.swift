@@ -37,6 +37,13 @@ struct TokenResponse: Decodable {
 }
 
 enum JSONCoding {
+    /// "2026-10-16T22:30:00.000Z", which Postgres and `parseDate` both accept.
+    static func string(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
+    }
+
     /// Postgres timestamps come back like "2026-10-16T18:30:00.123456+00:00"; trim to milliseconds.
     static func parseDate(_ raw: String) -> Date? {
         let trimmed = raw.replacingOccurrences(of: #"(\.\d{3})\d+"#, with: "$1", options: .regularExpression)
@@ -60,5 +67,16 @@ enum JSONCoding {
             return date
         }
         return decoder
+    }()
+
+    /// Mirror of `decoder` for on-disk snapshots.
+    static let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(string(from: date))
+        }
+        return encoder
     }()
 }

@@ -42,9 +42,11 @@ final class HitsStore {
         let owner = await SupabaseClient.shared.session?.userID
         do {
             let fresh = try await API.Hits.feed()
-            // Still the newest load, and still the same player: after a sign-out or a switch, the answer
-            // belongs to someone else and must not reach the lists or the files the next player reads.
-            guard generation == feedGeneration, await SupabaseClient.shared.session?.userID == owner else { return }
+            // Still the same player (after a sign-out or a switch the answer belongs to someone else and
+            // must not reach the lists or the files the next player reads), and, checked last with no
+            // await in between, still the newest load.
+            let samePlayer = await SupabaseClient.shared.session?.userID == owner
+            guard samePlayer, generation == feedGeneration else { return }
             feed = fresh
             feedError = nil
             SnapshotCache.save(fresh, key: "play_feed")
@@ -64,7 +66,8 @@ final class HitsStore {
         let owner = await SupabaseClient.shared.session?.userID
         do {
             let fresh = try await API.Hits.mine()
-            guard generation == myHitsGeneration, await SupabaseClient.shared.session?.userID == owner else { return }
+            let samePlayer = await SupabaseClient.shared.session?.userID == owner
+            guard samePlayer, generation == myHitsGeneration else { return }
             myHits = fresh
             myHitsError = nil
             SnapshotCache.save(fresh, key: "my_hits")

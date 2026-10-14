@@ -48,6 +48,7 @@ struct MainTabView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await hits.refreshAll() }
+                Task { await API.Devices.retryPending() }   // a push token the server didn't take yet
             }
         }
     }

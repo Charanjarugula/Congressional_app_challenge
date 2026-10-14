@@ -285,7 +285,7 @@ begin
   v_evening_before := (date_trunc('day', h.starts_at at time zone 'America/New_York') - interval '1 day' + interval '20 hours')
                       at time zone 'America/New_York';
   v_expires := coalesce(p_expires_at, least(h.starts_at - interval '2 hours', v_evening_before));
-  if v_expires <= now() then v_expires := least(h.starts_at - interval '30 minutes', now() + interval '12 hours'); end if;
+  if v_expires <= now() then v_expires := least(h.starts_at - interval '5 minutes', now() + interval '12 hours'); end if;
   if v_expires >= h.starts_at then raise exception 'invalid_expiry'; end if;
 
   insert into public.hit_invites (hit_id, chat_id, created_by, target_user_id, spots, expires_at)

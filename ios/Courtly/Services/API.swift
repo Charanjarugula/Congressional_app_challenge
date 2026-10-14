@@ -8,6 +8,18 @@ enum API {
     private static func nullable(_ value: Any?) -> Any { value ?? NSNull() }
 
     enum Profile {
+        /// Puts a profile photo in the avatars bucket and returns the path to store on the profile.
+        static func uploadPhoto(_ data: Data, for userID: UUID) async throws -> String {
+            let path = "\(userID.uuidString.lowercased())/avatar-\(Int(Date.now.timeIntervalSince1970)).jpg"
+            try await client.upload(bucket: "avatars", path: path, data: data, contentType: "image/jpeg")
+            return path
+        }
+
+        /// Removes a photo the profile no longer points at.
+        static func removePhoto(at path: String) async throws {
+            try await client.remove(bucket: "avatars", path: path)
+        }
+
         static func me() async throws -> Courtly.Profile {
             try await client.rpc("get_me")
         }
@@ -211,6 +223,22 @@ enum API {
 
         static func setMuted(_ chatID: UUID, muted: Bool) async throws {
             try await client.rpc("set_chat_muted", params: ["p_chat": chatID.uuidString, "p_muted": muted])
+        }
+    }
+
+    enum Account {
+        /// Hands Apple's one-time authorization code to the backend, which keeps the refresh token it
+        /// yields so the sign-in can be revoked when the account is deleted.
+        static func exchangeAppleCode(_ code: String) async throws {
+            let _: [String: Bool]? = try await client.invoke("apple-token-exchange", body: ["authorization_code": code])
+        }
+
+        /// The server removes hits, chats, photos and the sign-in; the device forgets everything afterwards.
+        static func delete() async throws {
+            struct Receipt: Decodable {
+                let deleted: Bool?
+            }
+            let _: Receipt = try await client.invoke("delete-account", body: ["mode": "full"])
         }
     }
 

@@ -171,11 +171,14 @@ struct MainTabView: View {
             paths[.myHits] = [.hit(id)]
             Task { await hits.refreshAll() }
         case let .request(id):
-            if hits.needsReplyItem(requestID: id) == nil { await hits.loadFeed() }
+            // A request already on hand opens at once; one that isn't waits for the feed. Either way the
+            // lists refresh behind the screen, without loading the feed twice when it was just loaded.
+            let cached = hits.needsReplyItem(requestID: id) != nil
+            if !cached { await hits.loadFeed() }
             guard generation == openGeneration else { return }   // a later tap landed while the feed loaded
             selected = .play
             paths[.play] = [.request(id)]
-            Task { await hits.loadMyHits() }
+            Task { if cached { await hits.refreshAll() } else { await hits.loadMyHits() } }
         case let .chat(id):
             selected = .people
             paths[.people] = [.chat(id)]

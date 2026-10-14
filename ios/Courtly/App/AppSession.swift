@@ -71,7 +71,10 @@ final class AppSession {
     /// Saves part of the profile (`update_profile` only touches the keys in the patch).
     @MainActor
     func updateProfile(_ patch: [String: Any]) async throws {
+        let owner = profile?.id
         let me = try await API.Profile.update(patch)
+        // A save that lands after a sign-out, or with someone else signed in by now, is theirs alone.
+        guard owner != nil, profile?.id == owner else { return }
         profile = me
         ProfileCache.save(me)
     }
@@ -106,7 +109,6 @@ final class AppSession {
         profile = nil
         ProfileCache.save(nil)
         SnapshotCache.clear()
-        UserDefaults.standard.removeObject(forKey: MainTabView.coachMarksDoneKey)   // the next player gets the tips
         stage = .onboarding(resume: false)
     }
 

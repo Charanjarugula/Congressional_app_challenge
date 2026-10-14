@@ -75,6 +75,7 @@ actor SupabaseClient {
     }
 
     func signOut() async {
+        refreshTask?.cancel()
         if session != nil {
             _ = try? await request("/auth/v1/logout", method: "POST", body: nil, authorized: true)
         }
@@ -89,7 +90,11 @@ actor SupabaseClient {
         let task = Task<Session, Error> {
             defer { refreshTask = nil }
             do {
-                return try await tokenGrant(path: "/auth/v1/token?grant_type=refresh_token", body: ["refresh_token": current.refreshToken], provider: current.provider)
+                let fresh = try await tokenGrant(path: "/auth/v1/token?grant_type=refresh_token", body: ["refresh_token": current.refreshToken], provider: current.provider, store: false)
+                // The player may have signed out while the refresh was in flight.
+                guard session?.userID == current.userID else { throw SupabaseError.notSignedIn }
+                session = fresh
+                return fresh
             } catch let error as SupabaseError {
                 if case let .http(status, _) = error, status == 400 || status == 401 {
                     session = nil
@@ -102,7 +107,7 @@ actor SupabaseClient {
         return try await task.value
     }
 
-    private func tokenGrant(path: String, body: [String: Any], provider: String?) async throws -> Session {
+    private func tokenGrant(path: String, body: [String: Any], provider: String?, store: Bool = true) async throws -> Session {
         let data = try await request(path, method: "POST", body: body, authorized: false)
         let token: TokenResponse
         do {
@@ -111,7 +116,7 @@ actor SupabaseClient {
             throw SupabaseError.decoding(String(describing: error))
         }
         let fresh = token.session(provider: provider)
-        session = fresh
+        if store { session = fresh }
         return fresh
     }
 

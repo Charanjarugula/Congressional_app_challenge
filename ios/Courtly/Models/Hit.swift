@@ -42,7 +42,7 @@ enum HitStatusKind: Equatable {
 }
 
 /// A player on a hit: their card plus whether they host it. Decoded from `player_card || {role}`.
-struct HitPlayer: Codable, Identifiable {
+struct HitPlayer: Codable, Identifiable, Equatable {
     let card: PlayerCard
     let role: String
 
@@ -67,15 +67,15 @@ struct HitPlayer: Codable, Identifiable {
 }
 
 /// One hit as every screen reads it (`hit_json`), plus the extras the feed and My Hits add.
-struct Hit: Codable, Identifiable {
-    struct Viewer: Codable {
-        struct Request: Codable {
+struct Hit: Codable, Identifiable, Equatable {
+    struct Viewer: Codable, Equatable {
+        struct Request: Codable, Equatable {
             let id: UUID
             let status: RequestStatus
             let seen: Bool
         }
 
-        struct Invite: Codable {
+        struct Invite: Codable, Equatable {
             let id: UUID
             let status: InviteStatus
             let expiresAt: Date

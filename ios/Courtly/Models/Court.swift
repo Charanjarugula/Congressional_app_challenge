@@ -30,5 +30,4 @@ struct Court: Codable, Identifiable, Hashable {
     }
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
-    static func == (lhs: Court, rhs: Court) -> Bool { lhs.id == rhs.id }
 }

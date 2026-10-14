@@ -49,12 +49,10 @@ struct Message: Codable, Identifiable, Equatable {
     let clientId: UUID?
     let createdAt: Date
     var invite: HitInvite?
-
-    static func == (lhs: Message, rhs: Message) -> Bool { lhs.id == rhs.id }
 }
 
 /// A host's offer of open spots to a chat (`invite_json`). First claim takes the spot.
-struct HitInvite: Codable, Identifiable {
+struct HitInvite: Codable, Identifiable, Equatable {
     let id: UUID
     let hitId: UUID
     let chatId: UUID

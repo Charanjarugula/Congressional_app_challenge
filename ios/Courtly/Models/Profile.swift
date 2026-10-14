@@ -56,27 +56,17 @@ struct Profile: Codable, Equatable {
 
 /// Small on-disk copy so the app can paint before the network answers.
 enum ProfileCache {
-    private static var url: URL {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appending(path: "profile.json")
-    }
+    private static let key = "profile"
 
     static func load() -> Profile? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONCoding.decoder.decode(Profile.self, from: data)
+        SnapshotCache.load(Profile.self, key: key)
     }
 
     static func save(_ profile: Profile?) {
-        guard let profile else {
-            try? FileManager.default.removeItem(at: url)
-            return
-        }
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(profile) {
-            try? data.write(to: url, options: .atomic)
+        if let profile {
+            SnapshotCache.save(profile, key: key)
+        } else {
+            SnapshotCache.remove(key: key)
         }
     }
 }

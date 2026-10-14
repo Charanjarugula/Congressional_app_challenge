@@ -68,6 +68,7 @@ struct ChatThreadView: View {
         .toolbar(.hidden, for: .tabBar)
         .task(id: chatID) {
             await load()
+            guard !Task.isCancelled else { return }
             if let subscription { RealtimeHub.shared.unsubscribe(subscription) }
             subscription = RealtimeHub.shared.subscribe(table: "messages", filter: "chat_id=eq.\(chatID.uuidString.lowercased())") {
                 Task { await refresh() }
@@ -222,8 +223,11 @@ struct ChatThreadView: View {
             local.clientId == local.id && !page.messages.contains { $0.clientId == local.clientId }
         }
         let latest = page.messages + pending
-        if latest.count != messages.count || latest.last?.id != messages.last?.id {
-            messages = latest
+        let hasNew = latest.count != messages.count || latest.last?.id != messages.last?.id
+        if latest != messages {
+            messages = latest   // also picks up invite cards whose spots or status changed
+        }
+        if hasNew {
             try? await API.Chats.markRead(chatID)
         }
     }

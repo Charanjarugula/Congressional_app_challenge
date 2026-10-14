@@ -67,6 +67,7 @@ struct MainTabView: View {
             startCoachMarksIfNeeded()
             startLiveUpdates()
         }
+        .onDisappear { stopLiveUpdates() }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
@@ -113,6 +114,8 @@ struct MainTabView: View {
         refreshDebounce = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
+            // The player's own action already refreshed the lists and echoes back as an event.
+            if let at = hits.lastRefreshedAt, Date.now.timeIntervalSince(at) < 1.5 { return }
             await hits.refreshAll()
         }
     }

@@ -151,7 +151,7 @@ struct PeopleToPlayWithView: View {
         var knownIDs: [UUID] = []
         if draft.contactsGranted {
             do {
-                let hashed = try ContactsService().hashedContacts()
+                let hashed = try await Task.detached(priority: .userInitiated) { try ContactsService().hashedContacts() }.value
                 let byHash = Dictionary(hashed.map { ($0.hash, $0.displayName) }, uniquingKeysWith: { first, _ in first })
                 let matches = try await API.People.matchContacts(hashes: hashed.map(\.hash))
                 var seen = Set<UUID>()

@@ -25,6 +25,7 @@ final class RealtimeHub {
     private var channels: [String: Channel] = [:]
     private var joined: Set<String> = []
     private var nextRef = 0
+    private var accessToken: String?
 
     /// `filter` is a PostgREST-style condition such as `chat_id=eq.<uuid>`; nil means every row the
     /// signed-in player is allowed to see. `events` is `INSERT` (default), `UPDATE` or `*`.
@@ -45,6 +46,16 @@ final class RealtimeHub {
             Task { await connectAndJoin() }
         }
         return Subscription(topic: topic, id: id)
+    }
+
+    /// Forget every subscription and close the socket. Called on sign-out so the next player
+    /// never inherits channels joined with someone else's token.
+    func reset() {
+        channels = [:]
+        dropSocket()
+        reconnect?.cancel()
+        reconnect = nil
+        accessToken = nil
     }
 
     func unsubscribe(_ subscription: Subscription) {
@@ -81,9 +92,31 @@ final class RealtimeHub {
             task.resume()
             startHeartbeat()
             startListening(on: task)
+            accessToken = session.accessToken
             joinPending(accessToken: session.accessToken)
         } else if let session = try? await SupabaseClient.shared.validSession() {
+            accessToken = session.accessToken
             joinPending(accessToken: session.accessToken)
+        }
+    }
+
+    /// The channel token expires with the session (about an hour). Hand every joined channel the
+    /// refreshed token so the server keeps delivering.
+    private func refreshTokenIfNeeded() async {
+        guard socket != nil, let session = try? await SupabaseClient.shared.validSession(), session.accessToken != accessToken else { return }
+        accessToken = session.accessToken
+        for topic in joined {
+            send(event: "access_token", topic: topic, payload: ["access_token": session.accessToken])
+        }
+    }
+
+    /// The server closed one channel (token expiry, a rejected join): join it again with a fresh token.
+    private func rejoin(_ topic: String) {
+        joined.remove(topic)
+        guard channels[topic] != nil else { return }
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            await self?.connectAndJoin()
         }
     }
 
@@ -102,6 +135,7 @@ final class RealtimeHub {
                 try? await Task.sleep(for: .seconds(25))
                 guard !Task.isCancelled else { break }
                 self?.send(event: "heartbeat", topic: "phoenix", payload: [:])
+                await self?.refreshTokenIfNeeded()
             }
         }
     }
@@ -157,8 +191,16 @@ final class RealtimeHub {
               let event = object["event"] as? String,
               let topic = object["topic"] as? String
         else { return }
-        if event == "postgres_changes", let channel = channels[topic] {
-            channel.handlers.values.forEach { $0() }
+        switch event {
+        case "postgres_changes":
+            channels[topic]?.handlers.values.forEach { $0() }
+        case "phx_error", "phx_close":
+            if topic != "phoenix" { rejoin(topic) }
+        case "system":
+            let payload = object["payload"] as? [String: Any]
+            if payload?["status"] as? String == "error", topic != "phoenix" { rejoin(topic) }
+        default:
+            break
         }
     }
 }

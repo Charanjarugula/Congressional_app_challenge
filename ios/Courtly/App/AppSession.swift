@@ -100,6 +100,7 @@ final class AppSession {
 
     @MainActor
     func signOut() async {
+        RealtimeHub.shared.reset()
         await client.signOut()
         profile = nil
         ProfileCache.save(nil)

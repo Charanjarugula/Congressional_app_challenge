@@ -34,6 +34,13 @@ struct AvailabilityMask: Codable, Equatable, Hashable {
         }
     }
 
+    /// The grid cell a moment falls in (Monday = 0), or nil outside the three blocks.
+    static func slot(for date: Date, calendar: Calendar = .current) -> (day: Int, block: Block)? {
+        let hour = calendar.component(.hour, from: date)
+        guard let block = Block.allCases.first(where: { hour >= $0.hourRange.start && hour < $0.hourRange.end }) else { return nil }
+        return ((calendar.component(.weekday, from: date) + 5) % 7, block)
+    }
+
     static let dayLetters = ["M", "T", "W", "T", "F", "S", "S"]
     static let dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 

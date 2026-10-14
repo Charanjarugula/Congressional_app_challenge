@@ -185,6 +185,7 @@ struct AreaSheet: View {
     @State private var isLookingUp = false
     @State private var lookupTask: Task<Void, Never>?
     @State private var locationService = LocationService()
+    @State private var skipNextLookup = false
     @State private var seeded = false
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -255,6 +256,11 @@ struct AreaSheet: View {
 
     private func lookUp(_ text: String) {
         lookupTask?.cancel()
+        isLookingUp = false
+        if skipNextLookup {
+            skipNextLookup = false
+            return
+        }
         let digits = text.filter(\.isNumber)
         if digits != text { zip = digits; return }
         if area?.zip == digits { return }
@@ -277,8 +283,9 @@ struct AreaSheet: View {
         Task { @MainActor in
             do {
                 let found = try await locationService.currentArea()
-                area = found
+                skipNextLookup = (found.zip ?? "") != zip
                 zip = found.zip ?? ""
+                area = found
             } catch {
                 errorMessage = "Location is off for Courtly. Type your ZIP code instead."
             }

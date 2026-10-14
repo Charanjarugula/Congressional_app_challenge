@@ -19,6 +19,10 @@ enum SnapshotCache {
         try? data.write(to: directory.appending(path: "\(key).json"), options: .atomic)
     }
 
+    static func remove(key: String) {
+        try? FileManager.default.removeItem(at: directory.appending(path: "\(key).json"))
+    }
+
     static func clear() {
         try? FileManager.default.removeItem(at: directory)
     }

@@ -54,7 +54,7 @@ struct PlanHitView: View {
         let eveningBefore = calendar.date(bySettingHour: 20, minute: 0, second: 0, of: calendar.date(byAdding: .day, value: -1, to: startsAt) ?? startsAt) ?? startsAt
         var expiry = min(startsAt.addingTimeInterval(-2 * 3600), eveningBefore)
         if expiry <= .now {
-            expiry = min(startsAt.addingTimeInterval(-30 * 60), Date.now.addingTimeInterval(12 * 3600))
+            expiry = min(startsAt.addingTimeInterval(-5 * 60), Date.now.addingTimeInterval(12 * 3600))
         }
         return expiry
     }
@@ -222,7 +222,7 @@ struct PlanHitView: View {
             }
             .padding(.horizontal, 4)
             .padding(.top, 12)
-            if showsExpiryPicker {
+            if showsExpiryPicker, startsAt > Date.now.addingTimeInterval(60) {
                 DatePicker(
                     "Open until",
                     selection: Binding(get: { inviteExpiry }, set: { customExpiry = $0 }),

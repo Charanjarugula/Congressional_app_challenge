@@ -219,7 +219,8 @@ struct AddFriendsView: View {
     }
 
     private func matchContacts() async {
-        guard let hashed = try? ContactsService().hashedContacts(), !hashed.isEmpty else { return }
+        let hashed = (try? await Task.detached(priority: .userInitiated) { try ContactsService().hashedContacts() }.value) ?? []
+        guard !hashed.isEmpty else { return }
         if let matches = try? await API.People.matchContacts(hashes: hashed.map(\.hash)) {
             var seen = Set<UUID>()
             contactMatches = matches.filter { seen.insert($0.player.id).inserted }

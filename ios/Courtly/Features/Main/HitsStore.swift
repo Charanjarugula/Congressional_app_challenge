@@ -29,7 +29,6 @@ final class HitsStore {
             let fresh = try await API.Hits.feed()
             feed = fresh
             lastError = nil
-            lastRefreshedAt = .now
             SnapshotCache.save(fresh, key: "play_feed")
             try? await UNUserNotificationCenter.current().setBadgeCount(fresh.badge)
         } catch {
@@ -44,7 +43,6 @@ final class HitsStore {
         do {
             let fresh = try await API.Hits.mine()
             myHits = fresh
-            lastRefreshedAt = .now
             SnapshotCache.save(fresh, key: "my_hits")
         } catch {
             lastError = error.localizedDescription
@@ -56,6 +54,7 @@ final class HitsStore {
         async let feedLoad: () = loadFeed()
         async let mineLoad: () = loadMyHits()
         _ = await (feedLoad, mineLoad)
+        lastRefreshedAt = .now
     }
 
     // MARK: - Lookups

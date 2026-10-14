@@ -72,8 +72,9 @@ struct HitDetailView: View {
         .alert("Leave this hit?", isPresented: $showsLeaveAlert) {
             Button("Leave", role: .destructive) {
                 Task {
-                    await perform { try await hits.leave(hitID) }
-                    navigate.pop()
+                    if await perform({ try await hits.leave(hitID) }) {
+                        navigate.pop()
+                    }
                 }
             }
             Button("Stay", role: .cancel) {}
@@ -263,21 +264,29 @@ struct HitDetailView: View {
 
     private func reload() async {
         do {
-            hit = try await API.Hits.get(hitID)
+            var fresh = try await API.Hits.get(hitID)
+            // `get_hit` carries no My Hits extras; keep the ones the list told us about.
+            let known = hit ?? hits.cachedHit(hitID)
+            fresh.needsAttendance = fresh.needsAttendance ?? known?.needsAttendance
+            hit = fresh
             loadFailed = false
         } catch {
             if hit == nil { loadFailed = true }
         }
     }
 
+    /// Runs an action that returns the updated hit. Returns false when it failed (the alert shows why).
     @MainActor
-    private func perform(_ work: () async throws -> Hit) async {
+    @discardableResult
+    private func perform(_ work: () async throws -> Hit) async -> Bool {
         isWorking = true
         defer { isWorking = false }
         do {
             hit = try await work()
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 

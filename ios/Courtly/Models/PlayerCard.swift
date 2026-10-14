@@ -29,7 +29,6 @@ struct PlayerCard: Codable, Identifiable, Equatable, Hashable {
     }
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
-    static func == (lhs: PlayerCard, rhs: PlayerCard) -> Bool { lhs.id == rhs.id }
 }
 
 /// A `match_contacts` row: the hash that matched, and the player it belongs to.

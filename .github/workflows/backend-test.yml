@@ -1,0 +1,37 @@
+name: Backend test
+
+on:
+  pull_request:
+    paths:
+      - "supabase/**"
+      - ".github/workflows/backend-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+
+jobs:
+  smoke:
+    name: Migrations and smoke test on Postgres 16
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run
+        run: supabase/tests/local/run.sh

@@ -1,0 +1,61 @@
+name: Backend deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which project to deploy to
+        type: choice
+        options: [dev, prod]
+        default: dev
+      steps:
+        description: Deploy steps, in order (reviewer, reviewer-remove, demo, demo-remove and status are optional extras; reset wipes the dev project and is refused on prod)
+        type: string
+        default: check migrate seed settings auth secrets functions test status
+  # A push to main deploys the dev project; prod is deployed only by running this workflow by hand with target prod.
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - "scripts/supabase-deploy.mjs"
+      - ".github/workflows/backend.yml"
+
+concurrency:
+  group: backend-${{ inputs.target || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.target || 'dev' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ (inputs.target == 'prod') && 'jrlocgfyskutnusscenf' || 'letuvtazmtjkvivattfy' }}
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+      APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+      APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+      APNS_BUNDLE_ID: com.courtly.ios
+      APPLE_SIWA_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+      APPLE_SIWA_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+      APPLE_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+      APPLE_CLIENT_ID: com.courtly.ios
+      ADMIN_EMAIL: courtly.support@gmail.com
+      REVIEWER_PASSWORD: ${{ secrets.REVIEWER_PASSWORD }}
+      DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: "587"
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      SMTP_SENDER_EMAIL: courtly.support@gmail.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Deploy
+        run: node scripts/supabase-deploy.mjs ${{ inputs.steps || 'check migrate seed settings auth secrets functions test status' }}

@@ -287,7 +287,7 @@ struct ChatThreadView: View {
                 }
             } catch {
                 messages.removeAll { $0.id == clientID }
-                draft = text
+                draft = draft.isEmpty ? text : text + "\n" + draft   // give the text back, in front of anything typed since
                 errorMessage = error.localizedDescription
             }
             isSending = false

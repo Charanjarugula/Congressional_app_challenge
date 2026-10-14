@@ -14,6 +14,7 @@ struct MainTabView: View {
     @State private var coachStep: Int?
     @State private var liveUpdates: [RealtimeHub.Subscription] = []
     @State private var refreshDebounce: Task<Void, Never>?
+    @State private var openGeneration = 0   // the newest deep link is the one that lands
     @State private var inboxDebounce: Task<Void, Never>?
 
     private var isAtRoot: Bool { (paths[selected] ?? []).isEmpty }
@@ -70,6 +71,7 @@ struct MainTabView: View {
         .environment(hits)
         .environment(inbox)
         .task {
+            Task { await inbox.load() }   // the People dot is right from the start, not from the first visit
             if let link = deepLinks.pending {
                 await open(link)   // loads what the screen needs; the lists refresh behind it
             } else {
@@ -85,6 +87,7 @@ struct MainTabView: View {
             case .active:
                 Task { await hits.refreshAll() }
                 Task { await inbox.load() }
+                Task { await API.Devices.retryPending() }
                 startLiveUpdates()
             case .background:
                 stopLiveUpdates()
@@ -150,6 +153,8 @@ struct MainTabView: View {
         deepLinks.pending = nil
         isPlanning = false
         coachStep = nil
+        openGeneration += 1
+        let generation = openGeneration
         switch link {
         case .play:
             selected = .play
@@ -161,6 +166,7 @@ struct MainTabView: View {
             Task { await hits.refreshAll() }
         case let .request(id):
             if hits.needsReplyItem(requestID: id) == nil { await hits.loadFeed() }
+            guard generation == openGeneration else { return }   // a later tap landed while the feed loaded
             selected = .play
             paths[.play] = [.request(id)]
             Task { await hits.loadMyHits() }
@@ -173,9 +179,16 @@ struct MainTabView: View {
 
     // MARK: - Coach marks
 
+    /// Remembered on the device as well, so tips finished offline stay finished; the server hears next time.
+    static let coachMarksDoneKey = "coach_marks_done_local"
+
     /// Only over the Play root: a pushed screen or another tab is not where the tips point.
     private func startCoachMarksIfNeeded() {
         guard let profile = session.profile, !profile.coachMarksDone, coachStep == nil else { return }
+        if UserDefaults.standard.bool(forKey: Self.coachMarksDoneKey) {
+            Task { try? await session.updateProfile(["coach_marks_done": true]) }   // finished before; the save hadn't landed
+            return
+        }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(700))
             guard coachStep == nil, session.profile?.coachMarksDone == false, isAtRoot, selected == .play, deepLinks.pending == nil else { return }
@@ -198,6 +211,7 @@ struct MainTabView: View {
             }
         }
         if step >= 3 {
+            UserDefaults.standard.set(true, forKey: Self.coachMarksDoneKey)
             Task { try? await session.updateProfile(["coach_marks_done": true]) }
         }
     }

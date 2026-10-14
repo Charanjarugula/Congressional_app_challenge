@@ -415,12 +415,14 @@ struct EditProfileSheet: View {
     @State private var lastName = ""
     @State private var pickerItem: PhotosPickerItem?
     @State private var newPhoto: UIImage?
+    @State private var photoLoad = 0
+    @State private var isLoadingPhoto = false
     @State private var seeded = false
     @State private var isSaving = false
     @State private var errorMessage: String?
 
     private var canSave: Bool {
-        !firstName.trimmingCharacters(in: .whitespaces).isEmpty && !isSaving
+        !firstName.trimmingCharacters(in: .whitespaces).isEmpty && !isSaving && !isLoadingPhoto
     }
 
     var body: some View {
@@ -527,10 +529,16 @@ struct EditProfileSheet: View {
 
     private func loadPhoto(_ item: PhotosPickerItem?) {
         guard let item else { return }
+        photoLoad += 1
+        let load = photoLoad
+        isLoadingPhoto = true   // Save waits: the photo chosen is the photo saved
         Task { @MainActor in
+            defer { if load == photoLoad { isLoadingPhoto = false } }
             guard let data = try? await item.loadTransferable(type: Data.self) else { return }
             // Decoding and scaling a camera photo is slow; keep it off the main thread.
-            newPhoto = await Task.detached(priority: .userInitiated) { UIImage(data: data)?.downscaled(to: 600) }.value
+            let image = await Task.detached(priority: .userInitiated) { UIImage(data: data)?.downscaled(to: 600) }.value
+            guard load == photoLoad else { return }   // a newer pick has taken over
+            newPhoto = image
         }
     }
 

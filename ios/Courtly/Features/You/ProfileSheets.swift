@@ -35,6 +35,7 @@ struct SheetScaffold<Content: View>: View {
                     Button("Cancel") { dismiss() }
                         .font(CourtlyFont.body)
                         .foregroundStyle(CourtlyColor.blue)
+                        .disabled(isSaving)   // a save already under way lands either way, so the sheet stays until it finishes
                     Spacer()
                 }
             }
@@ -184,7 +185,8 @@ struct AreaSheet: View {
     @State private var radius: TravelRadius = .ten
     @State private var isLookingUp = false
     @State private var lookupTask: Task<Void, Never>?
-    @State private var locationService = LocationService()
+    @StateObject private var locationService = LocationService()
+    @State private var skipNextLookup = false
     @State private var seeded = false
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -255,6 +257,11 @@ struct AreaSheet: View {
 
     private func lookUp(_ text: String) {
         lookupTask?.cancel()
+        isLookingUp = false
+        if skipNextLookup {
+            skipNextLookup = false
+            return
+        }
         let digits = text.filter(\.isNumber)
         if digits != text { zip = digits; return }
         if area?.zip == digits { return }
@@ -273,12 +280,14 @@ struct AreaSheet: View {
     }
 
     private func useLocation() {
+        guard !isLookingUp else { return }
         isLookingUp = true
         Task { @MainActor in
             do {
                 let found = try await locationService.currentArea()
-                area = found
+                skipNextLookup = (found.zip ?? "") != zip
                 zip = found.zip ?? ""
+                area = found
             } catch {
                 errorMessage = "Location is off for Courtly. Type your ZIP code instead."
             }
@@ -321,8 +330,7 @@ struct AvailabilitySheet: View {
     @State private var showsManage = false
     @State private var isSaving = false
     @State private var errorMessage: String?
-
-    private let calendarService = CalendarService()
+    @State private var calendarService = CalendarService()
 
     var body: some View {
         SheetScaffold(title: "Availability", isSaving: isSaving, detents: [.large], onSave: save) {
@@ -428,6 +436,7 @@ struct EditProfileSheet: View {
                     Button("Cancel") { dismiss() }
                         .font(CourtlyFont.body)
                         .foregroundStyle(CourtlyColor.blue)
+                        .disabled(isSaving)
                     Spacer()
                     Button(isSaving ? "Saving…" : "Save", action: save)
                         .font(CourtlyFont.bodySemibold)
@@ -458,6 +467,7 @@ struct EditProfileSheet: View {
                                     .background(Circle().fill(CourtlyColor.blue))
                                     .overlay(Circle().stroke(CourtlyColor.groupedBackground, lineWidth: 4))
                             }
+                            .accessibilityLabel("Change photo")
                         }
                         PhotosPicker(selection: $pickerItem, matching: .images) {
                             Text("Change photo")

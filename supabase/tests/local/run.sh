@@ -31,5 +31,17 @@ for f in "$ROOT"/seed/*.sql; do
   prep "$f" | psql -v ON_ERROR_STOP=1 -q -o /dev/null || { echo "FAILED: $(basename "$f")"; exit 1; }
 done
 echo "smoke   tests/smoke.sql"
-out=$(prep "$ROOT/tests/smoke.sql" | psql -v ON_ERROR_STOP=1 -q 2>&1)
+# Function calls are tracked so the run can tell which functions the test never reached.
+out=$({ echo "set track_functions = 'all';"; prep "$ROOT/tests/smoke.sql"; } | psql -v ON_ERROR_STOP=1 -q 2>&1)
 if echo "$out" | grep -q "SMOKE_OK"; then echo "smoke passed"; else echo "$out" | head -40; echo "smoke FAILED"; exit 1; fi
+
+# Every function in the schema has to run at least once: a branch no test reaches is where the next
+# add_court-style bug hides (that one failed only when inserting a new court).
+missed=$(psql -At -c "select n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  left join pg_stat_user_functions s on s.funcid = p.oid
+  where n.nspname in ('public', 'private') and s.calls is null order by 1")
+if [ -n "$missed" ]; then
+  echo "functions the smoke test never called:"; echo "$missed" | sed 's/^/  /'; echo "coverage FAILED"; exit 1
+fi
+echo "coverage every function ran"

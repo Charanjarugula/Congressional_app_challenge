@@ -1,23 +1,29 @@
 import Foundation
 
-/// Watches one chat's `messages` rows over Supabase Realtime so the thread updates as soon as
-/// someone writes. Polling stays on as the fallback; this only makes it feel instant.
+/// Watches inserts into one table over Supabase Realtime (optionally filtered to one row key) and
+/// calls back when something lands, so screens refresh at once. Polling stays on as the fallback;
+/// this only makes things feel instant. Reconnects by itself if the socket drops.
 @MainActor
-final class ChatRealtime {
-    private let chatID: UUID
+final class RealtimeListener {
+    private let table: String
+    private let filter: String?
     private let onChange: () -> Void
     private var socket: URLSessionWebSocketTask?
     private var heartbeat: Task<Void, Never>?
     private var listener: Task<Void, Never>?
     private var nextRef = 0
+    private var isStopped = false
 
-    init(chatID: UUID, onChange: @escaping () -> Void) {
-        self.chatID = chatID
+    /// `filter` is a PostgREST-style condition such as `chat_id=eq.<uuid>`; nil means every row
+    /// the signed-in player is allowed to see.
+    init(table: String, filter: String? = nil, onChange: @escaping () -> Void) {
+        self.table = table
+        self.filter = filter
         self.onChange = onChange
     }
 
     func connect() async {
-        guard socket == nil, let session = try? await SupabaseClient.shared.validSession() else { return }
+        guard socket == nil, !isStopped, let session = try? await SupabaseClient.shared.validSession() else { return }
         guard var components = URLComponents(url: AppConfig.supabaseURL, resolvingAgainstBaseURL: false) else { return }
         components.scheme = "wss"
         components.path = "/realtime/v1/websocket"
@@ -27,17 +33,15 @@ final class ChatRealtime {
         ]
         guard let url = components.url else { return }
 
+        var change: [String: Any] = ["event": "INSERT", "schema": "public", "table": table]
+        if let filter { change["filter"] = filter }
+
         let task = URLSession.shared.webSocketTask(with: url)
         socket = task
         task.resume()
         send(event: "phx_join", topic: topic, payload: [
             "config": [
-                "postgres_changes": [[
-                    "event": "INSERT",
-                    "schema": "public",
-                    "table": "messages",
-                    "filter": "chat_id=eq.\(chatID.uuidString.lowercased())",
-                ]],
+                "postgres_changes": [change],
                 "broadcast": ["self": false],
                 "presence": ["key": ""],
             ],
@@ -56,10 +60,21 @@ final class ChatRealtime {
                 guard let message = try? await live.receive() else { break }
                 self?.handle(message)
             }
+            // The socket closed under us: wait a little and try again unless we were stopped.
+            guard !Task.isCancelled, let self, !self.isStopped else { return }
+            self.dropSocket()
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled, !self.isStopped else { return }
+            await self.connect()
         }
     }
 
     func disconnect() {
+        isStopped = true
+        dropSocket()
+    }
+
+    private func dropSocket() {
         heartbeat?.cancel()
         heartbeat = nil
         listener?.cancel()
@@ -69,7 +84,8 @@ final class ChatRealtime {
     }
 
     private var topic: String {
-        "realtime:chat-\(chatID.uuidString.lowercased())"
+        let suffix = filter?.replacingOccurrences(of: "=eq.", with: "-") ?? "all"
+        return "realtime:\(table)-\(suffix)".lowercased()
     }
 
     private func send(event: String, topic: String, payload: [String: Any]) {

@@ -9,7 +9,7 @@ struct ChatThreadView: View {
     @Environment(InboxStore.self) private var inbox
     @Environment(\.navigate) private var navigate
     @State private var chat: Chat?
-    @State private var realtime: ChatRealtime?
+    @State private var realtime: RealtimeListener?
     @State private var showsRequestHit = false
     @State private var messages: [Message] = []
     @State private var draft = ""
@@ -68,7 +68,9 @@ struct ChatThreadView: View {
         .toolbar(.hidden, for: .tabBar)
         .task(id: chatID) {
             await load()
-            let live = ChatRealtime(chatID: chatID) { Task { await refresh() } }
+            let live = RealtimeListener(table: "messages", filter: "chat_id=eq.\(chatID.uuidString.lowercased())") {
+                Task { await refresh() }
+            }
             realtime?.disconnect()
             realtime = live
             await live.connect()

@@ -23,12 +23,16 @@ prep() {
     -e '/using gist/d' \
     "$1"
 }
-# Migrations are recorded the way the deploy records them, so the status report has its table.
-psql -v ON_ERROR_STOP=1 -qc "create schema if not exists private; create table private.app_migrations (name text primary key, applied_at timestamptz not null default now());"
-for f in "$ROOT"/migrations/*.sql; do
-  echo "migrate $(basename "$f")"
-  { prep "$f"; echo "insert into private.app_migrations (name) values ('$(basename "$f")');"; } | psql -v ON_ERROR_STOP=1 -q -o /dev/null || { echo "FAILED: $(basename "$f")"; exit 1; }
-done
+# Migrations are recorded the way the deploy records them, hash included, so the status report has its table.
+migrate_all() {
+  psql -v ON_ERROR_STOP=1 -qc "create schema if not exists private; create table private.app_migrations (name text primary key, applied_at timestamptz not null default now(), sha256 text);"
+  for f in "$ROOT"/migrations/*.sql; do
+    echo "migrate $(basename "$f")"
+    { prep "$f"; echo "insert into private.app_migrations (name, sha256) values ('$(basename "$f")', '$(sha256sum "$f" | cut -c1-64)');"; } \
+      | psql -v ON_ERROR_STOP=1 -q -o /dev/null || { echo "FAILED: $(basename "$f")"; exit 1; }
+  done
+}
+migrate_all
 for f in "$ROOT"/seed/*.sql; do
   echo "seed    $(basename "$f")"
   prep "$f" | psql -v ON_ERROR_STOP=1 -q -o /dev/null || { echo "FAILED: $(basename "$f")"; exit 1; }
@@ -107,3 +111,20 @@ echo "demo    removed without a trace"
 # The status report has to run against the schema as well; its lines are shown for a look.
 report=$(prep "$ROOT/tests/status.sql" | psql -v ON_ERROR_STOP=1 -qAt -F ' = ') || { echo "FAILED: tests/status.sql"; exit 1; }
 echo "$report" | sed 's/^/status  /'
+
+# The dev-only reset has to take out everything the migrations made, asking the catalogs rather than a
+# list, and the migrations have to run again from what it leaves. Accounts go with it; the bucket stays.
+echo "reset   reset.sql"
+dropped=$({ echo "set client_min_messages = warning;"; cat "$ROOT/reset.sql"; } | psql -v ON_ERROR_STOP=1 -qAt -F '|') || { echo "FAILED: reset.sql"; exit 1; }
+echo "$dropped" | cut -d'|' -f1 | sort | uniq -c | awk '{printf "reset   %s %s%s\n", $1, $2, ($3 ? " " $3 : "")}'
+left=$(psql -At -c "select (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind in ('r', 'p', 'v', 'm', 'S'))
+  + (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public')
+  + (select count(*) from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typtype in ('e', 'd'))
+  + (select count(*) from pg_namespace where nspname = 'private')
+  + (select count(*) from cron.job) + (select count(*) from pg_policies where schemaname = 'storage')
+  + (select count(*) from pg_trigger where tgrelid = 'auth.users'::regclass and not tgisinternal)
+  + (select count(*) from auth.users) + (select count(*) from vault.secrets where name like 'apple-refresh-%')")
+[ "$left" = "0" ] || { echo "reset left $left objects or rows behind"; exit 1; }
+migrate_all
+recorded=$(psql -At -c "select count(*)::text || ' recorded, ' || count(sha256)::text || ' with hash' from private.app_migrations")
+echo "reset   left nothing of the migrations behind; every file applied again from empty: $recorded"

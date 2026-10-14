@@ -17,6 +17,12 @@
 // account is meant to see), then checks it from the reviewer's side; DEMO_PASSWORD, when set, is
 // the demo players' sign-in password. "demo-remove" takes the world and the demo players down.
 // "status" prints one line per fact about the deployed project (migrations, cron, grants, counts).
+// "reset" (dev project only) takes the project back to before the first migration: everything the
+// migrations created goes, accounts included, so the next "migrate" runs every file again from nothing.
+//
+// Flags: --adopt-hashes lets "migrate" record hashes for files a project applied before hashes were
+// kept. Without it such a project is refused, because nothing proves it received the files as they
+// read today; use the flag only when that is known, otherwise reset (dev) and migrate again.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -27,6 +33,9 @@ const API = "https://api.supabase.com/v1";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "supabase");
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 const REF = process.env.SUPABASE_PROJECT_REF;
+const DEV_REF = "letuvtazmtjkvivattfy"; // the only project "reset" will touch
+const KNOWN_FLAGS = new Set(["--adopt-hashes"]);
+const flags = new Set(process.argv.slice(2).filter((arg) => arg.startsWith("--")));
 
 const FUNCTIONS = {
   "send-push": { verifyJwt: false }, // called by the database webhook, authenticated by a shared secret
@@ -105,19 +114,29 @@ const steps = {
       alter table private.app_migrations add column if not exists sha256 text;
     `);
     // A recorded file must still read exactly as it did when it ran: migrations are append-only, and a
-    // change edited into an applied file would never reach the project. Files recorded before hashes
-    // were kept get theirs noted on the first run.
+    // change edited into an applied file would never reach the project. A file recorded without a hash
+    // proves nothing about what the project received, so such a project is refused unless the caller
+    // vouches for it with --adopt-hashes; the way back otherwise is a reset (dev) and a fresh migrate.
     const applied = new Map((await sql(`select name, sha256 from private.app_migrations`)).map((r) => [r.name, r.sha256]));
+    const unhashed = [...applied].filter(([, sha]) => !sha).map(([name]) => name);
+    if (unhashed.length > 0 && !flags.has("--adopt-hashes")) {
+      fail(`${unhashed.join(", ")} ${unhashed.length === 1 ? "was" : "were"} recorded before hashes were kept, so nothing proves ` +
+        "the project received the files as they read today. Reset the project and migrate again (dev only: the reset step), " +
+        "or, only when every applied file is known to match the project, run migrate once with --adopt-hashes to record the current hashes.");
+    }
     for (const file of await sqlFiles(path.join(ROOT, "migrations"))) {
       const digest = crypto.createHash("sha256").update(file.text.replace(/\r\n/g, "\n")).digest("hex");
       const literal = file.name.replace(/'/g, "''");
       if (applied.has(file.name)) {
         const recorded = applied.get(file.name);
-        if (recorded && recorded !== digest) {
+        if (!recorded) {
+          await sql(`update private.app_migrations set sha256 = '${digest}' where name = '${literal}'`);
+          console.log(`adopt   ${file.name} (hash recorded as the file reads today)`);
+        } else if (recorded !== digest) {
           fail(`${file.name} is recorded as applied but its contents have changed; put the change in a new migration file`);
+        } else {
+          console.log(`skip    ${file.name}`);
         }
-        if (!recorded) await sql(`update private.app_migrations set sha256 = '${digest}' where name = '${literal}'`);
-        console.log(`skip    ${file.name}${recorded ? "" : " (hash noted)"}`);
         continue;
       }
       console.log(`apply   ${file.name}`);
@@ -270,6 +289,15 @@ const steps = {
     for (const row of await sqlFile("tests/status.sql")) console.log(`status  ${row.k.padEnd(22)} ${row.v}`);
   },
 
+  // Back to before the first migration, on the dev project only. reset.sql asks the catalogs for what
+  // exists rather than carrying a list, and reports each thing it took out.
+  async reset() {
+    if (REF !== DEV_REF) fail(`reset only runs against the dev project (${DEV_REF}); refusing on ${REF}`);
+    const rows = await sqlFile("reset.sql");
+    for (const row of rows) console.log(`drop    ${row.kind.padEnd(15)} ${row.name}`);
+    console.log(`reset   ${rows.length} entries removed; migrate now runs every file from the start`);
+  },
+
   async test() {
     const text = await readFile(path.join(ROOT, "tests", "smoke.sql"), "utf8");
     try {
@@ -294,7 +322,8 @@ async function walk(dir) {
 
 async function main() {
   if (!TOKEN || !REF) fail("SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF are required");
-  const requested = process.argv.slice(2);
+  for (const flag of flags) if (!KNOWN_FLAGS.has(flag)) fail(`unknown flag "${flag}"; flags: ${[...KNOWN_FLAGS].join(", ")}`);
+  const requested = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
   if (requested.length === 0) fail(`no steps given; choose from ${Object.keys(steps).join(", ")}`);
   for (const name of requested) {
     if (!steps[name]) fail(`unknown step "${name}"`);

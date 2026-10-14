@@ -1,5 +1,5 @@
 -- One row per fact about the deployed project, for the deploy's status step. Reads only.
-select 'migrations' as k, count(*)::text || ' recorded, last ' || max(name) as v from private.app_migrations
+select 'migrations' as k, count(*)::text || ' recorded (' || count(sha256)::text || ' with hash), last ' || max(name) as v from private.app_migrations
 union all select 'cron_jobs', string_agg(jobname || ' (' || schedule || ')', ', ' order by jobname) from cron.job
 union all select 'cron_failed_24h', count(*)::text from cron.job_run_details where status <> 'succeeded' and start_time > now() - interval '24 hours'
 union all select 'cron_last_run', coalesce(to_char(max(start_time) at time zone 'UTC', 'YYYY-MM-DD HH24:MI') || ' UTC', 'never') from cron.job_run_details

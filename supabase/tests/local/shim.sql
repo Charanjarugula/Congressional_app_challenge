@@ -49,6 +49,9 @@ create table cron.job_run_details (jobid bigint, status text, start_time timesta
 create function cron.schedule(job text, sched text, cmd text) returns bigint language sql as $$
   insert into cron.job (jobname, schedule, command) values (job, sched, cmd) returning jobid
 $$;
+create function cron.unschedule(job_id bigint) returns boolean language sql as $$
+  delete from cron.job where jobid = job_id returning true
+$$;
 
 create schema net;
 create function net.http_post(url text, body jsonb default '{}'::jsonb, params jsonb default '{}'::jsonb, headers jsonb default '{}'::jsonb, timeout_milliseconds int default 5000)

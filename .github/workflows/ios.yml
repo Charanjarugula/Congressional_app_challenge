@@ -69,7 +69,7 @@ jobs:
             echo "::error::AppConfig.siteURL still points at the placeholder domain. Use the deployed Vercel URL."; exit 1
           fi
           mapfile -t urls < <(grep -o 'https://[a-z]*\.supabase\.co' "$f")
-          mapfile -t keys < <(grep -o 'sb_publishable_[A-Za-z0-9_-]*' "$f")
+          mapfile -t keys < <(grep 'supabaseAnonKey = "' "$f" | grep -o 'sb_publishable_[A-Za-z0-9_-]*')
           [ "${#urls[@]}" -eq 2 ] && [ "${#keys[@]}" -eq 2 ] || { echo "::error::Expected two project URLs and two publishable keys in AppConfig.swift"; exit 1; }
           for i in 0 1; do
             status=$(curl -s -o /dev/null -w '%{http_code}' -H "apikey: ${keys[$i]}" "${urls[$i]}/auth/v1/health")

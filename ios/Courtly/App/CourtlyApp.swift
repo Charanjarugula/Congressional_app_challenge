@@ -36,13 +36,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     /// A push arrived while the app is open: show it, and let the lists refresh.
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        await DeepLinkCenter.shared.pushArrived()
+        DeepLinkCenter.shared.pushArrived()
         return [.banner, .list, .sound, .badge]
     }
 
     /// The player tapped a notification.
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         guard let link = DeepLink(userInfo: response.notification.request.content.userInfo) else { return }
-        await DeepLinkCenter.shared.open(link)
+        DeepLinkCenter.shared.open(link)
     }
 }

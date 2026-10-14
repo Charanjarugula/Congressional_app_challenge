@@ -209,7 +209,7 @@ actor SupabaseClient {
             ?? "unknown error"
         // The gateway rejects the whole request when the anon key does not belong to the project.
         if message.localizedCaseInsensitiveContains("invalid api key") || message.localizedCaseInsensitiveContains("no api key") {
-            return .http(status: status, message: "The app’s Supabase key doesn’t match this project. Update the anon key in AppConfig.swift.")
+            return .http(status: status, message: "The app’s Supabase key doesn’t match this project. Paste the sb_publishable key from Project Settings → API Keys into AppConfig.swift.")
         }
         return .http(status: status, message: message)
     }

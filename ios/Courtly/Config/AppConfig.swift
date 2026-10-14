@@ -1,7 +1,9 @@
 import Foundation
 
 /// Environment-specific values. Debug builds talk to courtly-dev, release builds to courtly-prod.
-/// The anon key is a public client key by design; row-level security protects the data.
+/// The key below is the project's public client key (Project Settings → API Keys). Both projects
+/// were created with the new key format, so use the `sb_publishable_…` key there, not the legacy
+/// `eyJ…` one; row-level security protects the data either way.
 enum AppConfig {
     #if DEBUG
     static let supabaseURL = URL(string: "https://letuvtazmtjkvivattfy.supabase.co")!

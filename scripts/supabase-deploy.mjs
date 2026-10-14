@@ -4,7 +4,7 @@
 // Needs SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF. No database password: migrations
 // run through the SQL endpoint, functions through the deploy endpoint.
 //
-//   node scripts/supabase-deploy.mjs check migrate seed settings auth secrets functions test
+//   node scripts/supabase-deploy.mjs check migrate seed settings auth secrets functions test status
 //
 // Steps run in the order given. Secrets for Edge Functions come from the environment and
 // are only sent when present (see SECRET_NAMES). The "auth" step sets the email code template,

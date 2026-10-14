@@ -11,7 +11,7 @@ on:
       steps:
         description: Deploy steps, in order (reviewer, reviewer-remove, demo, demo-remove and status are optional extras)
         type: string
-        default: check migrate seed settings auth secrets functions test
+        default: check migrate seed settings auth secrets functions test status
   push:
     branches: [main]
     paths:
@@ -57,4 +57,4 @@ jobs:
           node-version: "22"
 
       - name: Deploy
-        run: node scripts/supabase-deploy.mjs ${{ inputs.steps || 'check migrate seed settings auth secrets functions test' }}
+        run: node scripts/supabase-deploy.mjs ${{ inputs.steps || 'check migrate seed settings auth secrets functions test status' }}

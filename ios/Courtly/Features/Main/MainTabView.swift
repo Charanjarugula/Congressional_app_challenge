@@ -93,7 +93,7 @@ struct MainTabView: View {
     /// Hits, requests and messages change on other phones. Refresh when they do instead of waiting
     /// for a poll; row-level security means each player only hears about rows they can see.
     private func startLiveUpdates() {
-        stopLiveUpdates()
+        guard liveUpdates.isEmpty else { return }   // launch fires both the task and the active phase
         let hub = RealtimeHub.shared
         liveUpdates = [
             hub.subscribe(table: "hits", events: "*") { scheduleHitsRefresh() },

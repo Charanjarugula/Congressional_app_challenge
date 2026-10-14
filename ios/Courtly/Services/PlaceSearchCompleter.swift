@@ -85,3 +85,6 @@ final class PlaceSearchCompleter: NSObject, MKLocalSearchCompleterDelegate {
         suggestions = []
     }
 }
+
+/// Lets screens hold one instance with @StateObject; change tracking still comes from @Observable.
+extension PlaceSearchCompleter: ObservableObject {}

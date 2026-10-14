@@ -184,7 +184,7 @@ struct AreaSheet: View {
     @State private var radius: TravelRadius = .ten
     @State private var isLookingUp = false
     @State private var lookupTask: Task<Void, Never>?
-    @State private var locationService = LocationService()
+    @StateObject private var locationService = LocationService()
     @State private var skipNextLookup = false
     @State private var seeded = false
     @State private var isSaving = false
@@ -279,6 +279,7 @@ struct AreaSheet: View {
     }
 
     private func useLocation() {
+        guard !isLookingUp else { return }
         isLookingUp = true
         Task { @MainActor in
             do {

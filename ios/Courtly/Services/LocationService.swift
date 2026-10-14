@@ -120,3 +120,6 @@ extension HomeArea {
         )
     }
 }
+
+/// Lets screens hold one instance with @StateObject; change tracking still comes from @Observable.
+extension LocationService: ObservableObject {}

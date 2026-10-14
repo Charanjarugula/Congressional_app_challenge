@@ -167,7 +167,7 @@ struct PeopleToPlayWithView: View {
             }
         }
         do {
-            let suggestions = try await API.People.suggestions(knownIDs: [])
+            let suggestions = try await API.People.suggestions(knownIDs: knownIDs)
             recommended = suggestions
                 .filter { suggestion in !knownIDs.contains(suggestion.id) }
                 .map { PersonSuggestion(card: $0.card, displayName: $0.card.displayName, detail: $0.reason ?? $0.card.levelAndArea) }

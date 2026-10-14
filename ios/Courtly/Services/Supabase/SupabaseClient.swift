@@ -82,7 +82,7 @@ actor SupabaseClient {
     func signOut() async {
         refreshTask?.cancel()
         if session != nil {
-            _ = try? await request("/auth/v1/logout", method: "POST", body: nil, authorized: true)
+            _ = try? await request("/auth/v1/logout?scope=local", method: "POST", body: nil, authorized: true)   // this device only
         }
         session = nil
     }
@@ -192,7 +192,7 @@ actor SupabaseClient {
         return try await request(path, method: method, rawBody: raw, headers: allHeaders, authorized: authorized)
     }
 
-    private func request(_ path: String, method: String, rawBody: Data?, headers: [String: String], authorized: Bool) async throws -> Data {
+    private func request(_ path: String, method: String, rawBody: Data?, headers: [String: String], authorized: Bool, retried: Bool = false) async throws -> Data {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
             throw SupabaseError.http(status: 0, message: "bad path \(path)")
         }
@@ -214,6 +214,12 @@ actor SupabaseClient {
         let (data, response) = try await urlSession.data(for: urlRequest)
         guard let http = response as? HTTPURLResponse else {
             throw SupabaseError.http(status: 0, message: "no response")
+        }
+        if http.statusCode == 401, authorized, !retried {
+            // The server stopped honoring a token the device still thought was good (clock skew, a
+            // revoked session): refresh once and try again. A rejected refresh signs the player out.
+            _ = try await refreshNow()
+            return try await request(path, method: method, rawBody: rawBody, headers: headers, authorized: true, retried: true)
         }
         guard (200..<300).contains(http.statusCode) else {
             throw Self.error(status: http.statusCode, data: data)

@@ -36,6 +36,7 @@ struct MainTabView: View {
                             .stroke(Color.white.opacity(0.35), lineWidth: 4)
                             .opacity(coachStep == 3 ? 1 : 0)
                     )
+                    .anchorPreference(key: CoachAnchorKey.self, value: .bounds) { ["pill": $0] }
                     .padding(.trailing, 20)
                     .padding(.bottom, 16)
             }
@@ -45,10 +46,17 @@ struct MainTabView: View {
                 GlassTabBar(selected: $selected, dots: dots)
             }
         }
-        .overlay {
+        .overlayPreferenceValue(CoachAnchorKey.self) { anchors in
             if let coachStep {
-                CoachMarksOverlay(step: coachStep, onNext: advanceCoachMarks)
-                    .zIndex(1)
+                GeometryReader { proxy in
+                    CoachMarksOverlay(
+                        step: coachStep,
+                        pillFrame: anchors["pill"].map { proxy[$0] },
+                        containerHeight: proxy.size.height,
+                        onNext: advanceCoachMarks
+                    )
+                }
+                .zIndex(1)
             }
         }
         .sheet(isPresented: $isPlanning) {

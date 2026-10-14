@@ -104,7 +104,7 @@ final class RealtimeHub {
                 URLQueryItem(name: "apikey", value: AppConfig.supabaseAnonKey),
                 URLQueryItem(name: "vsn", value: "1.0.0"),
             ]
-            guard let url = components.url, socket == nil else { return }
+            guard let url = components.url, socket == nil, !channels.isEmpty else { return }   // the last subscriber may have left during the await
             let task = URLSession.shared.webSocketTask(with: url)
             socket = task
             joined = []

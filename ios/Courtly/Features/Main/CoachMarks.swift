@@ -3,6 +3,9 @@ import SwiftUI
 /// Three tips over the real app the first time in: the hit list, adding friends, planning a hit.
 struct CoachMarksOverlay: View {
     let step: Int
+    /// Where the Plan a hit pill is, in the overlay's space, so the third tip sits right above it.
+    var pillFrame: CGRect? = nil
+    var containerHeight: CGFloat = 0
     let onNext: () -> Void
 
     var body: some View {
@@ -33,11 +36,12 @@ struct CoachMarksOverlay: View {
                         text: "Nobody posted a time that works? Post your own. Pick a day, a court and what you want to play.",
                         counter: "3 of 3", button: "Got it", arrow: .bottom
                     )
-                    .padding(.bottom, 82 + 80)   // the pill floats above the tab bar
+                    .padding(.bottom, pillFrame.map { containerHeight - $0.minY + 12 } ?? 160)
                 }
             }
             .padding(.horizontal, CourtlyMetrics.screenPadding)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .transition(.opacity)
     }
 
@@ -83,5 +87,15 @@ struct CoachMarksOverlay: View {
                     .offset(x: arrow == .top ? -28 : -60, y: arrow == .top ? -6 : 6)
             }
         }
+    }
+}
+
+
+/// Frames the first-run tips point at, published by the views that own them.
+struct CoachAnchorKey: PreferenceKey {
+    static let defaultValue: [String: Anchor<CGRect>] = [:]
+
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue()) { $1 }
     }
 }

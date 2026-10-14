@@ -16,16 +16,23 @@ final class InboxStore {
         chats?.reduce(0) { $0 + $1.unreadCount } ?? 0
     }
 
+    // Only the newest load may write, so an answer that left before a read mark never puts a dot back.
+    private var generation = 0
+
     @MainActor
     func load() async {
+        generation += 1
+        let mine = generation
         isLoading = true
-        defer { isLoading = false }
+        defer { if mine == generation { isLoading = false } }
         do {
             let fresh = try await API.Chats.inbox()
+            guard mine == generation else { return }
             chats = fresh
             lastError = nil
             SnapshotCache.save(fresh, key: "inbox")
         } catch {
+            guard mine == generation, !(error is CancellationError), (error as? URLError)?.code != .cancelled else { return }
             lastError = error.localizedDescription
         }
     }

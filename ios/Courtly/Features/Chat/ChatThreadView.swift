@@ -63,7 +63,7 @@ struct ChatThreadView: View {
                 }
                 .defaultScrollAnchor(.bottom)
                 .scrollDismissesKeyboard(.interactively)
-                .onChange(of: messages.count) { _, _ in
+                .onChange(of: messages.last?.id) { _, _ in   // a page loaded above leaves the reader where they are
                     withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
             }

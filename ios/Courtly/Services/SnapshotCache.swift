@@ -2,10 +2,17 @@ import Foundation
 
 /// The last copy of each screen's data, so tabs paint before the network answers and work offline.
 enum SnapshotCache {
+    /// Bump when a cached model changes shape; older folders are removed on first use.
+    private static let version = 2
+
     private static var directory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = base.appending(path: "snapshots")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dir = base.appending(path: "snapshots-v\(version)")
+        if !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.removeItem(at: base.appending(path: "snapshots"))
+            for older in 1..<version { try? FileManager.default.removeItem(at: base.appending(path: "snapshots-v\(older)")) }
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
         return dir
     }
 

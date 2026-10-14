@@ -5,13 +5,15 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var hits: HitsStore
+    @State private var inbox: InboxStore
     @State private var selected: MainTab = .play
     @State private var paths: [MainTab: [AppRoute]] = [:]
     @State private var isPlanning = false
 
-    /// The store reads and writes only the signed-in player's own snapshots.
+    /// The stores read and write only the signed-in player's own snapshots.
     init(account: UUID?) {
         _hits = State(initialValue: HitsStore(account: account))
+        _inbox = State(initialValue: InboxStore(account: account))
     }
 
     private var isAtRoot: Bool { (paths[selected] ?? []).isEmpty }
@@ -46,13 +48,16 @@ struct MainTabView: View {
         .tint(CourtlyColor.blue)
         .preferredColorScheme(.light)
         .environment(hits)
+        .environment(inbox)
         .task {
+            Task { await inbox.load() }   // the People dot is right from the start, not from the first visit
             await hits.refreshAll()
             await NotificationPermission.registerIfAuthorized()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 Task { await hits.refreshAll() }
+                Task { await inbox.load() }
                 Task { await API.Devices.retryPending() }   // a push token the server didn't take yet
             }
         }
@@ -64,7 +69,10 @@ struct MainTabView: View {
     }
 
     private var dots: Set<MainTab> {
-        hits.needsReplyCount > 0 ? [.play] : []
+        var tabs = Set<MainTab>()
+        if hits.needsReplyCount > 0 { tabs.insert(.play) }
+        if inbox.unreadCount > 0 { tabs.insert(.people) }
+        return tabs
     }
 
     private func stack(for tab: MainTab) -> some View {
@@ -98,7 +106,7 @@ struct MainTabView: View {
         switch tab {
         case .play: PlayView(onPlan: { isPlanning = true })
         case .myHits: MyHitsView(onPlan: { isPlanning = true })
-        case .people: PeoplePlaceholderView()
+        case .people: PeopleView(isActive: selected == .people)
         case .you: YouSummaryView()
         }
     }
@@ -109,26 +117,10 @@ struct MainTabView: View {
         case let .hit(id): HitDetailView(hitID: id)
         case let .request(id): JoinRequestView(requestID: id)
         case let .chat(id): ChatThreadView(chatID: id)
+        case let .player(id): PlayerProfileView(playerID: id)
+        case .addFriends: AddFriendsView()
+        case .newGroup: NewGroupView()
         }
-    }
-}
-
-/// Stands in until the People tab lands.
-private struct PeoplePlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 6) {
-            Text("No chats yet")
-                .font(CourtlyFont.sectionHeader)
-                .foregroundStyle(CourtlyColor.ink)
-            Text("Friends and hits you join show up here.")
-                .font(CourtlyFont.secondary)
-                .foregroundStyle(CourtlyColor.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.horizontal, 40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
-        .navigationTitle("People")
     }
 }
 

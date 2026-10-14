@@ -193,6 +193,7 @@ enum HitFormatting {
     static let dayAndDate = formatter("EEE, MMM d")
     static let month = formatter("MMMM")
     static let monthAndYear = formatter("MMMM yyyy")
+    static let monthDay = formatter("MMM d")
 
     /// "6 mi", or "0.4 mi" under a mile.
     static func miles(_ miles: Double) -> String {
@@ -205,6 +206,15 @@ enum HitFormatting {
         if calendar.isDateInToday(date) { return "Today \(clock.string(from: date))" }
         if calendar.isDateInYesterday(date) { return "Yesterday \(clock.string(from: date))" }
         return "\(dayAndDate.string(from: date)) \(clock.string(from: date))"
+    }
+
+    /// Inbox timestamps: "9:12 AM" today, "Yesterday", "Mon" this week, then "Oct 6".
+    static func inboxTime(_ date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return clock.string(from: date) }
+        if calendar.isDateInYesterday(date) { return "Yesterday" }
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: .now)).day ?? 99
+        return days < 7 ? day.string(from: date) : monthDay.string(from: date)
     }
 
     /// "11h left", "45m left", "Closed"

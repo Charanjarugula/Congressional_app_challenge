@@ -41,6 +41,36 @@ enum API {
         static func removeFriend(_ userID: UUID) async throws {
             try await client.rpc("remove_friend", params: ["p_user": userID.uuidString])
         }
+
+        static func search(_ query: String) async throws -> [SearchedPlayer] {
+            try await client.rpc("search_players", params: ["p_query": query])
+        }
+
+        static func player(_ userID: UUID) async throws -> PlayerProfile {
+            try await client.rpc("get_player", params: ["p_user": userID.uuidString])
+        }
+
+        static func block(_ userID: UUID) async throws {
+            try await client.rpc("block_user", params: ["p_user": userID.uuidString])
+        }
+
+        static func unblock(_ userID: UUID) async throws {
+            try await client.rpc("unblock_user", params: ["p_user": userID.uuidString])
+        }
+
+        static func report(_ userID: UUID, reason: ReportReason, details: String?, alsoBlock: Bool, hitID: UUID?) async throws {
+            try await client.rpc("report_user", params: [
+                "p_user": userID.uuidString,
+                "p_reason": reason.rawValue,
+                "p_details": nullable(details),
+                "p_also_block": alsoBlock,
+                "p_hit": nullable(hitID?.uuidString),
+            ])
+        }
+
+        static func blocked() async throws -> [PlayerCard] {
+            try await client.rpc("get_blocked_players")
+        }
     }
 
     enum Hits {
@@ -56,7 +86,8 @@ enum API {
             try await client.rpc("get_hit", params: ["p_hit": hitID.uuidString])
         }
 
-        static func create(courtID: UUID, startsAt: Date, durationMin: Int, format: PlayFormat, spots: Int, visibility: HitVisibility) async throws -> Hit {
+        static func create(courtID: UUID, startsAt: Date, durationMin: Int, format: PlayFormat, spots: Int, visibility: HitVisibility,
+                           inviteChatID: UUID? = nil, inviteExpiresAt: Date? = nil) async throws -> Hit {
             try await client.rpc("create_hit", params: [
                 "p_court_id": courtID.uuidString,
                 "p_starts_at": JSONCoding.string(from: startsAt),
@@ -64,6 +95,8 @@ enum API {
                 "p_format": format.rawValue,
                 "p_spots": spots,
                 "p_visibility": visibility.rawValue,
+                "p_invite_chat_id": nullable(inviteChatID?.uuidString),
+                "p_invite_expires_at": nullable(inviteExpiresAt.map(JSONCoding.string(from:))),
             ])
         }
 
@@ -158,6 +191,22 @@ enum API {
 
         static func markRead(_ chatID: UUID) async throws {
             try await client.rpc("mark_chat_read", params: ["p_chat": chatID.uuidString])
+        }
+
+        static func createGroup(name: String, memberIDs: [UUID]) async throws -> Chat {
+            try await client.rpc("create_group_chat", params: ["p_name": name, "p_members": memberIDs.map(\.uuidString)])
+        }
+
+        static func addMembers(chatID: UUID, memberIDs: [UUID]) async throws -> Chat {
+            try await client.rpc("add_chat_members", params: ["p_chat": chatID.uuidString, "p_members": memberIDs.map(\.uuidString)])
+        }
+
+        static func leave(_ chatID: UUID) async throws {
+            try await client.rpc("leave_chat", params: ["p_chat": chatID.uuidString])
+        }
+
+        static func setMuted(_ chatID: UUID, muted: Bool) async throws {
+            try await client.rpc("set_chat_muted", params: ["p_chat": chatID.uuidString, "p_muted": muted])
         }
     }
 

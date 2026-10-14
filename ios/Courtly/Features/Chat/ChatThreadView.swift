@@ -6,8 +6,10 @@ struct ChatThreadView: View {
     let chatID: UUID
 
     @Environment(AppSession.self) private var session
+    @Environment(InboxStore.self) private var inbox
     @Environment(\.navigate) private var navigate
     @State private var chat: Chat?
+    @State private var showsRequestHit = false
     @State private var messages: [Message] = []
     @State private var draft = ""
     @State private var isSending = false
@@ -71,12 +73,41 @@ struct ChatThreadView: View {
                 await refresh()
             }
         }
+        .onDisappear {
+            inbox.markRead(chatID)
+            Task { await inbox.load() }
+        }
+        .sheet(isPresented: $showsRequestHit) {
+            if let chat {
+                PlanHitView(inviteTo: chat) { _ in
+                    Task { await refresh() }
+                }
+            }
+        }
         .errorAlert($errorMessage)
+    }
+
+    /// Hit chats already are about a hit; DMs and groups can ask for one.
+    private var canRequestHit: Bool {
+        guard let chat else { return false }
+        return chat.type != .hit && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     // MARK: - Pieces
 
     private var header: some View {
+        Button {
+            if let other = chat?.others(than: me).first, chat?.type == .dm {
+                navigate(.player(other.id))
+            }
+        } label: {
+            headerContent
+        }
+        .buttonStyle(.plain)
+        .disabled(chat?.type != .dm)
+    }
+
+    private var headerContent: some View {
         HStack(spacing: 10) {
             if let chat {
                 if chat.type == .group {
@@ -119,14 +150,28 @@ struct ChatThreadView: View {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .strokeBorder(CourtlyColor.separator, lineWidth: 1)
                     )
-                Button(action: send) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 30))
-                        .foregroundStyle(canSend ? CourtlyColor.blue : CourtlyColor.placeholder)
+                if canRequestHit {
+                    Button {
+                        showsRequestHit = true
+                    } label: {
+                        Text("Request a hit")
+                            .font(CourtlyFont.secondarySemibold)
+                            .foregroundStyle(CourtlyColor.blue)
+                            .padding(.horizontal, 14)
+                            .frame(height: 36)
+                            .background(Capsule().fill(CourtlyColor.blueTint))
+                    }
+                    .buttonStyle(PressableButtonStyle())
+                } else {
+                    Button(action: send) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 30))
+                            .foregroundStyle(canSend ? CourtlyColor.blue : CourtlyColor.placeholder)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canSend)
+                    .padding(.bottom, 2)
                 }
-                .buttonStyle(.plain)
-                .disabled(!canSend)
-                .padding(.bottom, 2)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)

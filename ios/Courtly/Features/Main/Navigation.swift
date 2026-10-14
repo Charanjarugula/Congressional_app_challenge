@@ -5,6 +5,9 @@ enum AppRoute: Hashable {
     case hit(UUID)
     case request(UUID)
     case chat(UUID)
+    case player(UUID)
+    case addFriends
+    case newGroup
 }
 
 /// Pushes screens onto the current tab's stack from anywhere in its tree.

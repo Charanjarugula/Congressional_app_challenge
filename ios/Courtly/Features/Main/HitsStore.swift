@@ -90,8 +90,10 @@ final class HitsStore {
     // MARK: - Actions
 
     @MainActor
-    func create(courtID: UUID, startsAt: Date, durationMin: Int, format: PlayFormat, spots: Int, visibility: HitVisibility) async throws -> Hit {
-        var hit = try await API.Hits.create(courtID: courtID, startsAt: startsAt, durationMin: durationMin, format: format, spots: spots, visibility: visibility)
+    func create(courtID: UUID, startsAt: Date, durationMin: Int, format: PlayFormat, spots: Int, visibility: HitVisibility,
+                inviteChatID: UUID? = nil, inviteExpiresAt: Date? = nil) async throws -> Hit {
+        var hit = try await API.Hits.create(courtID: courtID, startsAt: startsAt, durationMin: durationMin, format: format, spots: spots,
+                                            visibility: visibility, inviteChatID: inviteChatID, inviteExpiresAt: inviteExpiresAt)
         hit.state = Hit.RowState.openWaiting.rawValue
         var mine = myHits ?? .empty
         mine.upcoming.append(hit)

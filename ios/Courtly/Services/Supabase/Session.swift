@@ -47,15 +47,26 @@ enum JSONCoding {
         return formatter.string(from: date)
     }
 
-    /// Postgres timestamps come back like "2026-10-16T18:30:00.123456+00:00"; trim to milliseconds.
+    /// Postgres timestamps come back like "2026-10-16T18:30:00.123456+00:00", and it trims trailing
+    /// zeros ("…:00.5+00:00"). The formatter wants exactly three fraction digits, so normalize first.
     static func parseDate(_ raw: String) -> Date? {
-        let trimmed = raw.replacingOccurrences(of: #"(\.\d{3})\d+"#, with: "$1", options: .regularExpression)
+        let text = withThreeFractionDigits(raw)
         let withFraction = ISO8601DateFormatter()
         withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = withFraction.date(from: trimmed) { return date }
+        if let date = withFraction.date(from: text) { return date }
         let plain = ISO8601DateFormatter()
         plain.formatOptions = [.withInternetDateTime]
-        return plain.date(from: trimmed)
+        return plain.date(from: text)
+    }
+
+    private static func withThreeFractionDigits(_ raw: String) -> String {
+        guard let dot = raw.firstIndex(of: ".") else { return raw }
+        let start = raw.index(after: dot)
+        let end = raw[start...].firstIndex { !$0.isNumber } ?? raw.endIndex
+        let digits = raw[start..<end]
+        guard !digits.isEmpty else { return raw }
+        let fixed = String(digits.prefix(3)).padding(toLength: 3, withPad: "0", startingAt: 0)
+        return String(raw[..<dot]) + "." + fixed + String(raw[end...])
     }
 
     static let decoder: JSONDecoder = {

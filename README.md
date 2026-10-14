@@ -36,7 +36,7 @@ To run on a device, choose your team under Signing & Capabilities. The bundle id
 
 ## How the app talks to the backend
 
-Every read and write is one database function (`get_play_feed`, `create_hit`, `send_message`, ...) called through `API.swift`. Row-level security guards direct table access; the functions run as security definer and check the caller themselves. Errors raised as short codes (`hit_full`, `already_requested`) are turned into plain sentences in `BackendMessages.swift`.
+Every read and write is one database function (`get_play_feed`, `create_hit`, `send_message`, ...) called through `API.swift`. Row-level security guards direct table access; the functions run as security definer and check the caller themselves. Only those entry points are callable over the API: helpers such as `hit_json` or `chat_json` have no grant, so a new function the app should call needs `grant execute ... to authenticated` in its migration (see `0009_function_grants.sql`). Errors raised as short codes (`hit_full`, `already_requested`) are turned into plain sentences in `BackendMessages.swift`.
 
 The Play and My Hits tabs keep the last response on disk so they paint before the network answers. Open chats, the People list and the hit tabs listen over Supabase Realtime (`RealtimeListener.swift`) for rows they are allowed to see and refresh at once; a slow poll stays on as the fallback.
 

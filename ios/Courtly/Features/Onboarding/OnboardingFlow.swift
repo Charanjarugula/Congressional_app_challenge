@@ -7,6 +7,7 @@ enum AccountMode: Hashable {
 /// Every pushed screen in the flow, in order. Welcome is the stack root.
 enum OnboardingRoute: Hashable {
     case createAccount(AccountMode)
+    case emailCode(String)
     case name
     case birthday
     case gender
@@ -21,10 +22,18 @@ enum OnboardingRoute: Hashable {
 }
 
 /// Welcome → account → profile questions → location → availability → friends → notifications → done.
+/// A player who signed in but never finished starts again at the name step.
 struct OnboardingFlow: View {
     @Environment(AppSession.self) private var session
     @State private var draft = OnboardingDraft()
-    @State private var path: [OnboardingRoute] = []
+    @State private var path: [OnboardingRoute]
+
+    private let resumeProfile: Bool
+
+    init(resumeProfile: Bool) {
+        self.resumeProfile = resumeProfile
+        _path = State(initialValue: resumeProfile ? [.name] : [])
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -39,23 +48,37 @@ struct OnboardingFlow: View {
         // Welcome is blue with white status-bar text; every other screen is light. The root
         // view's preference wins inside a NavigationStack, so it has to change with the path.
         .preferredColorScheme(path.isEmpty ? .dark : .light)
+        .onAppear {
+            if resumeProfile, let profile = session.profile { draft.load(from: profile) }
+        }
+    }
+
+    /// After any successful sign-in: into the app if the profile is finished, otherwise on to the name step.
+    private func continueAfterSignIn() {
+        Task { @MainActor in
+            do {
+                let onboarded = try await session.handleSignedIn()
+                if !onboarded {
+                    if let profile = session.profile { draft.load(from: profile) }
+                    path.append(.name)
+                }
+            } catch {
+                session.show(error, title: "Couldn’t load your profile")
+            }
+        }
     }
 
     @ViewBuilder
     private func destination(for route: OnboardingRoute) -> some View {
         switch route {
         case let .createAccount(mode):
-            CreateAccountView(mode: mode, draft: draft) {
-                switch mode {
-                case .signUp:
-                    path.append(.name)
-                case .signIn:
-                    // There is no backend yet to load an existing profile from, so a returning player
-                    // completes the profile steps like a new one. Once sign-in can fetch the profile,
-                    // this goes straight to the app.
-                    path.append(.name)
-                }
-            }
+            CreateAccountView(
+                mode: mode,
+                onSignedIn: continueAfterSignIn,
+                onEmailSent: { email in path.append(.emailCode(email)) }
+            )
+        case let .emailCode(email):
+            EmailCodeView(email: email, onSignedIn: continueAfterSignIn)
         case .name:
             NameView(draft: draft) { path.append(.birthday) }
         case .birthday:
@@ -84,7 +107,7 @@ struct OnboardingFlow: View {
             NotificationsView(draft: draft) { path.append(.done) }
         case .done:
             YoureInView(firstName: draft.trimmedFirstName) {
-                session.completeOnboarding(with: draft)
+                try await session.completeOnboarding(with: draft, accountEmail: nil)
             }
         }
     }

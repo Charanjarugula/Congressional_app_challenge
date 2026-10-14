@@ -1,9 +1,12 @@
 import SwiftUI
 
-/// 17 · You're in. Green check, greeting, Let's hit.
+/// 17 · You're in. Green check, greeting, Let's hit. Saving the profile happens here.
 struct YoureInView: View {
     let firstName: String
-    let onLetsHit: () -> Void
+    let onLetsHit: () async throws -> Void
+
+    @State private var isSaving = false
+    @State private var errorMessage: String?
 
     private var greeting: String {
         firstName.isEmpty ? "You’re in." : "You’re in, \(firstName)."
@@ -38,6 +41,13 @@ struct YoureInView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 280)
                 .padding(.top, 10)
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(CourtlyFont.caption)
+                    .foregroundStyle(CourtlyColor.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 16)
+            }
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -45,11 +55,25 @@ struct YoureInView: View {
         .padding(.bottom, 70)
         .background(Color.white.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            PrimaryButton(title: "Let’s hit", action: onLetsHit)
+            PrimaryButton(title: "Let’s hit", isLoading: isSaving, action: finish)
                 .padding(.horizontal, CourtlyMetrics.screenPadding)
                 .padding(.bottom, 16)
                 .background(Color.white.ignoresSafeArea())
         }
         .toolbar(.hidden, for: .navigationBar)
+    }
+
+    private func finish() {
+        guard !isSaving else { return }
+        isSaving = true
+        errorMessage = nil
+        Task { @MainActor in
+            do {
+                try await onLetsHit()
+            } catch {
+                isSaving = false
+                errorMessage = "Couldn’t save your profile. \(error.localizedDescription)"
+            }
+        }
     }
 }

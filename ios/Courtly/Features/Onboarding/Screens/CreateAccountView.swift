@@ -2,29 +2,32 @@ import SwiftUI
 
 /// 02 · Create account. Google and Apple first, then email.
 struct CreateAccountView: View {
+    enum Busy {
+        case apple, google, email
+    }
+
     let mode: AccountMode
-    @Bindable var draft: OnboardingDraft
-    let onContinue: () -> Void
+    let onSignedIn: () -> Void
+    let onEmailSent: (String) -> Void
 
     @State private var email = ""
-    @State private var busyProvider: AuthProvider?
+    @State private var busy: Busy?
     @State private var errorMessage: String?
-
-    private var isSigningInWithEmail: Bool {
-        if case .email = busyProvider { return true }
-        return false
-    }
 
     private var isValidEmail: Bool {
         let trimmed = email.trimmingCharacters(in: .whitespaces)
         return trimmed.contains("@") && trimmed.contains(".") && trimmed.count >= 6
     }
 
+    private var normalizedEmail: String {
+        email.trimmingCharacters(in: .whitespaces).lowercased()
+    }
+
     var body: some View {
         OnboardingStepView(progress: 0.1, title: mode == .signUp ? "Create your account" : "Welcome back") {
             VStack(spacing: 12) {
-                SocialSignInButton(kind: .google, isLoading: busyProvider == .google) { signIn(.google) }
-                SocialSignInButton(kind: .apple, isLoading: busyProvider == .apple) { signIn(.apple) }
+                SocialSignInButton(kind: .google, isLoading: busy == .google) { run(.google) { try await AppEnvironment.auth.signInWithGoogle(); onSignedIn() } }
+                SocialSignInButton(kind: .apple, isLoading: busy == .apple) { run(.apple) { try await AppEnvironment.auth.signInWithApple(); onSignedIn() } }
             }
             .padding(.top, 32)
 
@@ -54,13 +57,8 @@ struct CreateAccountView: View {
             }
             .padding(.top, 8)
 
-            PrimaryButton(
-                title: "Continue",
-                isEnabled: isValidEmail,
-                isLoading: isSigningInWithEmail,
-                action: continueWithEmail
-            )
-            .padding(.top, 16)
+            PrimaryButton(title: "Continue", isEnabled: isValidEmail, isLoading: busy == .email, action: continueWithEmail)
+                .padding(.top, 16)
 
             if let errorMessage {
                 Text(errorMessage)
@@ -90,22 +88,26 @@ struct CreateAccountView: View {
 
     private func continueWithEmail() {
         guard isValidEmail else { return }
-        signIn(.email(email.trimmingCharacters(in: .whitespaces).lowercased()))
+        let address = normalizedEmail
+        run(.email) {
+            try await AppEnvironment.auth.sendEmailCode(to: address)
+            onEmailSent(address)
+        }
     }
 
-    private func signIn(_ provider: AuthProvider) {
-        guard busyProvider == nil else { return }
-        busyProvider = provider
+    private func run(_ kind: Busy, _ work: @escaping () async throws -> Void) {
+        guard busy == nil else { return }
+        busy = kind
         errorMessage = nil
         Task { @MainActor in
             do {
-                draft.account = try await AppEnvironment.auth.signIn(with: provider)
-                busyProvider = nil
-                onContinue()
+                try await work()
+            } catch AuthError.cancelled {
+                // The player closed the sheet; nothing to say.
             } catch {
-                busyProvider = nil
-                errorMessage = "Couldn’t sign in. Please try again."
+                errorMessage = error.localizedDescription
             }
+            busy = nil
         }
     }
 }

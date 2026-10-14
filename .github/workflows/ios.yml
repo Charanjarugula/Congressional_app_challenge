@@ -1,0 +1,39 @@
+name: iOS build
+
+on:
+  push:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build for iOS Simulator
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project ios/Courtly.xcodeproj \
+            -target Courtly \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            | tee build.log | grep -E "^(\*\*|error:|warning:|.*: error:|.*: warning:|BUILD)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Show errors
+        if: failure()
+        run: grep -E "error:" build.log | head -100 || tail -100 build.log

@@ -7,6 +7,7 @@ import Foundation
 final class RealtimeListener {
     private let table: String
     private let filter: String?
+    private let events: String
     private let onChange: () -> Void
     private var socket: URLSessionWebSocketTask?
     private var heartbeat: Task<Void, Never>?
@@ -15,10 +16,11 @@ final class RealtimeListener {
     private var isStopped = false
 
     /// `filter` is a PostgREST-style condition such as `chat_id=eq.<uuid>`; nil means every row
-    /// the signed-in player is allowed to see.
-    init(table: String, filter: String? = nil, onChange: @escaping () -> Void) {
+    /// the signed-in player is allowed to see. `events` is `INSERT` (default), `UPDATE` or `*`.
+    init(table: String, filter: String? = nil, events: String = "INSERT", onChange: @escaping () -> Void) {
         self.table = table
         self.filter = filter
+        self.events = events
         self.onChange = onChange
     }
 
@@ -33,7 +35,7 @@ final class RealtimeListener {
         ]
         guard let url = components.url else { return }
 
-        var change: [String: Any] = ["event": "INSERT", "schema": "public", "table": table]
+        var change: [String: Any] = ["event": events, "schema": "public", "table": table]
         if let filter { change["filter"] = filter }
 
         let task = URLSession.shared.webSocketTask(with: url)
@@ -86,7 +88,7 @@ final class RealtimeListener {
 
     private var topic: String {
         let suffix = filter?.replacingOccurrences(of: "=eq.", with: "-") ?? "all"
-        return "realtime:\(table)-\(suffix)".lowercased()
+        return "realtime:\(table)-\(suffix)-\(events == "*" ? "any" : events)".lowercased()
     }
 
     private func send(event: String, topic: String, payload: [String: Any]) {

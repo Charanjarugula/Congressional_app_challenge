@@ -12,6 +12,8 @@ struct MainTabView: View {
     @State private var paths: [MainTab: [AppRoute]] = [:]
     @State private var isPlanning = false
     @State private var coachStep: Int?
+    @State private var liveUpdates: [RealtimeListener] = []
+    @State private var refreshDebounce: Task<Void, Never>?
 
     private var isAtRoot: Bool { (paths[selected] ?? []).isEmpty }
 
@@ -62,11 +64,18 @@ struct MainTabView: View {
             await NotificationPermission.registerIfAuthorized()
             if let link = deepLinks.pending { await open(link) }
             startCoachMarksIfNeeded()
+            await startLiveUpdates()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
+            switch phase {
+            case .active:
                 Task { await hits.refreshAll() }
                 Task { await inbox.load() }
+                Task { await startLiveUpdates() }
+            case .background:
+                stopLiveUpdates()
+            default:
+                break
             }
         }
         .onChange(of: deepLinks.pending) { _, link in
@@ -75,6 +84,37 @@ struct MainTabView: View {
         .onChange(of: deepLinks.lastPushReceivedAt) { _, _ in
             Task { await hits.refreshAll() }
             Task { await inbox.load() }
+        }
+    }
+
+    // MARK: - Live updates
+
+    /// Hits and requests change on other phones. Refresh when they do instead of waiting for a poll;
+    /// row-level security means each player only hears about rows they can see.
+    private func startLiveUpdates() async {
+        stopLiveUpdates()
+        let listeners = [
+            RealtimeListener(table: "hits", events: "*") { scheduleRefresh() },
+            RealtimeListener(table: "join_requests", events: "*") { scheduleRefresh() },
+        ]
+        liveUpdates = listeners
+        for listener in listeners {
+            await listener.connect()
+        }
+    }
+
+    private func stopLiveUpdates() {
+        liveUpdates.forEach { $0.disconnect() }
+        liveUpdates = []
+    }
+
+    /// Several rows often change in one action (a request, the hit, the chat); refresh once.
+    private func scheduleRefresh() {
+        refreshDebounce?.cancel()
+        refreshDebounce = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            await hits.refreshAll()
         }
     }
 

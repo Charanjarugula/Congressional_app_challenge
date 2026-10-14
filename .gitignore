@@ -30,3 +30,6 @@ node_modules/
 # Editors
 .vscode/
 .idea/
+
+# Local only
+.prod-db-password

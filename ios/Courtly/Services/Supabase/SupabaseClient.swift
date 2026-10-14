@@ -192,7 +192,9 @@ actor SupabaseClient {
         return try await request(path, method: method, rawBody: raw, headers: allHeaders, authorized: authorized)
     }
 
-    private func request(_ path: String, method: String, rawBody: Data?, headers: [String: String], authorized: Bool, retried: Bool = false) async throws -> Data {
+    /// `expecting` names the account a retry must still be signed in as; any other answer is theirs alone.
+    private func request(_ path: String, method: String, rawBody: Data?, headers: [String: String], authorized: Bool,
+                         retried: Bool = false, expecting: UUID? = nil) async throws -> Data {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
             throw SupabaseError.http(status: 0, message: "bad path \(path)")
         }
@@ -204,6 +206,7 @@ actor SupabaseClient {
         var sentAs: UUID?
         if authorized {
             let current = try await validSession()
+            if let expecting, current.userID != expecting { throw SupabaseError.notSignedIn }
             sentAs = current.userID
             urlRequest.setValue("Bearer \(current.accessToken)", forHTTPHeaderField: "Authorization")
         } else {
@@ -224,7 +227,7 @@ actor SupabaseClient {
             // else signed in by now, the answer is theirs alone.
             guard let now = session, now.userID == sentAs else { throw SupabaseError.notSignedIn }
             _ = try await refreshNow()
-            return try await request(path, method: method, rawBody: rawBody, headers: headers, authorized: true, retried: true)
+            return try await request(path, method: method, rawBody: rawBody, headers: headers, authorized: true, retried: true, expecting: sentAs)
         }
         guard (200..<300).contains(http.statusCode) else {
             throw Self.error(status: http.statusCode, data: data)

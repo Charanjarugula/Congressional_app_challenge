@@ -8,8 +8,10 @@ final class InboxStore {
     private(set) var isLoading = false
     private(set) var lastError: String?
 
-    init() {
-        chats = SnapshotCache.load([Chat].self, key: "inbox")
+    /// Paints from the signed-in player's own snapshot; nothing of another account's is ever read.
+    init(account: UUID?) {
+        guard let account else { return }
+        chats = SnapshotCache.load([Chat].self, key: "inbox", account: account)
     }
 
     var unreadCount: Int {
@@ -28,13 +30,13 @@ final class InboxStore {
         let owner = await SupabaseClient.shared.session?.userID
         do {
             let fresh = try await API.Chats.inbox()
-            // Same player (a sign-out mid-flight must not refill the cache), then, with no await in
-            // between, still the newest load.
+            // Same player (a sign-out mid-flight must not refill the list), then, with no await in
+            // between, still the newest load; the file goes under the account that fetched it.
             let samePlayer = await SupabaseClient.shared.session?.userID == owner
-            guard samePlayer, mine == generation else { return }
+            guard samePlayer, mine == generation, let owner else { return }
             chats = fresh
             lastError = nil
-            SnapshotCache.save(fresh, key: "inbox")
+            SnapshotCache.save(fresh, key: "inbox", account: owner)
         } catch {
             guard mine == generation, !(error is CancellationError), (error as? URLError)?.code != .cancelled else { return }
             lastError = error.localizedDescription

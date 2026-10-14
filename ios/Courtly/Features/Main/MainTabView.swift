@@ -5,8 +5,8 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.scenePhase) private var scenePhase
-    @State private var hits = HitsStore()
-    @State private var inbox = InboxStore()
+    @State private var hits: HitsStore
+    @State private var inbox: InboxStore
     @State private var deepLinks = DeepLinkCenter.shared
     @State private var selected: MainTab = .play
     @State private var paths: [MainTab: [AppRoute]] = [:]
@@ -16,6 +16,12 @@ struct MainTabView: View {
     @State private var refreshDebounce: Task<Void, Never>?
     @State private var openGeneration = 0   // the newest deep link is the one that lands
     @State private var inboxDebounce: Task<Void, Never>?
+
+    /// The stores read and write only the signed-in player's own snapshots.
+    init(account: UUID?) {
+        _hits = State(initialValue: HitsStore(account: account))
+        _inbox = State(initialValue: InboxStore(account: account))
+    }
 
     private var isAtRoot: Bool { (paths[selected] ?? []).isEmpty }
 

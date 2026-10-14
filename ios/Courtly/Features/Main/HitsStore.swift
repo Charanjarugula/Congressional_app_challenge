@@ -26,9 +26,11 @@ final class HitsStore {
     private var refreshTask: Task<Void, Never>?
     private var refreshQueued = false
 
-    init() {
-        feed = SnapshotCache.load(PlayFeed.self, key: "play_feed")
-        myHits = SnapshotCache.load(MyHits.self, key: "my_hits")
+    /// Paints from the signed-in player's own snapshots; nothing of another account's is ever read.
+    init(account: UUID?) {
+        guard let account else { return }
+        feed = SnapshotCache.load(PlayFeed.self, key: "play_feed", account: account)
+        myHits = SnapshotCache.load(MyHits.self, key: "my_hits", account: account)
     }
 
     // MARK: - Loading
@@ -43,13 +45,14 @@ final class HitsStore {
         do {
             let fresh = try await API.Hits.feed()
             // Still the same player (after a sign-out or a switch the answer belongs to someone else and
-            // must not reach the lists or the files the next player reads), and, checked last with no
-            // await in between, still the newest load.
+            // must not reach the lists), and, checked last with no await in between, still the newest
+            // load. The file goes under the account that fetched it, so even a write that slipped
+            // through could not be read by the next player.
             let samePlayer = await SupabaseClient.shared.session?.userID == owner
-            guard samePlayer, generation == feedGeneration else { return }
+            guard samePlayer, generation == feedGeneration, let owner else { return }
             feed = fresh
             feedError = nil
-            SnapshotCache.save(fresh, key: "play_feed")
+            SnapshotCache.save(fresh, key: "play_feed", account: owner)
             try? await UNUserNotificationCenter.current().setBadgeCount(fresh.badge)
         } catch {
             guard generation == feedGeneration, !Self.isCancellation(error) else { return }
@@ -67,10 +70,10 @@ final class HitsStore {
         do {
             let fresh = try await API.Hits.mine()
             let samePlayer = await SupabaseClient.shared.session?.userID == owner
-            guard samePlayer, generation == myHitsGeneration else { return }
+            guard samePlayer, generation == myHitsGeneration, let owner else { return }
             myHits = fresh
             myHitsError = nil
-            SnapshotCache.save(fresh, key: "my_hits")
+            SnapshotCache.save(fresh, key: "my_hits", account: owner)
         } catch {
             guard generation == myHitsGeneration, !Self.isCancellation(error) else { return }
             myHitsError = error.localizedDescription

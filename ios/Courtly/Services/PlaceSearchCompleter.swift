@@ -60,7 +60,7 @@ final class PlaceSearchCompleter: NSObject, MKLocalSearchCompleterDelegate {
 
     static func resolve(_ completion: MKLocalSearchCompletion) async throws -> HomeArea {
         let response = try await MKLocalSearch(request: MKLocalSearch.Request(completion: completion)).start()
-        guard let item = response.mapItems.first else {
+        guard let item = response.mapItems.first(where: { $0.placemark.isoCountryCode == "US" }) else {
             throw LocationService.LocationError.notFound
         }
         return await LocationService.coarsened(
@@ -70,8 +70,13 @@ final class PlaceSearchCompleter: NSObject, MKLocalSearchCompleterDelegate {
 
     // MARK: - MKLocalSearchCompleterDelegate
 
+    /// The region only biases MapKit; it still offers namesakes abroad, so those are dropped here.
+    private static func isInUnitedStates(_ result: MKLocalSearchCompletion) -> Bool {
+        result.subtitle.isEmpty || result.subtitle.contains("United States")
+    }
+
     func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        suggestions = completer.results.filter { Self.isCityOrZip($0.title) }.prefix(6).map { result in
+        suggestions = completer.results.filter { Self.isCityOrZip($0.title) && Self.isInUnitedStates($0) }.prefix(6).map { result in
             Suggestion(
                 id: result.title + "|" + result.subtitle,
                 title: result.title,

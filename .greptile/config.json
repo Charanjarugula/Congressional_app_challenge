@@ -1,0 +1,83 @@
+{
+  "strictness": 2,
+  "commentTypes": ["logic", "syntax"],
+  "autoReview": ["open", "push"],
+  "statusCheck": true,
+  "disabledLabels": ["no-review"],
+  "ignorePatterns": "ios/Courtly.xcodeproj/**\n**/*.xcassets/**\n**/*.png\n**/*.entitlements\nsite/styles.css",
+  "instructions": "Courtly is an iOS app (SwiftUI, iOS 17+) with a Supabase backend (Postgres with PostGIS, row-level security, security-definer SQL functions, Deno Edge Functions) and a static policy site. The iOS app talks to the backend only through the typed wrappers in ios/Courtly/Services/API.swift, which call database functions by name. Review for correctness, security and privacy first; style comments are off. When a change touches both the app and the SQL, check that the JSON shapes, parameter names and raised error codes still agree.",
+  "rules": [
+    {
+      "id": "sql-explicit-grants",
+      "rule": "Every new or renamed function in schema public that the app must call needs an explicit `grant execute ... to authenticated` in the same migration (see supabase/migrations/0009_function_grants.sql). Never add a blanket `grant execute on all functions`. Internal helpers (JSON builders, predicates, writers) must not be granted; flag any helper that takes an arbitrary user id or chat id and is reachable over the API.",
+      "scope": ["supabase/**/*.sql"],
+      "severity": "high"
+    },
+    {
+      "id": "sql-no-editing-applied-migrations",
+      "rule": "Migration files that have already been deployed must not be modified in place; the deploy script skips files recorded as applied. Put changes to existing functions or tables in a new, higher-numbered migration.",
+      "scope": ["supabase/migrations/**"],
+      "severity": "high"
+    },
+    {
+      "id": "sql-definer-hygiene",
+      "rule": "Functions declared `security definer` must set `search_path`, must start by resolving the caller (assert_signed_in or assert_onboarded) and must check visibility themselves (can_see_hit, is_chat_member, is_hit_host). Lock the hit row before its request or invite row, the order add_player uses, to avoid deadlocks.",
+      "scope": ["supabase/**/*.sql"],
+      "severity": "high"
+    },
+    {
+      "id": "sql-error-codes",
+      "rule": "Errors raised for the app must be short snake_case codes (`raise exception 'hit_full'`). A new code needs a matching entry in ios/Courtly/Services/Supabase/BackendMessages.swift, and the smoke test in supabase/tests/smoke.sql should cover new functions and new failure paths.",
+      "scope": ["supabase/**/*.sql", "ios/Courtly/Services/Supabase/BackendMessages.swift"],
+      "severity": "medium"
+    },
+    {
+      "id": "privacy-coarse-location-and-hashes",
+      "rule": "Never store or send a precise coordinate: locations are a ZIP or city centroid (LocationService.coarsened). Contact hashes are computed server-side from verified values; the client must not write phone_hash or email_hash. Anything shown to other players goes through player_card, never profile_json.",
+      "scope": ["ios/**", "supabase/**"],
+      "severity": "high"
+    },
+    {
+      "id": "swift-no-swallowed-errors",
+      "rule": "Do not turn a failed network call into an empty state with `try?`. Keep the error (an ErrorCaption, a QuietCard with the message, or the store's error field) so offline is distinguishable from 'nothing here'.",
+      "scope": ["ios/**/*.swift"],
+      "severity": "medium"
+    },
+    {
+      "id": "swift-view-owned-services",
+      "rule": "Services held by a SwiftUI View (CalendarService, LocationService, PlaceSearchCompleter, EKEventStore) must be `@State` or live in an @Observable store, never a plain stored `let`, because the struct is rebuilt on every render.",
+      "scope": ["ios/**/*.swift"],
+      "severity": "medium"
+    },
+    {
+      "id": "swift-main-actor-work",
+      "rule": "Contacts enumeration, HMAC hashing, image decoding and downscaling must run off the main actor (Task.detached) and only assign results on the main actor.",
+      "scope": ["ios/**/*.swift"],
+      "severity": "medium"
+    },
+    {
+      "id": "swift-dates",
+      "rule": "Calendar dates such as birthdays are formatted and parsed in the device time zone as yyyy-MM-dd, never through a GMT formatter. Any `ClosedRange<Date>` built from user input must guarantee lowerBound <= upperBound, since the `...` operator traps otherwise.",
+      "scope": ["ios/**/*.swift"],
+      "severity": "high"
+    },
+    {
+      "id": "swift-session-lifecycle",
+      "rule": "Anything that holds per-user state outside SwiftUI (RealtimeHub channels, SnapshotCache, ProfileCache, the app badge, DeepLinkCenter.pending, the stored APNs token) must be cleared in AppSession.signOut() and deleteAccount().",
+      "scope": ["ios/**/*.swift"],
+      "severity": "high"
+    },
+    {
+      "id": "deploy-secrets",
+      "rule": "Workflows must read tokens only from repository secrets, never from workflow_dispatch inputs. The deploy must never regenerate a secret the Edge Functions also hold unless it updates both in the same step.",
+      "scope": [".github/**", "scripts/**"],
+      "severity": "high"
+    },
+    {
+      "id": "site-matches-code",
+      "rule": "Statements on the policy, terms and support pages must match what the backend does: what is stored (own email and phone hashes, weekly busy flags), retention periods, what blocking hides, and how deletion works. Flag any new claim the code does not implement.",
+      "scope": ["site/**"],
+      "severity": "medium"
+    }
+  ]
+}

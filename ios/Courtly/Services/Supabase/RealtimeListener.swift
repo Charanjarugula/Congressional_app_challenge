@@ -61,8 +61,9 @@ final class RealtimeListener {
                 self?.handle(message)
             }
             // The socket closed under us: wait a little and try again unless we were stopped.
+            // This task is the listener itself, so it must not cancel itself here.
             guard !Task.isCancelled, let self, !self.isStopped else { return }
-            self.dropSocket()
+            self.dropSocket(cancellingListener: false)
             try? await Task.sleep(for: .seconds(5))
             guard !Task.isCancelled, !self.isStopped else { return }
             await self.connect()
@@ -74,10 +75,10 @@ final class RealtimeListener {
         dropSocket()
     }
 
-    private func dropSocket() {
+    private func dropSocket(cancellingListener: Bool = true) {
         heartbeat?.cancel()
         heartbeat = nil
-        listener?.cancel()
+        if cancellingListener { listener?.cancel() }
         listener = nil
         socket?.cancel(with: .goingAway, reason: nil)
         socket = nil

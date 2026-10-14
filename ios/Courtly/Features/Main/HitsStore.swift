@@ -11,9 +11,11 @@ final class HitsStore {
     private(set) var isLoadingMyHits = false
     private(set) var lastError: String?
 
-    init() {
-        feed = SnapshotCache.load(PlayFeed.self, key: "play_feed")
-        myHits = SnapshotCache.load(MyHits.self, key: "my_hits")
+    /// Paints from the signed-in player's own snapshots; nothing of another account's is ever read.
+    init(account: UUID?) {
+        guard let account else { return }
+        feed = SnapshotCache.load(PlayFeed.self, key: "play_feed", account: account)
+        myHits = SnapshotCache.load(MyHits.self, key: "my_hits", account: account)
     }
 
     // MARK: - Loading
@@ -22,11 +24,17 @@ final class HitsStore {
     func loadFeed() async {
         isLoadingFeed = true
         defer { isLoadingFeed = false }
+        let owner = await SupabaseClient.shared.session?.userID
         do {
             let fresh = try await API.Hits.feed()
+            // Still the same player: after a sign-out or a switch the answer belongs to someone else and
+            // must not reach the lists. The file goes under the account that fetched it, so even a write
+            // that slipped through could not be read by the next player.
+            let samePlayer = await SupabaseClient.shared.session?.userID == owner
+            guard samePlayer, let owner else { return }
             feed = fresh
             lastError = nil
-            SnapshotCache.save(fresh, key: "play_feed")
+            SnapshotCache.save(fresh, key: "play_feed", account: owner)
         } catch {
             lastError = error.localizedDescription
         }
@@ -36,10 +44,13 @@ final class HitsStore {
     func loadMyHits() async {
         isLoadingMyHits = true
         defer { isLoadingMyHits = false }
+        let owner = await SupabaseClient.shared.session?.userID
         do {
             let fresh = try await API.Hits.mine()
+            let samePlayer = await SupabaseClient.shared.session?.userID == owner
+            guard samePlayer, let owner else { return }
             myHits = fresh
-            SnapshotCache.save(fresh, key: "my_hits")
+            SnapshotCache.save(fresh, key: "my_hits", account: owner)
         } catch {
             lastError = error.localizedDescription
         }

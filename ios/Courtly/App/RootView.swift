@@ -15,7 +15,7 @@ struct RootView: View {
                 OnboardingFlow(resumeProfile: resume)
                     .transition(.opacity)
             case .main:
-                MainTabView()
+                MainTabView(account: session.profile?.id)
                     .transition(.opacity)
             }
         }

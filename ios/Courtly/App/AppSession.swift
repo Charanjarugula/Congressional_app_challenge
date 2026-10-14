@@ -70,7 +70,9 @@ final class AppSession {
 
     @MainActor
     func refreshProfile() async {
-        if let me = try? await API.Profile.me() {
+        let owner = profile?.id
+        if let me = try? await API.Profile.me(), profile?.id == owner, owner != nil {
+            // Only while the same player is still signed in; a late answer after a sign-out stays out.
             profile = me
             ProfileCache.save(me)
         }

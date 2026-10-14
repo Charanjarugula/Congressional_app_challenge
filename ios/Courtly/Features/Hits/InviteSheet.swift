@@ -9,6 +9,7 @@ struct InviteSheet: View {
     @State private var friends: [Friend] = []
     @State private var groups: [Chat] = []
     @State private var isLoading = true
+    @State private var loadFailed = false
     @State private var sent: Set<UUID> = []
     @State private var sending: UUID?
     @State private var errorMessage: String?
@@ -38,6 +39,13 @@ struct InviteSheet: View {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 40)
+                    } else if loadFailed {
+                        VStack(spacing: 12) {
+                            QuietCard(title: "Couldn’t load your friends", detail: "Check your connection and try again.")
+                            Button("Try again") { Task { await load() } }
+                                .font(CourtlyFont.secondarySemibold)
+                                .foregroundStyle(CourtlyColor.blue)
+                        }
                     } else if groups.isEmpty && friends.isEmpty {
                         QuietCard(title: "No one to invite yet", detail: "Add friends from People and they’ll show up here.")
                     } else {
@@ -160,12 +168,19 @@ struct InviteSheet: View {
 
     // MARK: - Data
 
+    /// A failed load says so instead of looking like a player with no one to invite.
     private func load() async {
+        isLoading = true
         defer { isLoading = false }
         async let friendList = API.People.friends()
         async let inbox = API.Chats.inbox()
-        friends = (try? await friendList) ?? []
-        groups = ((try? await inbox) ?? []).filter { $0.type == .group }
+        do {
+            friends = try await friendList
+            groups = try await inbox.filter { $0.type == .group }
+            loadFailed = false
+        } catch {
+            loadFailed = true
+        }
     }
 
     private func send(chatID: UUID, targetUserID: UUID?) {

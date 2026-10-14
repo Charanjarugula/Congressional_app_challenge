@@ -5,13 +5,20 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.scenePhase) private var scenePhase
-    @State private var hits = HitsStore()
-    @State private var inbox = InboxStore()
+    @State private var hits: HitsStore
+    @State private var inbox: InboxStore
     @State private var deepLinks = DeepLinkCenter.shared
     @State private var selected: MainTab = .play
     @State private var paths: [MainTab: [AppRoute]] = [:]
     @State private var isPlanning = false
     @State private var coachStep: Int?
+    @State private var openGeneration = 0   // the newest deep link is the one that lands
+
+    /// The stores read and write only the signed-in player's own snapshots.
+    init(account: UUID?) {
+        _hits = State(initialValue: HitsStore(account: account))
+        _inbox = State(initialValue: InboxStore(account: account))
+    }
 
     private var isAtRoot: Bool { (paths[selected] ?? []).isEmpty }
 
@@ -58,6 +65,7 @@ struct MainTabView: View {
         .environment(hits)
         .environment(inbox)
         .task {
+            Task { await inbox.load() }   // the People dot is right from the start, not from the first visit
             await hits.refreshAll()
             await NotificationPermission.registerIfAuthorized()
             if let link = deepLinks.pending { await open(link) }
@@ -67,6 +75,7 @@ struct MainTabView: View {
             if phase == .active {
                 Task { await hits.refreshAll() }
                 Task { await inbox.load() }
+                Task { await API.Devices.retryPending() }   // a push token the server didn't take yet
             }
         }
         .onChange(of: deepLinks.pending) { _, link in
@@ -86,9 +95,12 @@ struct MainTabView: View {
         deepLinks.pending = nil
         isPlanning = false
         coachStep = nil
+        openGeneration += 1
+        let generation = openGeneration
         switch link {
         case .play:
             await hits.loadFeed()
+            guard generation == openGeneration else { return }   // a later tap landed while the feed loaded
             selected = .play
             paths[.play] = []
         case let .hit(id), let .check(id, _):
@@ -96,6 +108,7 @@ struct MainTabView: View {
             paths[.myHits] = [.hit(id)]
         case let .request(id):
             await hits.loadFeed()
+            guard generation == openGeneration else { return }   // a later tap landed while the feed loaded
             selected = .play
             paths[.play] = [.request(id)]
         case let .chat(id):
@@ -106,8 +119,15 @@ struct MainTabView: View {
 
     // MARK: - Coach marks
 
+    /// Remembered on the device as well, so tips finished offline stay finished; the server hears next time.
+    static let coachMarksDoneKey = "coach_marks_done_local"
+
     private func startCoachMarksIfNeeded() {
         guard let profile = session.profile, !profile.coachMarksDone, coachStep == nil, deepLinks.pending == nil else { return }
+        if UserDefaults.standard.bool(forKey: Self.coachMarksDoneKey) {
+            Task { try? await session.updateProfile(["coach_marks_done": true]) }   // finished before; the save hadn't landed
+            return
+        }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(700))
             guard coachStep == nil, session.profile?.coachMarksDone == false else { return }
@@ -130,6 +150,7 @@ struct MainTabView: View {
             }
         }
         if step >= 3 {
+            UserDefaults.standard.set(true, forKey: Self.coachMarksDoneKey)
             Task { try? await session.updateProfile(["coach_marks_done": true]) }
         }
     }

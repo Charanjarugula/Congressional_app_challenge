@@ -8,6 +8,7 @@ struct NewGroupView: View {
     @State private var friends: [Friend] = []
     @State private var selected: Set<UUID> = []
     @State private var isLoading = true
+    @State private var loadFailed = false
     @State private var isCreating = false
     @State private var errorMessage: String?
 
@@ -32,6 +33,13 @@ struct NewGroupView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 24)
+                } else if loadFailed {
+                    VStack(spacing: 12) {
+                        QuietCard(title: "Couldn’t load your friends", detail: "Check your connection and try again.")
+                        Button("Try again") { Task { await load() } }
+                            .font(CourtlyFont.secondarySemibold)
+                            .foregroundStyle(CourtlyColor.blue)
+                    }
                 } else if friends.isEmpty {
                     QuietCard(title: "No friends yet", detail: "Groups are made of friends. Add some first.")
                 } else {
@@ -76,11 +84,20 @@ struct NewGroupView: View {
                 .padding(.bottom, 16)
                 .background(CourtlyColor.groupedBackground)
         }
-        .task {
-            friends = (try? await API.People.friends()) ?? []
-            isLoading = false
-        }
+        .task { await load() }
         .errorAlert($errorMessage, title: "Couldn’t create the group")
+    }
+
+    /// A failed load says so instead of looking like a player with no friends.
+    private func load() async {
+        isLoading = true
+        do {
+            friends = try await API.People.friends()
+            loadFailed = false
+        } catch {
+            loadFailed = true
+        }
+        isLoading = false
     }
 
     private func create() {

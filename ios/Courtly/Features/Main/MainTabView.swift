@@ -50,6 +50,7 @@ struct MainTabView: View {
         .environment(hits)
         .environment(inbox)
         .task {
+            Task { await inbox.load() }   // the People dot is right from the start, not from the first visit
             await hits.refreshAll()
             await NotificationPermission.registerIfAuthorized()
         }

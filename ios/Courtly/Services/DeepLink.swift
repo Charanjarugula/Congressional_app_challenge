@@ -54,10 +54,17 @@ enum DeepLink: Equatable {
 final class DeepLinkCenter {
     static let shared = DeepLinkCenter()
 
+    struct Arrival: Equatable {
+        let kind: String?
+        let at: Date
+    }
+
     /// A link waiting to be opened. The shell clears it once it has routed.
     var pending: DeepLink?
-    /// Bumped when a push arrives while the app is open, so lists refresh.
-    var lastPushReceivedAt: Date?
+    /// The last push that arrived while the app was open, so the lists it touches refresh.
+    var lastPush: Arrival?
+    /// The chat thread currently on screen; its own messages don't need a banner.
+    var visibleChatID: UUID?
 
     @MainActor
     func open(_ link: DeepLink) {
@@ -65,7 +72,13 @@ final class DeepLinkCenter {
     }
 
     @MainActor
-    func pushArrived() {
-        lastPushReceivedAt = .now
+    func pushArrived(kind: String?) {
+        lastPush = Arrival(kind: kind, at: .now)
+    }
+
+    /// The chat a notification is about, when it is about one.
+    static func chatID(in userInfo: [AnyHashable: Any]) -> UUID? {
+        if case let .chat(id)? = DeepLink(userInfo: userInfo) { return id }
+        return nil
     }
 }

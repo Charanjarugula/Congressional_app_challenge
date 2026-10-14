@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 
 struct AppAlert: Identifiable, Equatable {
     let id = UUID()
@@ -22,12 +23,22 @@ final class AppSession {
 
     private let client = SupabaseClient.shared
 
+    private var sessionLostObserver: NSObjectProtocol?
+
     init() {
         profile = ProfileCache.load()
+        // A refresh the server rejected means this session is over; the app goes back to Welcome.
+        sessionLostObserver = NotificationCenter.default.addObserver(forName: .courtlySessionLost, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.stage != .loading else { return }
+                await self.signOut()
+            }
+        }
         Task { @MainActor in await restore() }
     }
 
     /// On launch: no session → welcome; session + unfinished profile → resume; otherwise the app.
+    /// A suspended, deleted or missing account signs out; anything else keeps what the device has.
     @MainActor
     func restore() async {
         do {
@@ -35,9 +46,12 @@ final class AppSession {
             let me = try await API.Profile.me()
             apply(me)
         } catch SupabaseError.notSignedIn {
-            profile = nil
-            ProfileCache.save(nil)
-            stage = .onboarding(resume: false)
+            await signOut()
+        } catch SupabaseError.http(status: 401, message: _) {
+            await signOut()
+        } catch let SupabaseError.backend(code) where ["account_suspended", "account_deleted", "no_profile"].contains(code) {
+            await signOut()
+            alert = AppAlert(title: "Signed out", message: BackendMessages.text(for: code))
         } catch {
             // Offline or backend hiccup: keep going with what the device has.
             if let cached = profile, cached.isOnboarded {
@@ -61,11 +75,16 @@ final class AppSession {
     }
 
     @MainActor
-    func completeOnboarding(with draft: OnboardingDraft, accountEmail: String?) async throws {
-        let session = try await client.validSession()
-        _ = try await API.Profile.update(draft.makePatch(accountEmail: accountEmail ?? session.email))
+    func completeOnboarding(with draft: OnboardingDraft) async throws {
+        _ = try await API.Profile.update(draft.makePatch())
         let me = try await API.Profile.completeOnboarding()
         apply(me)
+    }
+
+    /// Saves what onboarding has collected so far, so a player who quits picks up where they left off.
+    func saveDraft(_ draft: OnboardingDraft) {
+        let patch = draft.makePatch()
+        Task { _ = try? await API.Profile.update(patch) }
     }
 
     /// Saves part of the profile (`update_profile` only touches the keys in the patch).
@@ -98,13 +117,17 @@ final class AppSession {
         }
     }
 
+    /// Server first (device token, sign-out), then everything the device remembers about the player.
     @MainActor
     func signOut() async {
         RealtimeHub.shared.reset()
+        await API.Devices.unregisterStored()
         await client.signOut()
         profile = nil
         ProfileCache.save(nil)
         SnapshotCache.clear()
+        DeepLinkCenter.shared.pending = nil
+        try? await UNUserNotificationCenter.current().setBadgeCount(0)
         stage = .onboarding(resume: false)
     }
 

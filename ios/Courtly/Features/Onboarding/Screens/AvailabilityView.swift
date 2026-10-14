@@ -206,7 +206,7 @@ struct ConnectCalendarSheet: View {
 
     @State private var isConnecting = false
     @State private var wasDenied = false
-    private let calendarService = CalendarService()
+    @State private var calendarService = CalendarService()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

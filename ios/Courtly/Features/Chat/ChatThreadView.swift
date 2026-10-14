@@ -15,6 +15,8 @@ struct ChatThreadView: View {
     @State private var draft = ""
     @State private var isSending = false
     @State private var loadFailed = false
+    @State private var hasEarlier = false
+    @State private var isLoadingEarlier = false
     @State private var errorMessage: String?
     @FocusState private var composerFocused: Bool
 
@@ -34,6 +36,13 @@ struct ChatThreadView: View {
                     LazyVStack(spacing: 10) {
                         if loadFailed && messages.isEmpty {
                             QuietCard(title: "Couldn’t open this chat", detail: "Check your connection and try again.")
+                        }
+                        if hasEarlier {
+                            Button(isLoadingEarlier ? "Loading…" : "Load earlier messages") { loadEarlier() }
+                                .font(CourtlyFont.secondarySemibold)
+                                .foregroundStyle(CourtlyColor.blue)
+                                .disabled(isLoadingEarlier)
+                                .padding(.bottom, 6)
                         }
                         ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
                             if showsTimestamp(at: index) {
@@ -67,19 +76,22 @@ struct ChatThreadView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .task(id: chatID) {
+            DeepLinkCenter.shared.visibleChatID = chatID
             await load()
             guard !Task.isCancelled else { return }
             if let subscription { RealtimeHub.shared.unsubscribe(subscription) }
             subscription = RealtimeHub.shared.subscribe(table: "messages", filter: "chat_id=eq.\(chatID.uuidString.lowercased())") {
                 Task { await refresh() }
             }
+            // Polling is the fallback: quick while Realtime is down, slow once it delivers.
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: .seconds(RealtimeHub.shared.isConnected ? 20 : 5))
                 guard !Task.isCancelled else { break }
                 await refresh()
             }
         }
         .onDisappear {
+            if DeepLinkCenter.shared.visibleChatID == chatID { DeepLinkCenter.shared.visibleChatID = nil }
             if let subscription { RealtimeHub.shared.unsubscribe(subscription) }
             subscription = nil
             inbox.markRead(chatID)
@@ -208,6 +220,7 @@ struct ChatThreadView: View {
             let page = try await API.Chats.page(chatID: chatID)
             chat = page.chat
             messages = page.messages
+            hasEarlier = page.messages.count >= Self.pageSize
             loadFailed = false
             try? await API.Chats.markRead(chatID)
         } catch {
@@ -218,17 +231,38 @@ struct ChatThreadView: View {
     private func refresh() async {
         guard let page = try? await API.Chats.page(chatID: chatID) else { return }
         chat = page.chat
-        // Keep messages still on their way to the server.
+        // Keep what the page doesn't have yet: messages still on their way, and ones sent moments ago
+        // that a page fetched before the insert committed would otherwise wipe out.
+        let newest = page.messages.last?.createdAt ?? .distantPast
         let pending = messages.filter { local in
-            local.clientId == local.id && !page.messages.contains { $0.clientId == local.clientId }
+            !page.messages.contains { $0.id == local.id || ($0.clientId != nil && $0.clientId == local.clientId) }
+                && (local.clientId == local.id || local.createdAt > newest)
         }
-        let latest = page.messages + pending
+        let earlier = messages.filter { local in
+            // Pages loaded with "Load earlier" sit before the latest page.
+            local.createdAt < (page.messages.first?.createdAt ?? .distantPast) && !page.messages.contains { $0.id == local.id }
+        }
+        let latest = earlier + page.messages + pending
         let hasNew = latest.count != messages.count || latest.last?.id != messages.last?.id
         if latest != messages {
             messages = latest   // also picks up invite cards whose spots or status changed
         }
         if hasNew {
             try? await API.Chats.markRead(chatID)
+        }
+    }
+
+    private static let pageSize = 50
+
+    private func loadEarlier() {
+        guard let first = messages.first, !isLoadingEarlier else { return }
+        isLoadingEarlier = true
+        Task { @MainActor in
+            defer { isLoadingEarlier = false }
+            guard let page = try? await API.Chats.page(chatID: chatID, before: first, limit: Self.pageSize) else { return }
+            let known = Set(messages.map(\.id))
+            messages = page.messages.filter { !known.contains($0.id) } + messages
+            hasEarlier = page.messages.count >= Self.pageSize
         }
     }
 

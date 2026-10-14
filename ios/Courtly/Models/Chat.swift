@@ -14,7 +14,8 @@ struct Chat: Codable, Identifiable {
     let memberCount: Int
     let lastMessageAt: Date?
     let preview: String?
-    let unreadCount: Int
+    let lastMessageType: MessageType?
+    var unreadCount: Int
     let muted: Bool?
     let friendship: String?
     var hit: Hit?

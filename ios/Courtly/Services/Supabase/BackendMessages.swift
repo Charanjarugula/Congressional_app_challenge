@@ -27,8 +27,12 @@ enum BackendMessages {
         case "message_too_long": "Keep messages under 2,000 characters."
         case "filtered": "That message can’t be sent."
         case "rate_limited": "Slow down a little and try again."
-        case "not_onboarded": "Finish setting up your profile first."
+        case "onboarding_incomplete": "Finish setting up your profile first."
         case "not_signed_in": "You’re signed out."
+        case "no_profile": "We couldn’t find your profile. Sign in again."
+        case "account_suspended": "This account has been suspended."
+        case "account_deleted": "This account was deleted."
+        case "too_many_hashes": "That’s more contacts than we can check at once."
         default: code.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }

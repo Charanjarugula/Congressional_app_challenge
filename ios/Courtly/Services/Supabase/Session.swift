@@ -42,21 +42,26 @@ struct TokenResponse: Decodable {
 enum JSONCoding {
     /// "2026-10-16T22:30:00.000Z", which Postgres and `parseDate` both accept.
     static func string(from date: Date) -> String {
+        fractional.string(from: date)
+    }
+
+    // ISO8601DateFormatter is thread-safe; one of each for every date the app decodes.
+    private static let fractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.string(from: date)
-    }
+        return formatter
+    }()
+    private static let plain: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 
     /// Postgres timestamps come back like "2026-10-16T18:30:00.123456+00:00", and it trims trailing
     /// zeros ("…:00.5+00:00"). The formatter wants exactly three fraction digits, so normalize first.
     static func parseDate(_ raw: String) -> Date? {
         let text = withThreeFractionDigits(raw)
-        let withFraction = ISO8601DateFormatter()
-        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = withFraction.date(from: text) { return date }
-        let plain = ISO8601DateFormatter()
-        plain.formatOptions = [.withInternetDateTime]
-        return plain.date(from: text)
+        return fractional.date(from: text) ?? plain.date(from: text)
     }
 
     private static func withThreeFractionDigits(_ raw: String) -> String {

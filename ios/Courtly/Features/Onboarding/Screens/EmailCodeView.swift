@@ -4,7 +4,8 @@ import SwiftUI
 /// the default length); the same step for new and returning players.
 struct EmailCodeView: View {
     let email: String
-    let onSignedIn: () -> Void
+    /// Runs after the session exists; the button keeps spinning until it returns.
+    let onSignedIn: () async -> Void
 
     @State private var code = ""
     @State private var isVerifying = false
@@ -69,8 +70,8 @@ struct EmailCodeView: View {
         Task { @MainActor in
             do {
                 try await AppEnvironment.auth.verifyEmailCode(email: email, code: digits)
+                await onSignedIn()
                 isVerifying = false
-                onSignedIn()
             } catch {
                 isVerifying = false
                 messageIsError = true

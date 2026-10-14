@@ -163,7 +163,7 @@ struct HitDetailView: View {
             SectionHeader(title: "Host", top: 24)
             Card {
                 Button {
-                    navigate(.player(hit.host.id))
+                    navigate(.player(hit.host.id, hitID: hit.id))
                 } label: {
                     HStack(spacing: 14) {
                         PlayerAvatar(card: hit.host, size: 48)
@@ -201,7 +201,7 @@ struct HitDetailView: View {
                     ActionButton(title: "No", style: attendance[player.id] == false ? .blue : .grouped) {
                         answer(player, showedUp: false, hit: hit)
                     }
-                    ActionButton(title: "Yes", style: attendance[player.id] == false ? .grouped : .blue) {
+                    ActionButton(title: "Yes", style: attendance[player.id] == true ? .blue : .grouped) {
                         answer(player, showedUp: true, hit: hit)
                     }
                 }

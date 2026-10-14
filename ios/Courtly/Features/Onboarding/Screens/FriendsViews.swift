@@ -15,7 +15,7 @@ struct FriendsIntroView: View {
         OnboardingStepView(
             progress: 0.9,
             title: "Tennis is better with friends.",
-            subtitle: "See which of your contacts already play, and invite the ones who should."
+            subtitle: "See which of your contacts already play (matched by email, and by phone once you add your number), and invite the ones who should."
         ) {
             HStack(spacing: -8) {
                 ForEach(Array(sampleInitials.enumerated()), id: \.offset) { _, item in
@@ -108,9 +108,7 @@ struct PeopleToPlayWithView: View {
                 }
 
                 if let errorMessage {
-                    Text(errorMessage)
-                        .font(CourtlyFont.caption)
-                        .foregroundStyle(CourtlyColor.red)
+                    ErrorCaption(text: errorMessage)
                         .padding(.top, 12)
                 }
             }
@@ -169,7 +167,7 @@ struct PeopleToPlayWithView: View {
             }
         }
         do {
-            let suggestions = try await API.People.suggestions(knownIDs: knownIDs)
+            let suggestions = try await API.People.suggestions(knownIDs: [])
             recommended = suggestions
                 .filter { suggestion in !knownIDs.contains(suggestion.id) }
                 .map { PersonSuggestion(card: $0.card, displayName: $0.card.displayName, detail: $0.reason ?? $0.card.levelAndArea) }

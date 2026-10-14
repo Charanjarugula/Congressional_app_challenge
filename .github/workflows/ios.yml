@@ -25,6 +25,9 @@ jobs:
       - name: Xcode version
         run: xcodebuild -version
 
+      - name: Privacy manifest is valid
+        run: plutil -lint ios/Courtly/PrivacyInfo.xcprivacy
+
       - name: Build
         run: |
           set -o pipefail
@@ -34,10 +37,42 @@ jobs:
             -sdk iphonesimulator \
             -destination "generic/platform=iOS Simulator" \
             -configuration ${{ matrix.configuration }} \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             | tee build.log | grep -E "^(\*\*|error:|warning:|.*: error:|.*: warning:|BUILD)" || true
           grep -q "BUILD SUCCEEDED" build.log
 
+      - name: Privacy manifest is bundled
+        run: test -f "build/Build/Products/${{ matrix.configuration }}-iphonesimulator/Courtly.app/PrivacyInfo.xcprivacy"
+
       - name: Show errors
         if: failure()
         run: grep -E "error:" build.log | head -100 || tail -100 build.log
+
+  config:
+    name: Config check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app ships with the values in AppConfig.swift. Fail while any of them is still a placeholder,
+      # and prove each Supabase key is accepted by its project.
+      - name: Keys and URLs are real
+        run: |
+          set -e
+          f=ios/Courtly/Config/AppConfig.swift
+          if grep -q 'supabaseAnonKey = "eyJ' "$f"; then
+            echo "::error::AppConfig.swift still holds legacy eyJ keys. Paste the sb_publishable_ keys from Project Settings → API Keys."; exit 1
+          fi
+          if grep -q 'https://courtly.app"' "$f"; then
+            echo "::error::AppConfig.siteURL still points at the placeholder domain. Use the deployed Vercel URL."; exit 1
+          fi
+          mapfile -t urls < <(grep -o 'https://[a-z]*\.supabase\.co' "$f")
+          mapfile -t keys < <(grep -o 'sb_publishable_[A-Za-z0-9_-]*' "$f")
+          [ "${#urls[@]}" -eq 2 ] && [ "${#keys[@]}" -eq 2 ] || { echo "::error::Expected two project URLs and two publishable keys in AppConfig.swift"; exit 1; }
+          for i in 0 1; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' -H "apikey: ${keys[$i]}" "${urls[$i]}/auth/v1/health")
+            echo "${urls[$i]} → $status"
+            [ "$status" = "200" ] || { echo "::error::${urls[$i]} rejected its key ($status)"; exit 1; }
+          done

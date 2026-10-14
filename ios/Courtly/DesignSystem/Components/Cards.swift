@@ -55,6 +55,18 @@ struct CardRows<Data: RandomAccessCollection, Row: View>: View where Data.Elemen
     }
 }
 
+/// The small red line under a form when something went wrong.
+struct ErrorCaption: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(CourtlyFont.caption)
+            .foregroundStyle(CourtlyColor.red)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 /// Centered title and detail inside a white card, for empty and error states.
 struct QuietCard: View {
     let title: String

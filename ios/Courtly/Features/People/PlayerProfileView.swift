@@ -3,6 +3,8 @@ import SwiftUI
 /// Another player: who they are, what they play, their open hits, and the safety actions.
 struct PlayerProfileView: View {
     let playerID: UUID
+    /// The hit this player was opened from, so a report can name it.
+    var hitID: UUID? = nil
 
     @Environment(HitsStore.self) private var hits
     @Environment(InboxStore.self) private var inbox
@@ -80,9 +82,9 @@ struct PlayerProfileView: View {
         }
         .sheet(isPresented: $showsReport) {
             if let card = profile?.card {
-                ReportView(player: card) { blocked in
+                ReportView(player: card, hitID: hitID) { blocked in
                     showsReport = false
-                    if blocked { navigate.pop() }
+                    if blocked { Task { await afterBlock() } }
                 }
             }
         }
@@ -192,13 +194,19 @@ struct PlayerProfileView: View {
         Task { @MainActor in
             do {
                 try await API.People.block(playerID)
-                await inbox.load()
-                await hits.refreshAll()
-                navigate.pop()
+                await afterBlock()
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    /// A block hides the player from chats and hits alike, so both refresh before this screen goes.
+    @MainActor
+    private func afterBlock() async {
+        await inbox.load()
+        await hits.refreshAll()
+        navigate.pop()
     }
 }
 

@@ -204,11 +204,12 @@ struct ChatRow: View {
     }
 
     private var isHitRequest: Bool {
-        chat.preview?.hasPrefix(Self.hitPrefix) == true
+        chat.lastMessageType == .hitInvite || chat.preview?.hasPrefix(Self.hitPrefix) == true
     }
 
+    /// Someone added you and is waiting for the add-back.
     private var isCallToAction: Bool {
-        chat.unreadCount > 0 && (chat.preview?.contains("added you back") == true)
+        chat.friendship == "requested_me"
     }
 
     private var previewText: String {

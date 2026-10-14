@@ -26,6 +26,7 @@ struct PlanHitView: View {
     @State private var customExpiry: Date?
     @State private var showsExpiryPicker = false
     @State private var showsCourtPicker = false
+    @State private var courtsError: String?
     @State private var isPosting = false
     @State private var didSeed = false
     @State private var errorMessage: String?
@@ -48,6 +49,12 @@ struct PlanHitView: View {
 
     /// When the request card stops taking claims: 8 PM the evening before, or two hours before
     /// the hit, whichever comes first. Never in the past.
+    /// Only an expiry the host picked is sent; otherwise the server applies the same default rule.
+    private var chosenExpiry: Date? {
+        guard let customExpiry, customExpiry > .now, customExpiry < startsAt else { return nil }
+        return customExpiry
+    }
+
     private var inviteExpiry: Date {
         if let customExpiry, customExpiry > .now, customExpiry < startsAt { return customExpiry }
         let calendar = Calendar.current
@@ -72,6 +79,11 @@ struct PlanHitView: View {
                     whenCard
                     label("Where")
                     whereRow
+                    if let courtsError, courts.isEmpty {
+                        ErrorCaption(text: courtsError)
+                            .padding(.top, 8)
+                            .padding(.horizontal, 4)
+                    }
                     label("What")
                     HStack(spacing: 8) {
                         ForEach(PlayFormat.allCases) { option in
@@ -290,11 +302,16 @@ struct PlanHitView: View {
                 spots = Self.defaultSpots(for: first)
             }
         }
-        guard let list = try? await API.Courts.nearby(limit: 30) else { return }
-        courts = list
-        if court == nil {
-            let lastID = UserDefaults.standard.string(forKey: Self.lastCourtKey).flatMap { UUID(uuidString: $0) }
-            court = list.first { $0.id == lastID } ?? list.first
+        do {
+            let list = try await API.Courts.nearby(limit: 30)
+            courts = list
+            courtsError = nil
+            if court == nil {
+                let lastID = UserDefaults.standard.string(forKey: Self.lastCourtKey).flatMap { UUID(uuidString: $0) }
+                court = list.first { $0.id == lastID } ?? list.first
+            }
+        } catch {
+            courtsError = "Couldn’t load nearby courts. \(error.localizedDescription)"
         }
     }
 
@@ -306,7 +323,7 @@ struct PlanHitView: View {
                 let hit = try await hits.create(
                     courtID: court.id, startsAt: startsAt, durationMin: duration,
                     format: format, spots: spots, visibility: visibility,
-                    inviteChatID: inviteChat?.id, inviteExpiresAt: inviteChat == nil ? nil : inviteExpiry
+                    inviteChatID: inviteChat?.id, inviteExpiresAt: inviteChat == nil ? nil : chosenExpiry
                 )
                 isPosting = false
                 dismiss()

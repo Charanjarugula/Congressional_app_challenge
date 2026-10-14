@@ -124,9 +124,9 @@ struct GroupInfoView: View {
 
     private func load() async {
         do {
-            let page = try await API.Chats.page(chatID: chatID, limit: 1)
-            chat = page.chat
-            isMuted = page.chat.muted ?? false
+            let fresh = try await API.Chats.get(chatID)
+            chat = fresh
+            isMuted = fresh.muted ?? false
             loadFailed = false
         } catch {
             if chat == nil { loadFailed = true }

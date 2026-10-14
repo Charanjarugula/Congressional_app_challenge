@@ -172,6 +172,10 @@ enum API {
             try await client.rpc("get_inbox")
         }
 
+        static func get(_ chatID: UUID) async throws -> Chat {
+            try await client.rpc("get_chat", params: ["p_chat": chatID.uuidString])
+        }
+
         static func page(chatID: UUID, before: Message? = nil, limit: Int = 50) async throws -> ChatPage {
             var params: [String: Any] = ["p_chat": chatID.uuidString, "p_limit": limit]
             if let before {
@@ -211,12 +215,28 @@ enum API {
     }
 
     enum Devices {
+        private static let tokenKey = "apns_token"
+
+        /// The APNs token this device last registered, kept so sign-out can take it back.
+        static var storedToken: String? {
+            get { UserDefaults.standard.string(forKey: tokenKey) }
+            set { UserDefaults.standard.set(newValue, forKey: tokenKey) }
+        }
+
         static func register(token: String, environment: String) async throws {
             try await client.rpc("register_device", params: [
                 "p_token": token,
                 "p_environment": environment,
                 "p_app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0",
             ])
+            storedToken = token
+        }
+
+        /// Stops pushes for this device; the next account to sign in registers it again.
+        static func unregisterStored() async {
+            guard let token = storedToken else { return }
+            try? await client.rpc("unregister_device", params: ["p_token": token])
+            storedToken = nil
         }
     }
 }

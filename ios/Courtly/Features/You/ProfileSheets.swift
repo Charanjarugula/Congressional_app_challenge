@@ -328,8 +328,7 @@ struct AvailabilitySheet: View {
     @State private var showsManage = false
     @State private var isSaving = false
     @State private var errorMessage: String?
-
-    private let calendarService = CalendarService()
+    @State private var calendarService = CalendarService()
 
     var body: some View {
         SheetScaffold(title: "Availability", isSaving: isSaving, detents: [.large], onSave: save) {
@@ -528,9 +527,9 @@ struct EditProfileSheet: View {
     private func loadPhoto(_ item: PhotosPickerItem?) {
         guard let item else { return }
         Task { @MainActor in
-            if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
-                newPhoto = image.downscaled(to: 600)
-            }
+            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+            // Decoding and scaling a camera photo is slow; keep it off the main thread.
+            newPhoto = await Task.detached(priority: .userInitiated) { UIImage(data: data)?.downscaled(to: 600) }.value
         }
     }
 
@@ -542,12 +541,16 @@ struct EditProfileSheet: View {
                     "first_name": firstName.trimmingCharacters(in: .whitespaces),
                     "last_name": lastName.trimmingCharacters(in: .whitespaces),
                 ]
+                let previousPhoto = session.profile?.photoPath
                 if let newPhoto, let data = newPhoto.jpegData(compressionQuality: 0.85), let me = session.profile?.id {
                     let path = "\(me.uuidString.lowercased())/avatar-\(Int(Date.now.timeIntervalSince1970)).jpg"
                     try await SupabaseClient.shared.upload(bucket: "avatars", path: path, data: data, contentType: "image/jpeg")
                     patch["photo_path"] = path
                 }
                 try await session.updateProfile(patch)
+                if let previousPhoto, let current = patch["photo_path"] as? String, previousPhoto != current {
+                    try? await SupabaseClient.shared.remove(bucket: "avatars", path: previousPhoto)
+                }
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription

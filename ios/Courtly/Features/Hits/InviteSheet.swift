@@ -73,18 +73,7 @@ struct InviteSheet: View {
 
     private func groupRow(_ group: Chat) -> some View {
         HStack(spacing: 14) {
-            ZStack(alignment: .bottomTrailing) {
-                let members = group.others(than: me)
-                if members.count >= 2 {
-                    PlayerAvatar(card: members[0], size: 30)
-                        .frame(width: 44, height: 44, alignment: .topLeading)
-                    PlayerAvatar(card: members[1], size: 30)
-                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                } else {
-                    InitialsAvatar(initials: String(group.title.prefix(2)).uppercased(), size: 44, style: .muted)
-                }
-            }
-            .frame(width: 44, height: 44)
+            ChatAvatar(chat: group, me: me, size: 44)
             VStack(alignment: .leading, spacing: 1) {
                 Text(group.title)
                     .font(CourtlyFont.bodySemibold)

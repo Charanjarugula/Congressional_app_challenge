@@ -7,6 +7,7 @@ struct JoinRequestView: View {
     @Environment(HitsStore.self) private var hits
     @Environment(\.navigate) private var navigate
     @State private var working: Bool?
+    @State private var didLoad = false
     @State private var errorMessage: String?
 
     private var item: NeedsReplyItem? { hits.needsReplyItem(requestID: requestID) }
@@ -51,10 +52,14 @@ struct JoinRequestView: View {
                         ActionButton(title: "Accept", isLoading: working == true) { respond(accept: true) }
                     }
                     .padding(.top, 16)
-                } else if hits.isLoadingFeed {
+                } else if hits.isLoadingFeed || !didLoad {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.top, 80)
+                } else if let error = hits.lastError {
+                    QuietCard(title: "Couldn’t load this request", detail: error)
+                    ActionButton(title: "Try again", style: .grouped) { Task { await hits.loadFeed() } }
+                        .padding(.top, 12)
                 } else {
                     QuietCard(title: "This request was already answered", detail: "Nothing left to do here.")
                 }
@@ -66,6 +71,11 @@ struct JoinRequestView: View {
         .navigationTitle("Request")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .task(id: requestID) {
+            // From a push or a stale snapshot the request may not be in the cached feed yet.
+            if item == nil { await hits.loadFeed() }
+            didLoad = true
+        }
         .errorAlert($errorMessage)
     }
 

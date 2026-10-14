@@ -5,7 +5,9 @@ import Security
 enum Keychain {
     private static let service = AppConfig.bundleID
 
-    static func save(_ data: Data, account: String) {
+    /// False when the keychain refused the write (the session then lasts only until the app quits).
+    @discardableResult
+    static func save(_ data: Data, account: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -15,7 +17,11 @@ enum Keychain {
         var insert = query
         insert[kSecValueData as String] = data
         insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(insert as CFDictionary, nil)
+        let status = SecItemAdd(insert as CFDictionary, nil)
+        #if DEBUG
+        if status != errSecSuccess { print("Keychain: SecItemAdd failed with status \(status)") }
+        #endif
+        return status == errSecSuccess
     }
 
     static func load(account: String) -> Data? {

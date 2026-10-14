@@ -1,5 +1,10 @@
 import Foundation
 
+extension Notification.Name {
+    /// Posted when a refresh is rejected and the stored session is gone; the app returns to Welcome.
+    static let courtlySessionLost = Notification.Name("courtly.sessionLost")
+}
+
 enum SupabaseError: LocalizedError, Equatable {
     case notSignedIn
     case http(status: Int, message: String)
@@ -97,7 +102,9 @@ actor SupabaseClient {
                 return fresh
             } catch let error as SupabaseError {
                 if case let .http(status, _) = error, status == 400 || status == 401 {
+                    // The refresh token was revoked or rotated away: the app has to sign the player out.
                     session = nil
+                    NotificationCenter.default.post(name: .courtlySessionLost, object: nil)
                     throw SupabaseError.notSignedIn
                 }
                 throw error
@@ -152,6 +159,10 @@ actor SupabaseClient {
         var headers = ["Content-Type": contentType, "x-upsert": "true"]
         headers["Cache-Control"] = "max-age=3600"
         _ = try await request("/storage/v1/object/\(bucket)/\(path)", method: "POST", rawBody: data, headers: headers, authorized: true)
+    }
+
+    func remove(bucket: String, path: String) async throws {
+        _ = try await request("/storage/v1/object/\(bucket)/\(path)", method: "DELETE", body: nil, authorized: true)
     }
 
     nonisolated func publicURL(bucket: String, path: String) -> URL {
@@ -214,7 +225,10 @@ actor SupabaseClient {
             ?? "unknown error"
         // The gateway rejects the whole request when the anon key does not belong to the project.
         if message.localizedCaseInsensitiveContains("invalid api key") || message.localizedCaseInsensitiveContains("no api key") {
-            return .http(status: status, message: "The app’s Supabase key doesn’t match this project. Paste the sb_publishable key from Project Settings → API Keys into AppConfig.swift.")
+            #if DEBUG
+            print("Supabase: the key in AppConfig.swift is not this project's. Paste the sb_publishable key from Project Settings → API Keys.")
+            #endif
+            return .http(status: status, message: "Courtly can’t reach its server right now.")
         }
         return .http(status: status, message: message)
     }

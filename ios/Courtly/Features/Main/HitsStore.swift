@@ -14,6 +14,13 @@ final class HitsStore {
     /// Bumped after every successful load so open screens can re-fetch their own copy.
     private(set) var lastRefreshedAt: Date?
 
+    // Loads that overlap: only the newest one may write, so an answer that left before an action
+    // never puts the list back the way it was.
+    private var feedGeneration = 0
+    private var myHitsGeneration = 0
+    private var refreshInFlight = false
+    private var refreshQueued = false
+
     init() {
         feed = SnapshotCache.load(PlayFeed.self, key: "play_feed")
         myHits = SnapshotCache.load(MyHits.self, key: "my_hits")
@@ -23,37 +30,57 @@ final class HitsStore {
 
     @MainActor
     func loadFeed() async {
+        feedGeneration += 1
+        let generation = feedGeneration
         isLoadingFeed = true
-        defer { isLoadingFeed = false }
+        defer { if generation == feedGeneration { isLoadingFeed = false } }
         do {
             let fresh = try await API.Hits.feed()
+            guard generation == feedGeneration else { return }
             feed = fresh
             lastError = nil
             SnapshotCache.save(fresh, key: "play_feed")
             try? await UNUserNotificationCenter.current().setBadgeCount(fresh.badge)
         } catch {
+            guard generation == feedGeneration else { return }
             lastError = error.localizedDescription
         }
     }
 
     @MainActor
     func loadMyHits() async {
+        myHitsGeneration += 1
+        let generation = myHitsGeneration
         isLoadingMyHits = true
-        defer { isLoadingMyHits = false }
+        defer { if generation == myHitsGeneration { isLoadingMyHits = false } }
         do {
             let fresh = try await API.Hits.mine()
+            guard generation == myHitsGeneration else { return }
             myHits = fresh
+            lastError = nil
             SnapshotCache.save(fresh, key: "my_hits")
         } catch {
+            guard generation == myHitsGeneration else { return }
             lastError = error.localizedDescription
         }
     }
 
+    /// Both lists. A refresh asked for while one runs makes it run once more afterwards, so a
+    /// change that landed in between is not missed and two refreshes never race.
     @MainActor
     func refreshAll() async {
-        async let feedLoad: () = loadFeed()
-        async let mineLoad: () = loadMyHits()
-        _ = await (feedLoad, mineLoad)
+        if refreshInFlight {
+            refreshQueued = true
+            return
+        }
+        refreshInFlight = true
+        repeat {
+            refreshQueued = false
+            async let feedLoad: () = loadFeed()
+            async let mineLoad: () = loadMyHits()
+            _ = await (feedLoad, mineLoad)
+        } while refreshQueued
+        refreshInFlight = false
         lastRefreshedAt = .now
     }
 

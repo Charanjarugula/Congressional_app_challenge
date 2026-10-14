@@ -36,7 +36,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     /// A push arrived while the app is open: show it, and let the lists refresh.
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        DeepLinkCenter.shared.pushArrived()
+        let info = notification.request.content.userInfo
+        DeepLinkCenter.shared.pushArrived(kind: info["kind"] as? String)
+        // The thread on screen shows the message itself; a banner and sound over it would be noise.
+        if let chatID = DeepLinkCenter.chatID(in: info), DeepLinkCenter.shared.visibleChatID == chatID {
+            return [.badge]
+        }
         return [.banner, .list, .sound, .badge]
     }
 

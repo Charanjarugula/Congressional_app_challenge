@@ -33,7 +33,7 @@ struct CoachMarksOverlay: View {
                         text: "Nobody posted a time that works? Post your own. Pick a day, a court and what you want to play.",
                         counter: "3 of 3", button: "Got it", arrow: .bottom
                     )
-                    .padding(.bottom, 82)
+                    .padding(.bottom, 82 + 80)   // the pill floats above the tab bar
                 }
             }
             .padding(.horizontal, CourtlyMetrics.screenPadding)

@@ -16,6 +16,10 @@ struct HitInviteCard: View {
     private var hit: Hit { claimed ?? invite.hit }
 
     var body: some View {
+        card.onChange(of: invite) { _, _ in claimed = nil }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Hit request")

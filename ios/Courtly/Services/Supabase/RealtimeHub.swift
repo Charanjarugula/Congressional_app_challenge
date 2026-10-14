@@ -27,6 +27,9 @@ final class RealtimeHub {
     private var nextRef = 0
     private var accessToken: String?
 
+    /// True while the socket is open; screens poll slower then.
+    var isConnected: Bool { socket != nil }
+
     /// `filter` is a PostgREST-style condition such as `chat_id=eq.<uuid>`; nil means every row the
     /// signed-in player is allowed to see. `events` is `INSERT` (default), `UPDATE` or `*`.
     func subscribe(table: String, filter: String? = nil, events: String = "INSERT", onChange: @escaping () -> Void) -> Subscription {
@@ -77,7 +80,11 @@ final class RealtimeHub {
 
     private func connectAndJoin() async {
         if socket == nil {
-            guard !channels.isEmpty, let session = try? await SupabaseClient.shared.validSession() else { return }
+            guard !channels.isEmpty else { return }
+            guard let session = try? await SupabaseClient.shared.validSession() else {
+                scheduleReconnect()   // offline, or the session is mid-refresh: try again shortly
+                return
+            }
             guard var components = URLComponents(url: AppConfig.supabaseURL, resolvingAgainstBaseURL: false) else { return }
             components.scheme = "wss"
             components.path = "/realtime/v1/websocket"
@@ -196,6 +203,9 @@ final class RealtimeHub {
             channels[topic]?.handlers.values.forEach { $0() }
         case "phx_error", "phx_close":
             if topic != "phoenix" { rejoin(topic) }
+        case "phx_reply":
+            let payload = object["payload"] as? [String: Any]
+            if payload?["status"] as? String == "error", topic != "phoenix" { rejoin(topic) }
         case "system":
             let payload = object["payload"] as? [String: Any]
             if payload?["status"] as? String == "error", topic != "phoenix" { rejoin(topic) }

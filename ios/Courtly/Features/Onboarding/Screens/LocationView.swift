@@ -42,9 +42,7 @@ struct LocationView: View {
                         .padding(.top, 8)
                 }
                 if let errorMessage {
-                    Text(errorMessage)
-                        .font(CourtlyFont.caption)
-                        .foregroundStyle(CourtlyColor.red)
+                    ErrorCaption(text: errorMessage)
                         .padding(.top, 10)
                 }
             }

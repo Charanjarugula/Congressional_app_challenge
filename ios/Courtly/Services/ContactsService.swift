@@ -37,12 +37,12 @@ struct ContactsService {
             var values: [String] = contact.phoneNumbers.compactMap { Self.normalizePhone($0.value.stringValue) }
             values += contact.emailAddresses.map { String($0.value).lowercased().trimmingCharacters(in: .whitespaces) }
             for value in values {
+                if result.count >= limit { stop.pointee = true; break }
                 let hash = Self.hash(value)
                 if seen.insert(hash).inserted {
                     result.append(HashedContact(hash: hash, displayName: name))
                 }
             }
-            if result.count >= limit { stop.pointee = true }
         }
         return result
     }

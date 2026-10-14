@@ -189,9 +189,15 @@ struct AddFriendsView: View {
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            let found = try? await API.People.search(trimmed)
-            guard !Task.isCancelled else { return }
-            results = found ?? []
+            do {
+                let found = try await API.People.search(trimmed)
+                guard !Task.isCancelled else { return }
+                results = found
+            } catch {
+                guard !Task.isCancelled else { return }
+                results = []
+                errorMessage = error.localizedDescription
+            }
             isSearching = false
         }
     }

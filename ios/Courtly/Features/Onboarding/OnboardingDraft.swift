@@ -16,7 +16,6 @@ final class OnboardingDraft {
     var busyThisWeek = AvailabilityMask()
     var calendar: CalendarConnection?
     var contactsGranted = false
-    var notificationsEnabled = false
 
     /// Players must be 13 or older: US law (COPPA) requires parental consent below that.
     static let minimumAge = 13
@@ -51,8 +50,8 @@ final class OnboardingDraft {
         }
     }
 
-    /// The `update_profile` patch.
-    func makePatch(accountEmail: String?) -> [String: Any] {
+    /// The `update_profile` patch. Contact hashes are the server's: it hashes the verified sign-in email itself.
+    func makePatch() -> [String: Any] {
         var patch: [String: Any] = [
             "first_name": trimmedFirstName,
             "last_name": trimmedLastName,
@@ -70,9 +69,6 @@ final class OnboardingDraft {
             patch["home_lat"] = homeArea.latitude
             patch["home_lng"] = homeArea.longitude
             if let zip = homeArea.zip { patch["zip"] = zip }
-        }
-        if let accountEmail, !accountEmail.isEmpty {
-            patch["email_hash"] = ContactsService.hash(accountEmail.lowercased())
         }
         return patch
     }

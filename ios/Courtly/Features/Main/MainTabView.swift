@@ -27,11 +27,7 @@ struct MainTabView: View {
                     .accessibilityHidden(selected != tab)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if isAtRoot {
-                GlassTabBar(selected: $selected, dots: dots)
-            }
-        }
+        // Placed before the inset so the pill floats above the tab bar instead of over it.
         .overlay(alignment: .bottomTrailing) {
             if isAtRoot && selected == .play && (showsPlanPill || coachStep == 3) {
                 PlanHitPill { isPlanning = true }
@@ -42,6 +38,11 @@ struct MainTabView: View {
                     )
                     .padding(.trailing, 20)
                     .padding(.bottom, 16)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if isAtRoot {
+                GlassTabBar(selected: $selected, dots: dots)
             }
         }
         .overlay {
@@ -61,10 +62,13 @@ struct MainTabView: View {
         .environment(hits)
         .environment(inbox)
         .task {
-            await hits.refreshAll()
+            if let link = deepLinks.pending {
+                await open(link)   // loads what the screen needs; the lists refresh behind it
+            } else {
+                await hits.refreshAll()
+                startCoachMarksIfNeeded()
+            }
             await NotificationPermission.registerIfAuthorized()
-            if let link = deepLinks.pending { await open(link) }
-            startCoachMarksIfNeeded()
             startLiveUpdates()
         }
         .onDisappear { stopLiveUpdates() }
@@ -83,9 +87,11 @@ struct MainTabView: View {
         .onChange(of: deepLinks.pending) { _, link in
             if let link { Task { await open(link) } }
         }
-        .onChange(of: deepLinks.lastPushReceivedAt) { _, _ in
-            Task { await hits.refreshAll() }
-            Task { await inbox.load() }
+        .onChange(of: deepLinks.lastPush) { _, arrival in
+            // Refresh only what the push is about; Realtime covers the rest.
+            guard let kind = arrival?.kind else { scheduleHitsRefresh(); scheduleInboxRefresh(); return }
+            if kind == "message" || kind == "hit_invite" { scheduleInboxRefresh() }
+            if kind != "message" { scheduleHitsRefresh() }
         }
     }
 
@@ -114,9 +120,7 @@ struct MainTabView: View {
         refreshDebounce = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            // The player's own action already refreshed the lists and echoes back as an event.
-            if let at = hits.lastRefreshedAt, Date.now.timeIntervalSince(at) < 1.5 { return }
-            await hits.refreshAll()
+            await hits.refreshAll()   // coalesces with one already running
         }
     }
 
@@ -139,29 +143,33 @@ struct MainTabView: View {
         coachStep = nil
         switch link {
         case .play:
-            await hits.loadFeed()
             selected = .play
             paths[.play] = []
+            await hits.refreshAll()
         case let .hit(id), let .check(id, _):
             selected = .myHits
             paths[.myHits] = [.hit(id)]
+            Task { await hits.refreshAll() }
         case let .request(id):
-            await hits.loadFeed()
+            if hits.needsReplyItem(requestID: id) == nil { await hits.loadFeed() }
             selected = .play
             paths[.play] = [.request(id)]
+            Task { await hits.loadMyHits() }
         case let .chat(id):
             selected = .people
             paths[.people] = [.chat(id)]
+            Task { await hits.refreshAll() }
         }
     }
 
     // MARK: - Coach marks
 
+    /// Only over the Play root: a pushed screen or another tab is not where the tips point.
     private func startCoachMarksIfNeeded() {
-        guard let profile = session.profile, !profile.coachMarksDone, coachStep == nil, deepLinks.pending == nil else { return }
+        guard let profile = session.profile, !profile.coachMarksDone, coachStep == nil else { return }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(700))
-            guard coachStep == nil, session.profile?.coachMarksDone == false else { return }
+            guard coachStep == nil, session.profile?.coachMarksDone == false, isAtRoot, selected == .play, deepLinks.pending == nil else { return }
             withAnimation(.easeInOut(duration: 0.25)) { coachStep = 1 }
         }
     }
@@ -240,7 +248,7 @@ struct MainTabView: View {
         case let .request(id): JoinRequestView(requestID: id)
         case let .chat(id): ChatThreadView(chatID: id)
         case let .groupInfo(id): GroupInfoView(chatID: id)
-        case let .player(id): PlayerProfileView(playerID: id)
+        case let .player(id, hitID): PlayerProfileView(playerID: id, hitID: hitID)
         case .addFriends: AddFriendsView()
         case .newGroup: NewGroupView()
         case .account: AccountView()

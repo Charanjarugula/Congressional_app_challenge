@@ -107,11 +107,12 @@ end $$;
 create or replace function public.purge_old_reports() returns void
 language sql security definer set search_path = public as $$
   delete from public.reports where created_at < now() - interval '90 days';
+  delete from public.rate_limits where window_start < now() - interval '2 days';
 $$;
 
 select cron.schedule('courtly-hit-scheduler', '*/5 * * * *', $$select public.run_hit_scheduler()$$);
 select cron.schedule('courtly-push-resend', '*/10 * * * *', $$select public.resend_unpushed()$$);
-select cron.schedule('courtly-purge-reports', '0 4 1 * *', $$select public.purge_old_reports()$$);
+select cron.schedule('courtly-purge-reports', '0 4 * * *', $$select public.purge_old_reports()$$);
 
 -- Moderation -------------------------------------------------------------------------
 
@@ -150,9 +151,18 @@ create or replace function public.internal_store_apple_token(p_user uuid, p_refr
 language plpgsql security definer set search_path = public as $$
 declare v_secret uuid;
 begin
-  delete from public.apple_tokens where user_id = p_user;
-  select vault.create_secret(p_refresh_token, 'apple-refresh-' || p_user::text) into v_secret;
-  insert into public.apple_tokens (user_id, vault_secret_id) values (p_user, v_secret);
+  -- Vault names are unique: a second sign-in updates the stored secret instead of creating another.
+  select vault_secret_id into v_secret from public.apple_tokens where user_id = p_user;
+  if v_secret is null then
+    select id into v_secret from vault.secrets where name = 'apple-refresh-' || p_user::text;
+  end if;
+  if v_secret is not null then
+    perform vault.update_secret(v_secret, p_refresh_token);
+  else
+    select vault.create_secret(p_refresh_token, 'apple-refresh-' || p_user::text) into v_secret;
+  end if;
+  insert into public.apple_tokens (user_id, vault_secret_id) values (p_user, v_secret)
+  on conflict (user_id) do update set vault_secret_id = excluded.vault_secret_id, created_at = now();
 end $$;
 
 create or replace function public.internal_apple_refresh_token(p_user uuid) returns text
@@ -170,9 +180,29 @@ begin
   select vault_secret_id into v_vault from public.apple_tokens where user_id = p_user;
 
   if p_mode = 'underage' then
+    -- Someone under 13 never finished onboarding; nothing of theirs stays, not even an anonymized row.
+    -- They may already have sent friend requests (which open DMs), blocked or reported someone.
+    delete from public.device_tokens where user_id = p_user;
+    delete from public.notifications where user_id = p_user;
+    delete from public.join_requests where user_id = p_user;
+    delete from public.hit_invites where created_by = p_user or target_user_id = p_user;
+    delete from public.friendships where p_user in (user_a, user_b);
+    delete from public.blocks where p_user in (blocker_id, blocked_id);
+    delete from public.reports where p_user in (reporter_id, reported_id);
+    delete from public.attendance_checks where p_user in (user_id, about_user_id);
+    delete from public.rate_limits where user_id = p_user;
     delete from public.apple_tokens where user_id = p_user;
     if v_vault is not null then delete from vault.secrets where id = v_vault; end if;
-    delete from public.rate_limits where user_id = p_user;
+    for r in select c.id from public.chats c join public.chat_members m on m.chat_id = c.id where c.type = 'dm' and m.user_id = p_user loop
+      update public.chats set last_message_id = null where id = r.id;
+      delete from public.messages where chat_id = r.id;
+      delete from public.chat_members where chat_id = r.id;
+      delete from public.chats where id = r.id;
+    end loop;
+    delete from public.messages where sender_id = p_user;
+    delete from public.chat_members where user_id = p_user;
+    delete from public.hit_players where user_id = p_user;
+    delete from public.hits where host_id = p_user;
     delete from public.profiles where id = p_user;
     return jsonb_build_object('deleted', true);
   end if;
@@ -189,7 +219,10 @@ begin
   for r in select h.id, h.host_id, h.chat_id from public.hits h join public.hit_players hp on hp.hit_id = h.id
            where hp.user_id = p_user and hp.role = 'player' and hp.left_at is null and h.status in ('open', 'confirmed') and h.starts_at > now() loop
     update public.hit_players set left_at = now() where hit_id = r.id and user_id = p_user;
-    update public.hits set spots_open = spots_open + 1 where id = r.id;
+    update public.hits set spots_open = spots_open + 1,
+      status = case when exists (select 1 from public.hit_players x where x.hit_id = r.id and x.role = 'player' and x.left_at is null)
+                    then status else 'open' end
+    where id = r.id;
     perform public.notify(r.host_id, 'player_left', 'Courtly', 'A player left ' || public.hit_push_label(r.id) || '. The spot is open again.',
       'courtly://hit/' || r.id, 'hit-' || r.id, jsonb_build_object('hit_id', r.id));
   end loop;

@@ -58,7 +58,8 @@ begin
       from (
         select h.* from public.hits h
         join public.profiles hp on hp.id = h.host_id
-        where public.feed_candidate(h.id, v_user) and public.is_friend(v_user, h.host_id)
+        where h.status in ('open', 'confirmed') and h.starts_at > now() and h.spots_open > 0
+          and public.feed_candidate(h.id, v_user) and public.is_friend(v_user, h.host_id)
         order by h.starts_at limit 20
       ) h
     ), '[]'::jsonb),
@@ -69,7 +70,8 @@ begin
         select h.*, row_number() over (order by extensions.st_distance(c.point, me.home_point), h.starts_at) as rn
         from public.hits h
         join public.courts c on c.id = h.court_id
-        where public.feed_candidate(h.id, v_user) and not public.is_friend(v_user, h.host_id)
+        where h.status in ('open', 'confirmed') and h.starts_at > now() and h.spots_open > 0
+          and public.feed_candidate(h.id, v_user) and not public.is_friend(v_user, h.host_id)
           and me.home_point is not null and extensions.st_dwithin(c.point, me.home_point, me.radius_mi * 1609.344)
         limit 30
       ) h
@@ -113,9 +115,14 @@ $$;
 -- Bits for the blocks still ahead this week (now through Sunday evening).
 create or replace function public.remaining_week_mask() returns integer
 language sql stable as $$
+  -- Between two blocks the next one today still counts; after the evening, tomorrow's morning is first.
   select coalesce(bit_or(1 << (d * 3 + b)), 0)::integer
-  from generate_series(0, 6) d, generate_series(0, 2) b
-  where (d * 3 + b) >= coalesce(public.availability_bit(now()), (extract(isodow from now() at time zone 'America/New_York')::int - 1) * 3 + 3);
+  from generate_series(0, 6) d, generate_series(0, 2) b, (select now() at time zone 'America/New_York' as local) t
+  where (d * 3 + b) >= (extract(isodow from local)::int - 1) * 3 + case
+    when extract(hour from local) < 11 then 0
+    when extract(hour from local) < 16 then 1
+    when extract(hour from local) < 21 then 2
+    else 3 end;
 $$;
 
 -- The small caption under a feed row: home court, friend of a friend, fits your availability, closest.
@@ -173,7 +180,7 @@ begin
               and not exists (select 1 from public.attendance_checks a where a.hit_id = h.id and a.user_id = v_user and a.about_user_id = o.user_id))) as item,
           h.starts_at
         from public.hits h join public.hit_players hp on hp.hit_id = h.id
-        where hp.user_id = v_user and (h.status in ('played', 'cancelled', 'expired') or h.starts_at + (h.duration_min || ' minutes')::interval <= v_now)
+        where hp.user_id = v_user and hp.left_at is null and (h.status in ('played', 'cancelled', 'expired') or h.starts_at + (h.duration_min || ' minutes')::interval <= v_now)
         order by h.starts_at desc limit 50
       ) x
     ), '[]'::jsonb)

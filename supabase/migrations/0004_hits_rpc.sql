@@ -217,11 +217,14 @@ end $$;
 
 create or replace function public.respond_to_request(p_request uuid, p_accept boolean) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare v_user uuid := public.assert_onboarded(); r public.join_requests; h public.hits;
+declare v_user uuid := public.assert_onboarded(); r public.join_requests; h public.hits; v_hit uuid;
 begin
-  select * into r from public.join_requests where id = p_request for update;
+  -- Lock the hit before its request, the order add_player and the scheduler use, so two accepts
+  -- or a claim and an accept on the same hit queue up instead of deadlocking.
+  select hit_id into v_hit from public.join_requests where id = p_request;
   if not found then raise exception 'request_not_found'; end if;
-  select * into h from public.hits where id = r.hit_id for update;
+  select * into h from public.hits where id = v_hit for update;
+  select * into r from public.join_requests where id = p_request for update;
   if h.host_id <> v_user then raise exception 'not_host'; end if;
   if r.status <> 'pending' then raise exception 'request_closed'; end if;
   if h.status not in ('open', 'confirmed') or h.starts_at <= now() then raise exception 'hit_closed'; end if;
@@ -268,13 +271,21 @@ create or replace function public.send_hit_invite(
 language plpgsql security definer set search_path = public as $$
 declare
   v_user uuid := public.assert_onboarded(); h public.hits; v_invite uuid; v_message uuid; v_expires timestamptz;
-  v_evening_before timestamptz; v_body text; m record;
+  v_evening_before timestamptz; v_body text; m record; c public.chats; v_other uuid;
 begin
   select * into h from public.hits where id = p_hit for update;
   if not found or h.host_id <> v_user then raise exception 'not_host'; end if;
   if h.status not in ('open', 'confirmed') or h.starts_at <= now() then raise exception 'hit_closed'; end if;
   if h.spots_open <= 0 then raise exception 'hit_full'; end if;
   if not public.is_chat_member(p_chat, v_user) then raise exception 'not_a_member'; end if;
+  select * into c from public.chats where id = p_chat;
+  if c.type = 'dm' then
+    -- Same gate as a text message: a DM carries hit requests only once both players added each other.
+    select user_id into v_other from public.chat_members where chat_id = p_chat and user_id <> v_user limit 1;
+    if public.is_blocked_either(v_user, v_other) then raise exception 'player_unavailable'; end if;
+    if not public.is_friend(v_user, v_other) then raise exception 'not_friends'; end if;
+  end if;
+  perform public.check_rate_limit('send_hit_invite', 20, interval '1 minute');
   if p_target_user is not null then
     if not public.is_chat_member(p_chat, p_target_user) then raise exception 'not_a_member'; end if;
     if public.is_blocked_either(v_user, p_target_user) then raise exception 'player_unavailable'; end if;
@@ -358,6 +369,7 @@ begin
   select * into h from public.hits where id = p_hit for update;
   if not found then raise exception 'hit_not_found'; end if;
   if h.host_id = v_user then raise exception 'host_cannot_leave'; end if;
+  if h.status not in ('open', 'confirmed') then raise exception 'hit_closed'; end if;
   if h.starts_at <= now() then raise exception 'hit_started'; end if;
   update public.hit_players set left_at = now() where hit_id = p_hit and user_id = v_user and left_at is null;
   if not found then raise exception 'not_a_player'; end if;
@@ -399,24 +411,30 @@ begin
   return public.hit_json(p_hit, v_user);
 end $$;
 
--- Day-after answer. Counters change once per (hit, absent player), on the first "No".
+-- Day-after answer. The absent player's counters move on the first "No" and move back when the only
+-- "No" is taken back, so changing an answer never counts one absence twice.
 create or replace function public.submit_attendance(p_hit uuid, p_about uuid, p_showed_up boolean, p_add_friend boolean default false) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare v_user uuid := public.assert_onboarded(); h public.hits; v_first_no boolean;
+declare v_user uuid := public.assert_onboarded(); h public.hits; v_prev boolean; v_others_no boolean;
 begin
-  select * into h from public.hits where id = p_hit;
+  select * into h from public.hits where id = p_hit for update;
   if not found or h.status <> 'played' then raise exception 'hit_not_played'; end if;
   if not public.is_hit_member(p_hit, v_user) or not public.is_hit_member(p_hit, p_about) or p_about = v_user then
     raise exception 'not_a_player';
   end if;
 
-  v_first_no := not exists (select 1 from public.attendance_checks where hit_id = p_hit and about_user_id = p_about and showed_up = false);
+  select showed_up into v_prev from public.attendance_checks where hit_id = p_hit and user_id = v_user and about_user_id = p_about;
+  v_others_no := exists (select 1 from public.attendance_checks
+                         where hit_id = p_hit and about_user_id = p_about and user_id <> v_user and showed_up = false);
   insert into public.attendance_checks (hit_id, user_id, about_user_id, showed_up) values (p_hit, v_user, p_about, p_showed_up)
   on conflict (hit_id, user_id, about_user_id) do update set showed_up = excluded.showed_up, created_at = now();
 
-  if not p_showed_up and v_first_no then
+  if not p_showed_up and v_prev is distinct from false and not v_others_no then
     update public.profiles set no_shows = no_shows + 1, hits_played = greatest(hits_played - 1, 0) where id = p_about;
     insert into public.reports (reporter_id, reported_id, hit_id, reason, auto) values (v_user, p_about, p_hit, 'no_show', true);
+  elsif p_showed_up and v_prev = false and not v_others_no then
+    update public.profiles set no_shows = greatest(no_shows - 1, 0), hits_played = hits_played + 1 where id = p_about;
+    delete from public.reports where hit_id = p_hit and reported_id = p_about and reason = 'no_show' and auto;
   end if;
   if p_add_friend then perform public.add_friend(p_about); end if;
   return jsonb_build_object('ok', true);

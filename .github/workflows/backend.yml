@@ -11,7 +11,7 @@ on:
       steps:
         description: Deploy steps, in order (reviewer and secrets are optional extras)
         type: string
-        default: check migrate seed settings functions test
+        default: check migrate seed settings secrets functions test
       access_token:
         description: Supabase access token (only if the SUPABASE_ACCESS_TOKEN secret is not set)
         type: string
@@ -57,4 +57,4 @@ jobs:
           node-version: "22"
 
       - name: Deploy
-        run: node scripts/supabase-deploy.mjs ${{ inputs.steps || 'check migrate seed settings functions' }}
+        run: node scripts/supabase-deploy.mjs ${{ inputs.steps || 'check migrate seed settings secrets functions' }}

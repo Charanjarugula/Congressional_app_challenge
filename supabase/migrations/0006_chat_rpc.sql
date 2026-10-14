@@ -131,7 +131,7 @@ create or replace function public.send_message(p_chat uuid, p_client_id uuid, p_
 language plpgsql security definer set search_path = public as $$
 declare v_user uuid := public.assert_onboarded(); c public.chats; v_other uuid; v_id uuid; v_body text := btrim(coalesce(p_body, '')); m record;
 begin
-  select id into v_id from public.messages where chat_id = p_chat and client_id = p_client_id;
+  select id into v_id from public.messages where chat_id = p_chat and client_id = p_client_id and sender_id = v_user;
   if v_id is not null then return public.message_json(v_id); end if;
 
   select * into c from public.chats where id = p_chat;

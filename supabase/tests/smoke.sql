@@ -2,7 +2,7 @@
 -- Everything happens inside one DO block that ends by raising SMOKE_OK, which rolls the whole thing back.
 do $$
 declare
-  a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid();
+  a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid(); d uuid := gen_random_uuid();
   v_court uuid; v_hit jsonb; v_hit_id uuid; v_req jsonb; v_req_id uuid; v_chat uuid; v_msg jsonb;
   v_feed jsonb; v_inbox jsonb; v_friend jsonb; v_invite jsonb; v_group jsonb; v_n integer;
 begin
@@ -74,6 +74,14 @@ begin
   begin
     perform public.send_message((v_friend->>'dm_chat_id')::uuid, gen_random_uuid(), 'hi');
     raise exception 'dm allowed before add-back';
+  exception when others then
+    if sqlerrm <> 'not_friends' then raise; end if;
+  end;
+  -- Same for a hit request card.
+  v_hit := public.create_hit(v_court, now() + interval '6 days', 60, 'singles', 1, 'anyone');
+  begin
+    perform public.send_hit_invite((v_hit->>'id')::uuid, (v_friend->>'dm_chat_id')::uuid, b);
+    raise exception 'hit request allowed before add-back';
   exception when others then
     if sqlerrm <> 'not_friends' then raise; end if;
   end;
@@ -154,6 +162,23 @@ begin
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
 
+  -- A hit cancelled under a player can't be left: leaving would reopen it.
+  v_hit := public.create_hit(v_court, now() + interval '5 days', 60, 'casual', 1, 'anyone');
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join((v_hit->>'id')::uuid);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+  perform public.cancel_hit((v_hit->>'id')::uuid);
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  begin
+    perform public.leave_hit((v_hit->>'id')::uuid);
+    raise exception 'left a cancelled hit';
+  exception when others then
+    if sqlerrm <> 'hit_closed' then raise; end if;
+  end;
+  if (select status from public.hits where id = (v_hit->>'id')::uuid) <> 'cancelled' then raise exception 'cancelled hit reopened'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+
   -- Reminders: a confirmed hit 50 minutes out gets the one-hour reminder, exactly once.
   v_hit := public.create_hit(v_court, now() + interval '50 minutes', 60, 'singles', 1, 'anyone');
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
@@ -210,6 +235,15 @@ begin
   if (select hits_played from public.profiles where id = b) <> 0 then raise exception 'hits_played after no-show'; end if;
   select count(*) into v_n from public.reports where reported_id = b and reason = 'no_show' and auto;
   if v_n <> 1 then raise exception 'expected 1 automatic no-show report, got %', v_n; end if;
+  -- Taking the "No" back restores the counters and withdraws the report; a second "No" counts once more.
+  perform public.submit_attendance((v_hit->>'id')::uuid, b, true);
+  if (select no_shows from public.profiles where id = b) <> 0 or (select hits_played from public.profiles where id = b) <> 1 then raise exception 'no-show not taken back'; end if;
+  select count(*) into v_n from public.reports where reported_id = b and reason = 'no_show' and auto;
+  if v_n <> 0 then raise exception 'automatic report not withdrawn (%)', v_n; end if;
+  perform public.submit_attendance((v_hit->>'id')::uuid, b, false);
+  if (select no_shows from public.profiles where id = b) <> 1 then raise exception 'no_shows after the second no: %', (select no_shows from public.profiles where id = b); end if;
+  select count(*) into v_n from public.reports where reported_id = b and reason = 'no_show' and auto;
+  if v_n <> 1 then raise exception 'expected 1 automatic report after the second no, got %', v_n; end if;
   -- Jordan says Maya showed up and adds her as a friend in the same step; his past row no longer needs an answer.
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   perform public.submit_attendance((v_hit->>'id')::uuid, a, true, true);
@@ -217,6 +251,9 @@ begin
   v_feed := public.get_my_hits();
   if not exists (select 1 from jsonb_array_elements(v_feed->'past') e where (e->>'id')::uuid = (v_hit->>'id')::uuid and (e->>'needs_attendance')::boolean = false) then
     raise exception 'past row should be answered: %', v_feed->'past';
+  end if;
+  if exists (select 1 from jsonb_array_elements(v_feed->'past') e where (e->>'id')::uuid = v_hit_id) then
+    raise exception 'past lists a hit jordan left: %', v_feed->'past';
   end if;
   perform public.mark_request_seen((v_req->'viewer'->'request'->>'id')::uuid);
   if (select seen_by_requester_at from public.join_requests where id = (v_req->'viewer'->'request'->>'id')::uuid) is null then raise exception 'mark_request_seen'; end if;
@@ -233,6 +270,7 @@ begin
   if (v_feed->>'first_name') <> 'Maya' or (v_feed->>'relationship') <> 'requested' or (v_feed->>'hits_together')::int <> 1 then raise exception 'get_player: %', v_feed; end if;
   v_feed := public.search_players('Al');
   if not exists (select 1 from jsonb_array_elements(v_feed) e where (e->>'id')::uuid = c) then raise exception 'search_players: %', v_feed; end if;
+  if jsonb_array_length(public.search_players('%%')) <> 0 then raise exception 'search_players treats %% as a wildcard'; end if;
   v_feed := public.get_nearby_courts(5);
   if jsonb_array_length(v_feed) < 1 or (v_feed->0->>'miles') is null then raise exception 'get_nearby_courts: %', v_feed; end if;
 
@@ -240,6 +278,17 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   v_friend := public.add_friend(b);
   if (v_friend->>'relationship') <> 'friend' then raise exception 'maya add back: %', v_friend; end if;
+  -- Jordan's block dissolved his friendship with Alex; once they add each other again, Maya sees Alex suggested through Jordan.
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  perform public.add_friend(b);
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_friend := public.add_friend(c);
+  if (v_friend->>'relationship') <> 'friend' then raise exception 'jordan and alex again: %', v_friend; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_feed := public.get_friend_suggestions();
+  if not exists (select 1 from jsonb_array_elements(v_feed) e where (e->>'id')::uuid = c and e->>'source' = 'mutual' and e->>'reason' = 'Friends with Jordan') then
+    raise exception 'mutual suggestion: %', v_feed;
+  end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   v_group := public.add_chat_members((v_group->>'id')::uuid, array[a]);
   if (v_group->>'member_count')::int <> 3 then raise exception 'add_chat_members: %', v_group; end if;
@@ -250,9 +299,35 @@ begin
   if (public.chat_json((v_group->>'id')::uuid, b)->>'member_count')::int <> 2 then raise exception 'leave_chat member count'; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
 
-  -- Deletion anonymizes without touching others' threads.
+  -- Signing in with Apple again replaces the stored refresh token instead of colliding on the vault name.
+  perform public.internal_store_apple_token(c, 'apple-refresh-1');
+  perform public.internal_store_apple_token(c, 'apple-refresh-2');
+  if public.internal_apple_refresh_token(c) <> 'apple-refresh-2' then raise exception 'apple token not replaced'; end if;
+  select count(*) into v_n from vault.secrets where name = 'apple-refresh-' || c::text;
+  if v_n <> 1 then raise exception 'expected one vault secret, got %', v_n; end if;
+
+  -- Only the app's entry points are callable over the API; policies keep their predicates.
+  if has_function_privilege('authenticated', 'public.profile_json(uuid)', 'execute') then raise exception 'profile_json is callable by the app role'; end if;
+  if has_function_privilege('authenticated', 'public.chat_json(uuid, uuid)', 'execute') then raise exception 'chat_json is callable by the app role'; end if;
+  if has_function_privilege('authenticated', 'public.find_dm_chat(uuid, uuid)', 'execute') then raise exception 'find_dm_chat is callable by the app role'; end if;
+  if has_function_privilege('anon', 'public.get_me()', 'execute') then raise exception 'get_me is callable by anon'; end if;
+  if not has_function_privilege('authenticated', 'public.get_me()', 'execute') then raise exception 'get_me is not callable by the app role'; end if;
+  if not has_function_privilege('authenticated', 'public.can_see_hit(uuid, uuid)', 'execute') then raise exception 'can_see_hit must stay callable for policies'; end if;
+  if not has_function_privilege('service_role', 'public.internal_delete_account(uuid, text)', 'execute') then raise exception 'service role lost internal_delete_account'; end if;
+
+  -- Underage deletion removes a half-onboarded account outright, with the friend request and DM it opened.
+  insert into public.profiles (id, first_name, last_name) values (d, 'Sam', 'Lee');
+  perform set_config('request.jwt.claims', json_build_object('sub', d, 'role', 'authenticated')::text, true);
+  v_friend := public.add_friend(a);
+  perform public.internal_delete_account(d, 'underage');
+  if exists (select 1 from public.profiles where id = d) then raise exception 'underage profile kept'; end if;
+  if exists (select 1 from public.friendships where d in (user_a, user_b)) then raise exception 'underage friendship kept'; end if;
+  if exists (select 1 from public.chats where id = (v_friend->>'dm_chat_id')::uuid) then raise exception 'underage dm kept'; end if;
+
+  -- Deletion anonymizes without touching others' threads, and drops the Apple secret.
   perform public.internal_delete_account(c, 'full');
   if (select first_name from public.profiles where id = c) <> 'Deleted' then raise exception 'delete did not anonymize'; end if;
+  if exists (select 1 from vault.secrets where name = 'apple-refresh-' || c::text) then raise exception 'vault secret kept after deletion'; end if;
   select count(*) into v_n from public.messages where chat_id = (v_group->>'id')::uuid;
   if v_n < 1 then raise exception 'group thread lost after deletion'; end if;
 

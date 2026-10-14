@@ -245,6 +245,7 @@ language plpgsql security definer set search_path = public as $$
 declare v_user uuid := public.assert_signed_in(); v_q text := btrim(coalesce(p_query, ''));
 begin
   if length(v_q) < 2 then return '[]'::jsonb; end if;
+  v_q := replace(replace(replace(v_q, '\', '\\'), '%', '\%'), '_', '\_');
   return coalesce((
     select jsonb_agg(public.player_card(p.id) || jsonb_build_object(
       'mutual_friends', to_jsonb(public.mutual_friend_names(v_user, p.id)),

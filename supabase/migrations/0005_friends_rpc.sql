@@ -124,12 +124,20 @@ language plpgsql security definer set search_path = public as $$
 declare v_user uuid := public.assert_signed_in();
 begin
   return coalesce((
-    with candidates as (
-      select p.id as other, 'mutual' as source, count(*)::int as weight,
-             'Friends with ' || array_to_string((public.mutual_friend_names(v_user, p.id))[1:2], ' and ') as reason
-      from public.profiles p
-      where exists (select 1 from public.profiles m where public.is_friend(v_user, m.id) and public.is_friend(m.id, p.id))
-      group by p.id
+    with mine as (
+      select case when f.user_a = v_user then f.user_b else f.user_a end as id
+      from public.friendships f where v_user in (f.user_a, f.user_b) and f.status = 'accepted'
+    ),
+    candidates as (
+      -- Friends of my friends, weighted by how many of mine they share.
+      select fof.other, 'mutual' as source, count(*)::int as weight,
+             'Friends with ' || array_to_string((array_agg(p.first_name order by p.first_name))[1:2], ' and ') as reason
+      from mine
+      join public.friendships f on mine.id in (f.user_a, f.user_b) and f.status = 'accepted'
+      cross join lateral (select case when f.user_a = mine.id then f.user_b else f.user_a end as other) fof
+      join public.profiles p on p.id = mine.id
+      where fof.other <> v_user and fof.other not in (select id from mine)
+      group by fof.other
       union all
       select m2.user_id, 'group', 2, 'In ' || c.name || ' with you'
       from public.chat_members m1

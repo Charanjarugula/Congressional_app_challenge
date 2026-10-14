@@ -113,7 +113,7 @@ const steps = {
     await sql(`
       insert into private.settings (key, value) values
         ('functions_url', '${functionsUrl}'),
-        ('webhook_secret', '${webhookSecret}')
+        ('webhook_secret', '${webhookSecret.replace(/'/g, "''")}')
       on conflict (key) do update set value = excluded.value;
     `);
     console.log(`settings functions_url=${functionsUrl} webhook_secret=(set)`);

@@ -31,6 +31,16 @@ final class PlaceSearchCompleter: NSObject, MKLocalSearchCompleterDelegate {
         completer.delegate = self
         completer.resultTypes = .address
         completer.region = Self.palmBeachCounty
+        if #available(iOS 18.0, *) {
+            completer.addressFilter = MKAddressFilter(including: [.locality, .subLocality, .postalCode])
+        }
+    }
+
+    /// Street addresses start with a house number; ZIP codes are five digits. Keep cities and ZIPs.
+    private static func isCityOrZip(_ title: String) -> Bool {
+        guard let first = title.first, first.isNumber else { return true }
+        let token = title.prefix { $0.isNumber }
+        return token.count == 5 && title.count <= 5 + 2
     }
 
     func update(query: String) {
@@ -53,13 +63,15 @@ final class PlaceSearchCompleter: NSObject, MKLocalSearchCompleterDelegate {
         guard let item = response.mapItems.first else {
             throw LocationService.LocationError.notFound
         }
-        return HomeArea(placemark: item.placemark, fallback: item.placemark.coordinate)
+        return await LocationService.coarsened(
+            HomeArea(placemark: item.placemark, fallback: item.placemark.coordinate)
+        )
     }
 
     // MARK: - MKLocalSearchCompleterDelegate
 
     func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
-        suggestions = completer.results.prefix(6).map { result in
+        suggestions = completer.results.filter { Self.isCityOrZip($0.title) }.prefix(6).map { result in
             Suggestion(
                 id: result.title + "|" + result.subtitle,
                 title: result.title,

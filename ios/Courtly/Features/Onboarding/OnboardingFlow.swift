@@ -50,9 +50,10 @@ struct OnboardingFlow: View {
                 case .signUp:
                     path.append(.name)
                 case .signIn:
-                    // Returning players will load their profile from the backend. Until then, sign-in
-                    // drops into the app with what the device has.
-                    session.completeOnboarding(with: draft)
+                    // There is no backend yet to load an existing profile from, so a returning player
+                    // completes the profile steps like a new one. Once sign-in can fetch the profile,
+                    // this goes straight to the app.
+                    path.append(.name)
                 }
             }
         case .name:

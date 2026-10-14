@@ -2,7 +2,8 @@ import CoreLocation
 import Foundation
 
 /// One-shot location lookup that turns a coordinate or a typed city/ZIP into a `HomeArea`.
-/// The app never stores the precise coordinate; only the geocoded area and its centroid.
+/// Every result goes through `coarsened(_:)`, so the stored point is the centroid of the
+/// player's ZIP (or city), never the device fix or a street address.
 final class LocationService: NSObject, CLLocationManagerDelegate {
     enum LocationError: Error {
         case denied, unavailable, notFound
@@ -30,7 +31,28 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     static func area(for location: CLLocation) async throws -> HomeArea {
         let placemarks = try await CLGeocoder().reverseGeocodeLocation(location)
         guard let placemark = placemarks.first else { throw LocationError.notFound }
-        return HomeArea(placemark: placemark, fallback: location.coordinate)
+        return await coarsened(HomeArea(placemark: placemark, fallback: location.coordinate))
+    }
+
+    /// Replaces a precise point with the centroid of the area's ZIP, or its city when there is
+    /// no ZIP. Falls back to rounding to about 1 km if the lookup fails.
+    static func coarsened(_ area: HomeArea) async -> HomeArea {
+        let query = area.zip.map { "\($0), United States" } ?? area.label
+        if let placemark = try? await CLGeocoder().geocodeAddressString(query).first,
+           let location = placemark.location {
+            return HomeArea(
+                label: area.label,
+                zip: area.zip,
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude
+            )
+        }
+        return HomeArea(
+            label: area.label,
+            zip: area.zip,
+            latitude: (area.latitude * 100).rounded() / 100,
+            longitude: (area.longitude * 100).rounded() / 100
+        )
     }
 
     static func area(matching query: String) async throws -> HomeArea {
@@ -41,7 +63,7 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         guard let placemark = placemarks.first, let location = placemark.location else {
             throw LocationError.notFound
         }
-        return HomeArea(placemark: placemark, fallback: location.coordinate)
+        return await coarsened(HomeArea(placemark: placemark, fallback: location.coordinate))
     }
 
     // MARK: - Private

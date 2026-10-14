@@ -10,6 +10,11 @@ struct CreateAccountView: View {
     @State private var busyProvider: AuthProvider?
     @State private var errorMessage: String?
 
+    private var isSigningInWithEmail: Bool {
+        if case .email = busyProvider { return true }
+        return false
+    }
+
     private var isValidEmail: Bool {
         let trimmed = email.trimmingCharacters(in: .whitespaces)
         return trimmed.contains("@") && trimmed.contains(".") && trimmed.count >= 6
@@ -52,7 +57,7 @@ struct CreateAccountView: View {
             PrimaryButton(
                 title: "Continue",
                 isEnabled: isValidEmail,
-                isLoading: busyProvider == .email(email),
+                isLoading: isSigningInWithEmail,
                 action: continueWithEmail
             )
             .padding(.top, 16)

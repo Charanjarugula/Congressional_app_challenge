@@ -66,7 +66,8 @@ language sql stable security definer set search_path = public as $$
       h.host_id = p_user
       or public.is_hit_member(p_hit, p_user)
       or (
-        not public.is_blocked_either(p_user, h.host_id)
+        h.status in ('open', 'confirmed') and h.starts_at > now()   -- strangers only ever see live hits
+        and not public.is_blocked_either(p_user, h.host_id)
         and public.is_active_user(h.host_id)
         and (
           (h.visibility = 'anyone' and public.host_allows_anyone(h.host_id))
@@ -122,6 +123,15 @@ create policy notifications_select on public.notifications for select to authent
 create policy notifications_update on public.notifications for update to authenticated
   using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy attendance_select on public.attendance_checks for select to authenticated using (user_id = auth.uid());
+
+-- Grants are explicit so they do not depend on the project's "automatically expose tables" setting.
+grant usage on schema public to authenticated, service_role;
+grant select on public.profiles, public.courts, public.hits, public.hit_players, public.join_requests,
+  public.hit_invites, public.friendships, public.blocks, public.chats, public.chat_members, public.messages,
+  public.notifications, public.attendance_checks to authenticated;
+grant select, insert, update, delete on public.device_tokens to authenticated;
+grant update on public.notifications to authenticated;
+grant all on all tables in schema public to service_role;
 
 -- The anon key never reads application data; the app always has a signed-in user.
 revoke all on all tables in schema public from anon;

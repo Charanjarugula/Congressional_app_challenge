@@ -226,6 +226,7 @@ begin
   return jsonb_build_object('deleted', true);
 end $$;
 
+grant execute on all functions in schema public to authenticated, service_role;
 revoke execute on function public.internal_store_apple_token(uuid, text) from public, anon, authenticated;
 revoke execute on function public.internal_apple_refresh_token(uuid) from public, anon, authenticated;
 revoke execute on function public.internal_delete_account(uuid, text) from public, anon, authenticated;

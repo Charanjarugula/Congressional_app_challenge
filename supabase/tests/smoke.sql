@@ -97,18 +97,100 @@ begin
     if sqlerrm not in ('invite_closed', 'spot_taken', 'already_in') then raise; end if;
   end;
 
-  -- Block hides Jordan's hit from Alex and vice versa.
+  -- Alex blocks Jordan: relationship flips, and a hit Jordan posts afterwards is invisible to Alex.
   perform public.block_user(b);
-  if public.can_see_hit(v_hit_id, c) then raise exception 'blocked user still sees hit'; end if;
+  if public.relationship_to(c, b) <> 'blocked' then raise exception 'relationship after block: %', public.relationship_to(c, b); end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_hit := public.create_hit(v_court, now() + interval '4 days', 60, 'singles', 1, 'anyone');
+  if public.can_see_hit((v_hit->>'id')::uuid, c) then raise exception 'blocked user still sees hit'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
   perform public.unblock_user(b);
 
   -- Scheduler runs without error; badge works.
   perform public.run_hit_scheduler();
   if public.badge_count(a) < 0 then raise exception 'badge'; end if;
 
+  -- My Hits states for Jordan: the confirmed hit with Maya, the drills hit he hosts.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_feed := public.get_my_hits();
+  if jsonb_array_length(v_feed->'upcoming') < 2 then raise exception 'my hits upcoming: %', v_feed; end if;
+  if not exists (select 1 from jsonb_array_elements(v_feed->'upcoming') e where e->>'state' = 'confirmed') then
+    raise exception 'expected a confirmed row: %', v_feed->'upcoming';
+  end if;
+
+  -- Jordan leaves Maya's hit: the spot reopens, the hit goes back to open, Maya is told.
+  v_hit := public.leave_hit(v_hit_id);
+  if (v_hit->>'status') <> 'open' or (v_hit->>'spots_open')::int <> 1 then raise exception 'leave state: %', v_hit; end if;
+  select count(*) into v_n from public.notifications where user_id = a and kind = 'player_left';
+  if v_n <> 1 then raise exception 'player_left notification missing'; end if;
+  begin
+    perform public.leave_hit(v_hit_id);
+    raise exception 'left twice';
+  exception when others then
+    if sqlerrm <> 'not_a_player' then raise; end if;
+  end;
+
+  -- Maya cancels it: pending state cleared, nothing left to show.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_hit := public.cancel_hit(v_hit_id);
+  if (v_hit->>'status') <> 'cancelled' then raise exception 'cancel state: %', v_hit; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  begin
+    perform public.request_to_join(v_hit_id);
+    raise exception 'joined a cancelled hit';
+  exception when others then
+    if sqlerrm not in ('hit_closed', 'hit_not_found') then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+
+  -- Reminders: a confirmed hit 50 minutes out gets the one-hour reminder, exactly once.
+  v_hit := public.create_hit(v_court, now() + interval '50 minutes', 60, 'singles', 1, 'anyone');
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join((v_hit->>'id')::uuid);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+  perform public.run_hit_scheduler();
+  perform public.run_hit_scheduler();
+  select count(*) into v_n from public.notifications where kind = 'reminder_hour' and (data->>'hit_id')::uuid = (v_hit->>'id')::uuid;
+  if v_n <> 2 then raise exception 'expected 2 one-hour reminders (host + player), got %', v_n; end if;
+
+  -- Onboarding validation and contact matching.
+  perform public.update_profile(jsonb_build_object('phone_hash', 'hash-maya', 'email_hash', 'ehash-maya', 'radius_mi', 15));
+  if (public.get_me()->>'radius_mi')::int <> 15 then raise exception 'update_profile radius'; end if;
+  begin
+    perform public.update_profile(jsonb_build_object('radius_mi', 7));
+    raise exception 'invalid radius accepted';
+  exception when others then
+    if sqlerrm <> 'invalid_radius' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_feed := public.match_contacts(array['hash-maya', 'nothing']);
+  if jsonb_array_length(v_feed) <> 1 or (v_feed->0->'player'->>'id')::uuid <> a then raise exception 'match_contacts: %', v_feed; end if;
+  update public.profiles set birthday = current_date - interval '12 years' where id = b;
+  begin
+    perform public.complete_onboarding();
+    raise exception 'underage accepted';
+  exception when others then
+    if sqlerrm <> 'underage' then raise; end if;
+  end;
+  update public.profiles set birthday = '1994-05-02' where id = b;
+
+  -- Row-level security as the app's role: Alex sees only hits visible to him, never Maya's profile row.
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  select count(*) into v_n from public.profiles;
+  if v_n <> 1 then raise exception 'rls: profiles visible to others (%)', v_n; end if;
+  select count(*) into v_n from public.hits where host_id = a and status = 'cancelled';
+  if v_n <> 0 then raise exception 'rls: cancelled hit of a stranger is visible'; end if;
+  select count(*) into v_n from public.player_cards;
+  if v_n < 2 then raise exception 'rls: player_cards should list the other active players (%)', v_n; end if;
+  execute 'reset role';
+
   -- Deletion anonymizes without touching others' threads.
   perform public.internal_delete_account(c, 'full');
   if (select first_name from public.profiles where id = c) <> 'Deleted' then raise exception 'delete did not anonymize'; end if;
+  select count(*) into v_n from public.messages where chat_id = (v_group->>'id')::uuid;
+  if v_n < 1 then raise exception 'group thread lost after deletion'; end if;
 
   raise exception 'SMOKE_OK';
 end $$;

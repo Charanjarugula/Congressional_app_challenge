@@ -110,18 +110,22 @@ struct HitDetailView: View {
             }
             PlayerTiles(hit: hit, me: me)
             CourtMap(court: hit.court)
-            if hit.isMember && hit.isLive {
+            // The chat outlives the start time (running late, a thank-you after); inviting and the calendar don't.
+            let chatStaysOpen = hit.chatId != nil && hit.status != .cancelled && hit.status != .expired
+            if hit.isMember && (hit.isLive || chatStaysOpen) {
                 HStack(spacing: 8) {
                     if let chatID = hit.chatId {
                         ActionButton(title: hit.unreadMessages > 0 ? "Chat · \(hit.unreadMessages)" : "Chat") {
                             navigate(.chat(chatID))
                         }
-                    } else {
+                    } else if hit.isLive {
                         ActionButton(title: "Invite") { showsInvite = true }
                     }
-                    ActionButton(title: "Add to calendar", style: .grouped) { showsCalendar = true }
+                    if hit.isLive {
+                        ActionButton(title: "Add to calendar", style: .grouped) { showsCalendar = true }
+                    }
                 }
-                if hit.viewer.isHost && hit.chatId != nil && hit.spotsOpen > 0 {
+                if hit.isLive && hit.viewer.isHost && hit.chatId != nil && hit.spotsOpen > 0 {
                     ActionButton(title: "Invite more players", style: .grouped) { showsInvite = true }
                 }
             }

@@ -60,6 +60,7 @@ struct PeopleToPlayWithView: View {
     @State private var contacts: [PersonSuggestion] = []
     @State private var recommended: [PersonSuggestion] = []
     @State private var added: Set<UUID> = []
+    @State private var busy: Set<UUID> = []   // one request per person at a time, so Add then Added can't cross
     @State private var isLoading = true
     @State private var errorMessage: String?
 
@@ -180,9 +181,12 @@ struct PeopleToPlayWithView: View {
     }
 
     private func toggle(_ id: UUID) {
+        guard !busy.contains(id) else { return }
+        busy.insert(id)
         let wasAdded = added.contains(id)
         if wasAdded { added.remove(id) } else { added.insert(id) }
         Task { @MainActor in
+            defer { busy.remove(id) }
             do {
                 if wasAdded {
                     try await API.People.removeFriend(id)

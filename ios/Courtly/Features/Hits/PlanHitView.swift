@@ -99,6 +99,7 @@ struct PlanHitView: View {
                 Button("Cancel") { dismiss() }
                     .font(CourtlyFont.body)
                     .foregroundStyle(CourtlyColor.blue)
+                    .disabled(isPosting)   // the hit is already on its way; closing now would hide where it went
                 Spacer()
             }
         }

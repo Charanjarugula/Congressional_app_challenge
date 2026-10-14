@@ -89,13 +89,13 @@ psql -v ON_ERROR_STOP=1 -qc "delete from public.chats where hit_id in (select id
 echo "demo    reset gives back a seat held in someone else's hit"
 
 # Removing the review account on its own, with the world still up, gives back the seat it held in Ana's
-# one-seat hit and leaves nothing of the account.
+# one-seat hit and leaves nothing of the account, not even its line in the group chat.
 build_demo players world reviewer
 run_sql reviewer/remove
 seat=$(psql -At -c "select h.status || '/' || h.spots_open from public.hits h join public.profiles p on p.id = h.host_id where p.first_name = 'Ana' and h.status <> 'cancelled' order by h.starts_at limit 1")
 [ "$seat" = "open/1" ] || { echo "reviewer removal left Ana's hit at $seat (wanted open/1)"; exit 1; }
-left=$(psql -At -c "select (select count(*) from auth.users where email = 'reviewer@courtly.app') + (select count(*) from public.profiles where first_name = 'App')")
-[ "$left" = "0" ] || { echo "reviewer removal left $left rows of the account"; exit 1; }
+left=$(psql -At -c "select (select count(*) from auth.users where email = 'reviewer@courtly.app') + (select count(*) from public.profiles where first_name = 'App') + (select count(*) from public.messages where body like 'Thanks! Saturday mornings%')")
+[ "$left" = "0" ] || { echo "reviewer removal left $left rows of the account (sign-in, profile or a group message)"; exit 1; }
 echo "reviewer removed on its own; the seat it held is open again"
 
 run_sql demo/reset

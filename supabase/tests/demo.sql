@@ -24,6 +24,10 @@ begin
   if not exists (select 1 from jsonb_array_elements(m->'past') e where e->>'state' = 'played' and (e->>'needs_attendance')::boolean) then
     raise exception 'DEMO_CHECK past: %', m->'past';
   end if;
+  -- The reviewer's own line in the group is there (its removal is checked against it later).
+  if not exists (select 1 from public.messages m where m.sender_id = rv and m.body like 'Thanks! Saturday mornings%') then
+    raise exception 'DEMO_CHECK the reviewer''s group message is missing';
+  end if;
   -- The conversation with Ana, the group, and the two hit chats.
   if jsonb_array_length(i) < 4 then raise exception 'DEMO_CHECK inbox has % chats (wanted 4)', jsonb_array_length(i); end if;
 end $$;

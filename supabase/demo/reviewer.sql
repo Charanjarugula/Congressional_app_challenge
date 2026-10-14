@@ -33,11 +33,13 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', rv, 'role', 'authenticated')::text, true);
   perform public.add_friend(luis);
 
-  -- The group: Luis adds the reviewer, Ana says hi.
+  -- The group: Luis adds the reviewer, Ana says hi, the reviewer answers.
   perform set_config('request.jwt.claims', json_build_object('sub', luis, 'role', 'authenticated')::text, true);
   perform public.add_chat_members(v_group, array[rv]);
   perform set_config('request.jwt.claims', json_build_object('sub', ana, 'role', 'authenticated')::text, true);
   perform public.send_message(v_group, gen_random_uuid(), 'Welcome to the crew!');
+  perform set_config('request.jwt.claims', json_build_object('sub', rv, 'role', 'authenticated')::text, true);
+  perform public.send_message(v_group, gen_random_uuid(), 'Thanks! Saturday mornings work for me');
 
   -- The reviewer hosts the morning after tomorrow (clear of Ana's hit tomorrow and Priya's that evening):
   -- Luis is in, Priya is waiting for an answer, Luis has written in the chat.

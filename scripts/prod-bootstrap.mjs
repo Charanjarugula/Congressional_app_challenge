@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 if (!TOKEN) throw new Error("SUPABASE_ACCESS_TOKEN is required");
@@ -21,7 +22,7 @@ const DEV_REF = "letuvtazmtjkvivattfy";
 const OLD_REF = process.env.OLD_REF ?? "jrlocgfyskutnusscenf";
 const NEW_NAME = process.env.NEW_NAME ?? "courtly-prod";
 const REGION = process.env.REGION ?? "us-east-1";
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 async function api(method, route, body) {
   const res = await fetch(`https://api.supabase.com/v1${route}`, {
@@ -48,11 +49,13 @@ if (old && old.status === "ACTIVE_HEALTHY") {
 // 2. A fresh project, unless one by that name (other than the old one) already exists.
 let fresh = projects.find((p) => p.name === NEW_NAME && p.id !== OLD_REF);
 if (!fresh) {
-  const org = (await api("GET", "/organizations"))[0];
+  // The token may not list organizations; every project carries its organization's id.
+  const orgID = old?.organization_id ?? projects[0]?.organization_id ?? (await api("GET", "/organizations"))[0]?.id;
+  if (!orgID) throw new Error("no organization found to create the project in");
   const dbPass = crypto.randomBytes(24).toString("base64url");
   fs.writeFileSync(path.join(ROOT, ".prod-db-password"), `${dbPass}\n`, { mode: 0o600 });
-  console.log(`create  ${NEW_NAME} in ${org.name} (${REGION}); database password saved to .prod-db-password (gitignored)`);
-  fresh = await api("POST", "/projects", { organization_id: org.id, name: NEW_NAME, db_pass: dbPass, region: REGION });
+  console.log(`create  ${NEW_NAME} in organization ${orgID} (${REGION}); database password saved to .prod-db-password (gitignored)`);
+  fresh = await api("POST", "/projects", { organization_id: orgID, name: NEW_NAME, db_pass: dbPass, region: REGION });
 }
 const REF = fresh.id;
 for (let i = 0; ; i++) {

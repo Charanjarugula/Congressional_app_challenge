@@ -80,6 +80,17 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   v_friend := public.add_friend(c);
   if (v_friend->>'relationship') <> 'friend' then raise exception 'add back: %', v_friend; end if;
+  -- The system line reads from each side.
+  v_inbox := public.get_inbox();
+  if not exists (select 1 from jsonb_array_elements(v_inbox) x where x->>'id' = v_friend->>'dm_chat_id' and x->>'preview' = 'You added Alex O. back. Say hi') then
+    raise exception 'adder preview: %', v_inbox;
+  end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  v_inbox := public.get_inbox();
+  if not exists (select 1 from jsonb_array_elements(v_inbox) x where x->>'id' = v_friend->>'dm_chat_id' and x->>'preview' = 'Jordan T. added you back. Say hi') then
+    raise exception 'added preview: %', v_inbox;
+  end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   perform public.send_message((v_friend->>'dm_chat_id')::uuid, gen_random_uuid(), 'hey!');
 
   -- Group chat + hit request card + atomic claim.

@@ -10,11 +10,11 @@ const json = (body: unknown, status = 200) =>
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method" }, 405);
-  const authorization = req.headers.get("Authorization") ?? "";
-  const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: authorization } },
-  });
-  const { data: { user } } = await userClient.auth.getUser();
+  // The caller's token is checked with the service-role client, so the function does not depend on
+  // which anon key the runtime was handed; the gateway has already verified the JWT's signature.
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data: { user } } = token ? await admin.auth.getUser(token) : { data: { user: null } };
   if (!user) return json({ error: "not_signed_in" }, 401);
 
   let mode = "full";
@@ -23,7 +23,6 @@ Deno.serve(async (req) => {
     if (body?.mode === "underage") mode = "underage";
   } catch { /* no body */ }
 
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const steps: Record<string, string> = {};
 
   // Apple requires revoking the token when the account is deleted; a missing token must not block deletion.

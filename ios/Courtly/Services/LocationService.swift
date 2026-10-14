@@ -37,8 +37,11 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     /// Replaces a precise point with the centroid of the area's ZIP, or its city when there is
     /// no ZIP. Falls back to rounding to about 1 km if the lookup fails.
     static func coarsened(_ area: HomeArea) async -> HomeArea {
-        let query = area.zip.map { "\($0), United States" } ?? area.label
-        if let placemark = try? await CLGeocoder().geocodeAddressString(query).first,
+        // A ZIP is replaced by its centroid; a city keeps its own point, rounded. Looking a city label up
+        // again could land on a namesake elsewhere, which is how a Wellington once ended up in New Zealand.
+        if let zip = area.zip,
+           let placemark = try? await CLGeocoder().geocodeAddressString("\(zip), United States", in: serviceRegion)
+               .first(where: { $0.isoCountryCode == "US" }),
            let location = placemark.location {
             return HomeArea(
                 label: area.label,
@@ -55,12 +58,18 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         )
     }
 
+    /// Courtly runs in the United States; a lookup is steered towards Palm Beach County and anything
+    /// abroad is dropped, so "Wellington" is Wellington, FL and never the one in New Zealand.
+    static let serviceRegion = CLCircularRegion(
+        center: CLLocationCoordinate2D(latitude: 26.65, longitude: -80.2), radius: 150_000, identifier: "palm-beach"
+    )
+
     static func area(matching query: String) async throws -> HomeArea {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw LocationError.notFound }
         let looksLikeZip = text.count == 5 && text.allSatisfy(\.isNumber)
-        let placemarks = try await CLGeocoder().geocodeAddressString(looksLikeZip ? "\(text), United States" : text)
-        guard let placemark = placemarks.first, let location = placemark.location else {
+        let placemarks = try await CLGeocoder().geocodeAddressString(looksLikeZip ? "\(text), United States" : text, in: serviceRegion)
+        guard let placemark = placemarks.first(where: { $0.isoCountryCode == "US" }), let location = placemark.location else {
             throw LocationError.notFound
         }
         return await coarsened(HomeArea(placemark: placemark, fallback: location.coordinate))

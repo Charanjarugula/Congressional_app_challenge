@@ -9,6 +9,7 @@ struct HitDetailView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.navigate) private var navigate
     @State private var hit: Hit?
+    @State private var hitVersion = 0   // bumped by every reload and action; only the latest may write
     @State private var loadFailed = false
     @State private var isWorking = false
     @State private var showsCancelAlert = false
@@ -267,8 +268,11 @@ struct HitDetailView: View {
     // MARK: - Actions
 
     private func reload() async {
+        hitVersion += 1
+        let version = hitVersion
         do {
             var fresh = try await API.Hits.get(hitID)
+            guard version == hitVersion else { return }   // an action or a newer reload answered meanwhile
             // `get_hit` carries no My Hits extras; keep the ones the list told us about.
             let known = hit ?? hits.cachedHit(hitID)
             fresh.needsAttendance = fresh.needsAttendance ?? known?.needsAttendance
@@ -286,7 +290,9 @@ struct HitDetailView: View {
         isWorking = true
         defer { isWorking = false }
         do {
-            hit = try await work()
+            let updated = try await work()
+            hitVersion += 1   // a reload fetched before this action must not put the old state back
+            hit = updated
             return true
         } catch {
             errorMessage = error.localizedDescription

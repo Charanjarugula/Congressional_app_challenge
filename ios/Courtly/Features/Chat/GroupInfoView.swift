@@ -10,6 +10,8 @@ struct GroupInfoView: View {
     @State private var chat: Chat?
     @State private var loadFailed = false
     @State private var isMuted = false
+    @State private var muteTask: Task<Void, Never>?
+    @State private var muteSaves = 0
     @State private var showsAddMembers = false
     @State private var showsLeaveAlert = false
     @State private var isLeaving = false
@@ -133,12 +135,20 @@ struct GroupInfoView: View {
         }
     }
 
+    /// Flips reach the server one at a time, in order; a flip made while one is saving supersedes it,
+    /// and a stale failure can't undo a newer choice.
     private func setMuted(_ muted: Bool) {
         isMuted = muted
-        Task { @MainActor in
+        muteSaves += 1
+        let save = muteSaves
+        let previous = muteTask
+        muteTask = Task { @MainActor in
+            await previous?.value
+            guard save == muteSaves else { return }
             do {
                 try await API.Chats.setMuted(chatID, muted: muted)
             } catch {
+                guard save == muteSaves else { return }
                 isMuted = !muted
                 errorMessage = error.localizedDescription
             }
@@ -170,6 +180,7 @@ private struct AddMembersSheet: View {
     @State private var friends: [Friend] = []
     @State private var selected: Set<UUID> = []
     @State private var isLoading = true
+    @State private var loadFailed = false
     @State private var isAdding = false
     @State private var errorMessage: String?
 
@@ -179,6 +190,13 @@ private struct AddMembersSheet: View {
                 ProgressView()
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
+            } else if loadFailed {
+                VStack(spacing: 12) {
+                    QuietCard(title: "Couldn’t load your friends", detail: "Check your connection and try again.")
+                    Button("Try again") { Task { await load() } }
+                        .font(CourtlyFont.secondarySemibold)
+                        .foregroundStyle(CourtlyColor.blue)
+                }
             } else if friends.isEmpty {
                 QuietCard(title: "Everyone’s already here", detail: "All your friends are in this group.")
             } else {
@@ -202,12 +220,21 @@ private struct AddMembersSheet: View {
                 }
             }
         }
-        .task {
-            let memberIDs = Set((chat.members ?? []).map(\.id))
-            friends = ((try? await API.People.friends()) ?? []).filter { !memberIDs.contains($0.id) }
-            isLoading = false
-        }
+        .task { await load() }
         .errorAlert($errorMessage, title: "Couldn’t add them")
+    }
+
+    /// A failed load says so instead of looking like a group that already has everyone.
+    private func load() async {
+        isLoading = true
+        do {
+            let memberIDs = Set((chat.members ?? []).map(\.id))
+            friends = try await API.People.friends().filter { !memberIDs.contains($0.id) }
+            loadFailed = false
+        } catch {
+            loadFailed = true
+        }
+        isLoading = false
     }
 
     private func add() {

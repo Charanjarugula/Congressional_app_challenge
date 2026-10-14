@@ -111,10 +111,10 @@ final class RealtimeHub {
             task.resume()
             startHeartbeat()
             startListening(on: task)
-            accessToken = session.accessToken
+            adopt(session.accessToken)
             joinPending(accessToken: session.accessToken)
         } else if let session = try? await SupabaseClient.shared.validSession() {
-            accessToken = session.accessToken
+            adopt(session.accessToken)
             joinPending(accessToken: session.accessToken)
         }
     }
@@ -122,11 +122,19 @@ final class RealtimeHub {
     /// The channel token expires with the session (about an hour). Hand every joined channel the
     /// refreshed token so the server keeps delivering.
     private func refreshTokenIfNeeded() async {
-        guard socket != nil, let session = try? await SupabaseClient.shared.validSession(), session.accessToken != accessToken else { return }
-        accessToken = session.accessToken
-        for topic in joined {
-            send(event: "access_token", topic: topic, payload: ["access_token": session.accessToken])
+        guard socket != nil, let session = try? await SupabaseClient.shared.validSession() else { return }
+        adopt(session.accessToken)
+    }
+
+    /// Remembers the token the channels run on. Whichever path noticed a new one (a heartbeat, a
+    /// subscribe that refreshed the session), the channels already joined hear about it at once.
+    private func adopt(_ token: String) {
+        if token != accessToken {
+            for topic in joined {
+                send(event: "access_token", topic: topic, payload: ["access_token": token])
+            }
         }
+        accessToken = token
     }
 
     /// The server closed or refused one channel: join it again with a fresh token, waiting longer each

@@ -279,7 +279,8 @@ struct ChatThreadView: View {
         Task { @MainActor in
             do {
                 let sent = try await API.Chats.send(chatID: chatID, clientID: clientID, body: text)
-                if let index = messages.firstIndex(where: { $0.id == clientID }) {
+                // A refresh that landed first may already have swapped the temporary row for the server's.
+                if let index = messages.firstIndex(where: { $0.id == clientID || $0.id == sent.id || $0.clientId == clientID }) {
                     messages[index] = sent
                 } else {
                     messages.append(sent)

@@ -25,9 +25,11 @@ final class InboxStore {
         let mine = generation
         isLoading = true
         defer { if mine == generation { isLoading = false } }
+        let owner = await SupabaseClient.shared.session?.userID
         do {
             let fresh = try await API.Chats.inbox()
-            guard mine == generation else { return }
+            // Newest load, same player (see HitsStore): a sign-out mid-flight must not refill the cache.
+            guard mine == generation, await SupabaseClient.shared.session?.userID == owner else { return }
             chats = fresh
             lastError = nil
             SnapshotCache.save(fresh, key: "inbox")

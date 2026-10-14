@@ -201,8 +201,10 @@ actor SupabaseClient {
         urlRequest.httpBody = rawBody
         urlRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        var sentAs: UUID?
         if authorized {
             let current = try await validSession()
+            sentAs = current.userID
             urlRequest.setValue("Bearer \(current.accessToken)", forHTTPHeaderField: "Authorization")
         } else {
             urlRequest.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
@@ -218,6 +220,9 @@ actor SupabaseClient {
         if http.statusCode == 401, authorized, !retried {
             // The server stopped honoring a token the device still thought was good (clock skew, a
             // revoked session): refresh once and try again. A rejected refresh signs the player out.
+            // Only the player who sent the request may retry it: after a sign-out, or with someone
+            // else signed in by now, the answer is theirs alone.
+            guard let now = session, now.userID == sentAs else { throw SupabaseError.notSignedIn }
             _ = try await refreshNow()
             return try await request(path, method: method, rawBody: rawBody, headers: headers, authorized: true, retried: true)
         }

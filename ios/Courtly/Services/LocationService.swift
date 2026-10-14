@@ -121,5 +121,5 @@ extension HomeArea {
     }
 }
 
-/// Lets screens hold one instance with @StateObject; change tracking still comes from @Observable.
+/// Lets the Area sheet hold one instance for its lifetime with @StateObject; the sheet only calls it, so nothing here is published.
 extension LocationService: ObservableObject {}

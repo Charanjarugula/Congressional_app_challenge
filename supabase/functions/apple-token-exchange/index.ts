@@ -19,6 +19,7 @@ Deno.serve(async (req) => {
 
   const { authorization_code: code } = await req.json();
   if (!code) return json({ error: "authorization_code required" }, 400);
+  if (!Deno.env.get("APPLE_SIWA_PRIVATE_KEY")) return json({ error: "apple_not_configured" }, 503);
 
   const form = new URLSearchParams({
     client_id: Deno.env.get("APPLE_CLIENT_ID")!,

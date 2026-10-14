@@ -83,9 +83,14 @@ Deno.serve(async (req) => {
   }
 
   const delivered = Object.values(results).some((r) => r.startsWith("200"));
+  const status = !devices?.length
+    ? "no_devices"
+    : !Deno.env.get("APNS_PRIVATE_KEY")
+    ? "apns_not_configured"
+    : JSON.stringify(results).slice(0, 500);
   await supabase.from("notifications").update({
     pushed_at: delivered || !devices?.length ? new Date().toISOString() : null,
-    push_status: devices?.length ? JSON.stringify(results).slice(0, 500) : "no_devices",
+    push_status: status,
     push_attempts: (n.push_attempts ?? 0) + 1,
   }).eq("id", id);
 

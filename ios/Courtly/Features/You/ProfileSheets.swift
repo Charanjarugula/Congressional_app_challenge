@@ -542,12 +542,15 @@ struct EditProfileSheet: View {
                     "first_name": firstName.trimmingCharacters(in: .whitespaces),
                     "last_name": lastName.trimmingCharacters(in: .whitespaces),
                 ]
+                let previousPhoto = session.profile?.photoPath
                 if let newPhoto, let data = newPhoto.jpegData(compressionQuality: 0.85), let me = session.profile?.id {
-                    let path = "\(me.uuidString.lowercased())/avatar-\(Int(Date.now.timeIntervalSince1970)).jpg"
-                    try await SupabaseClient.shared.upload(bucket: "avatars", path: path, data: data, contentType: "image/jpeg")
-                    patch["photo_path"] = path
+                    patch["photo_path"] = try await API.Profile.uploadPhoto(data, for: me)
                 }
                 try await session.updateProfile(patch)
+                // The photo the profile stopped pointing at goes too; a failure here only leaves a stray file.
+                if let previousPhoto, let current = patch["photo_path"] as? String, previousPhoto != current {
+                    try? await API.Profile.removePhoto(at: previousPhoto)
+                }
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription

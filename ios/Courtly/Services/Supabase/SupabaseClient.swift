@@ -149,6 +149,10 @@ actor SupabaseClient {
         _ = try await request("/storage/v1/object/\(bucket)/\(path)", method: "POST", rawBody: data, headers: headers, authorized: true)
     }
 
+    func remove(bucket: String, path: String) async throws {
+        _ = try await request("/storage/v1/object/\(bucket)/\(path)", method: "DELETE", body: nil, authorized: true)
+    }
+
     nonisolated func publicURL(bucket: String, path: String) -> URL {
         baseURL.appending(path: "/storage/v1/object/public/\(bucket)/\(path)")
     }

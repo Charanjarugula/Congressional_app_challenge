@@ -82,10 +82,7 @@ final class AppSession {
     /// The server removes hits, chats, photos and the sign-in; then the device forgets everything.
     @MainActor
     func deleteAccount() async throws {
-        struct Receipt: Decodable {
-            let deleted: Bool?
-        }
-        let _: Receipt = try await client.invoke("delete-account", body: ["mode": "full"])
+        try await API.Account.delete()
         await signOut()
     }
 

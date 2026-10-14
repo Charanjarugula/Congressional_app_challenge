@@ -44,8 +44,11 @@ Deno.serve(async (req) => {
   if (deviceError) return json({ error: deviceError.message }, 500);
   const { data: badge } = await supabase.rpc("badge_count", { p_user: n.user_id });
 
+  // Phones that already have this push (an earlier attempt that partly failed) are not sent it again.
+  const delivered: string[] = Array.isArray(n.push_delivered) ? n.push_delivered : [];
+  const pending = (devices ?? []).filter((d) => !delivered.includes(d.token));
   const results: Record<string, string> = {};
-  if (devices && devices.length > 0 && Deno.env.get("APNS_PRIVATE_KEY")) {
+  if (pending.length > 0 && Deno.env.get("APNS_PRIVATE_KEY")) {
     const token = await providerToken();
     const payload = {
       aps: {
@@ -58,7 +61,7 @@ Deno.serve(async (req) => {
       kind: n.kind,
       data: n.data,
     };
-    for (const device of devices) {
+    for (const device of pending) {
       const host = device.environment === "sandbox" ? "api.sandbox.push.apple.com" : "api.push.apple.com";
       const headers: Record<string, string> = {
         authorization: `bearer ${token}`,
@@ -75,8 +78,10 @@ Deno.serve(async (req) => {
         });
         const text = await response.text();
         results[device.token.slice(0, 8)] = `${response.status} ${text}`.trim();
+        if (response.status === 200) delivered.push(device.token);
         if (response.status === 410 || text.includes("BadDeviceToken") || text.includes("Unregistered")) {
           await supabase.from("device_tokens").delete().eq("token", device.token);
+          delivered.push(device.token);   // gone for good: nothing left to retry for this phone
         }
       } catch (err) {
         results[device.token.slice(0, 8)] = `error ${(err as Error).message}`;
@@ -84,17 +89,19 @@ Deno.serve(async (req) => {
     }
   }
 
-  const delivered = Object.values(results).some((r) => r.startsWith("200"));
+  // Finished once every current phone has it (or there is none); otherwise the sweep comes back for the rest.
+  const everyPhoneHasIt = (devices ?? []).every((d) => delivered.includes(d.token));
   const status = !devices?.length
     ? "no_devices"
     : !Deno.env.get("APNS_PRIVATE_KEY")
     ? "apns_not_configured"
     : JSON.stringify(results).slice(0, 500);
   await supabase.from("notifications").update({
-    pushed_at: delivered || !devices?.length ? new Date().toISOString() : null,
+    pushed_at: everyPhoneHasIt ? new Date().toISOString() : null,
     push_status: status,
     push_attempts: (n.push_attempts ?? 0) + 1,
+    push_delivered: delivered,
   }).eq("id", id);
 
-  return json({ delivered, results });
+  return json({ delivered: everyPhoneHasIt, results });
 });

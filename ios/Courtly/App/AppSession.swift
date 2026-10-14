@@ -68,6 +68,28 @@ final class AppSession {
         apply(me)
     }
 
+    /// Saves part of the profile (`update_profile` only touches the keys in the patch).
+    @MainActor
+    func updateProfile(_ patch: [String: Any]) async throws {
+        let owner = profile?.id
+        let me = try await API.Profile.update(patch)
+        // A save that lands after a sign-out, or with someone else signed in by now, is theirs alone.
+        guard owner != nil, profile?.id == owner else { return }
+        profile = me
+        ProfileCache.save(me)
+    }
+
+    /// The server removes hits, chats, photos and the sign-in; then the device forgets everything.
+    @MainActor
+    func deleteAccount() async throws {
+        try await API.Account.delete()
+        await signOut()
+    }
+
+    func currentSession() async -> Session? {
+        await client.session
+    }
+
     @MainActor
     func refreshProfile() async {
         let owner = profile?.id

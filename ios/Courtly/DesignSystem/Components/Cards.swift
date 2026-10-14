@@ -76,6 +76,63 @@ struct QuietCard: View {
     }
 }
 
+/// 50pt row with a title, an optional grey value and a chevron ("Level — Intermediate ›").
+struct SettingsRow: View {
+    let title: String
+    var value: String? = nil
+    var valueColor: Color = CourtlyColor.secondary
+    var titleColor: Color = CourtlyColor.ink
+    var showsChevron = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Text(title)
+                    .font(CourtlyFont.body)
+                    .foregroundStyle(titleColor)
+                Spacer(minLength: 12)
+                if let value {
+                    Text(value)
+                        .font(CourtlyFont.secondary)
+                        .foregroundStyle(valueColor)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                if showsChevron {
+                    ChevronMark()
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 50)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Read-only 50pt row: title on the left, value on the right.
+struct ValueRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(CourtlyFont.body)
+                .foregroundStyle(CourtlyColor.ink)
+            Spacer(minLength: 12)
+            Text(value)
+                .font(CourtlyFont.body)
+                .foregroundStyle(CourtlyColor.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 50)
+    }
+}
+
 /// Small grey chevron at the trailing edge of a row.
 struct ChevronMark: View {
     var body: some View {

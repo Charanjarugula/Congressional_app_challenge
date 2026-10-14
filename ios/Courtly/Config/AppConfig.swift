@@ -24,4 +24,9 @@ enum AppConfig {
 
     /// App Review signs in with this address and a fixed code, which is that account's password.
     static let reviewerEmail = "reviewer@courtly.app"
+
+    /// Policy pages from the `site` folder. Point these at the Vercel domain once it exists.
+    static let privacyURL = URL(string: "https://courtly.app/privacy")!
+    static let termsURL = URL(string: "https://courtly.app/terms")!
+    static let supportEmail = "courtly.support@gmail.com"
 }

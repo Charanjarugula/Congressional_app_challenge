@@ -39,9 +39,10 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', ana, 'role', 'authenticated')::text, true);
   perform public.send_message(v_group, gen_random_uuid(), 'Welcome to the crew!');
 
-  -- The reviewer hosts tomorrow evening: Luis is in, Priya is waiting for an answer, Luis has written in the chat.
+  -- The reviewer hosts the morning after tomorrow (clear of Ana's hit tomorrow and Priya's that evening):
+  -- Luis is in, Priya is waiting for an answer, Luis has written in the chat.
   perform set_config('request.jwt.claims', json_build_object('sub', rv, 'role', 'authenticated')::text, true);
-  r := public.create_hit(c_well, (v_local + interval '1 day 18 hours') at time zone 'America/New_York', 90, 'casual', 2, 'anyone');
+  r := public.create_hit(c_well, (v_local + interval '2 days 10 hours') at time zone 'America/New_York', 90, 'casual', 2, 'anyone');
   v_mine := (r->>'id')::uuid;
   perform set_config('request.jwt.claims', json_build_object('sub', luis, 'role', 'authenticated')::text, true);
   v_req := public.request_to_join(v_mine);

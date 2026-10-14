@@ -16,7 +16,7 @@ begin
   -- Luis's drills, Ana's weekend singles and the group's hit request card reach the feed.
   if jsonb_array_length(f->'from_friends') < 2 then raise exception 'DEMO_CHECK from_friends: %', f->'from_friends'; end if;
   if jsonb_array_length(f->'near_you') + jsonb_array_length(f->'from_friends') < 3 then raise exception 'DEMO_CHECK feed too empty: %', f; end if;
-  -- Tomorrow: the reviewer's own hit and Ana's, both confirmed.
+  -- Ana's hit tomorrow and the reviewer's own the morning after, both confirmed.
   if (select count(*) from jsonb_array_elements(m->'upcoming') e where e->>'status' = 'confirmed') < 2 then
     raise exception 'DEMO_CHECK upcoming: %', m->'upcoming';
   end if;

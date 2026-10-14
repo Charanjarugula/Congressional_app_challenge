@@ -36,7 +36,7 @@ To run on a device, choose your team under Signing & Capabilities. The bundle id
 
 ## How the app talks to the backend
 
-Every read and write is one database function (`get_play_feed`, `create_hit`, `send_message`, ...) called through `API.swift`. Row-level security guards direct table access; the functions run as security definer and check the caller themselves. Only those entry points are callable over the API: helpers such as `hit_json` or `chat_json` have no grant, so a new function the app should call needs `grant execute ... to authenticated` in its migration (see `0009_function_grants.sql`). Errors raised as short codes (`hit_full`, `already_requested`) are turned into plain sentences in `BackendMessages.swift`.
+Every read and write is one database function (`get_play_feed`, `create_hit`, `send_message`, ...) called through `API.swift`. Row-level security guards direct table access; the functions run as security definer and check the caller themselves. Only those entry points are callable over the API: helpers such as `hit_json` or `chat_json` have no grant, so a new function the app should call needs `grant execute ... to authenticated` in its migration (see `0009_function_grants.sql`). The row policies take the caller from the session through the `viewer_*` wrappers (`0011_review_fixes.sql`); the two-player helpers such as `is_blocked_either` and `is_chat_member` are not callable by the app role, and neither is the `chats` table, which the app only ever reads through `chat_json`. Errors raised as short codes (`hit_full`, `already_requested`) are turned into plain sentences in `BackendMessages.swift`.
 
 Play, My Hits, the People list and the profile keep the last response on disk so they paint before the network answers. Open chats, the People list and the hit tabs listen over Supabase Realtime (`RealtimeHub.swift`, one connection for the app) for rows they are allowed to see and refresh at once; a slow poll stays on as the fallback.
 
@@ -48,7 +48,7 @@ The **Backend deploy** workflow (Actions tab) takes a target (`dev` or `prod`) a
 
 Email sign-in sends a six-digit code, so the Supabase project needs: OTP length 6 and expiry 600 s; the Magic Link and Confirm signup templates containing `{{ .Token }}`; and an SMTP server (the built-in mailer allows two emails an hour). Sign in with Apple needs the Apple provider enabled with the bundle id as client id; Google needs the iOS client id. The deploy's `auth` step sets all of this from the secrets above when the access token has the auth-config scope, and prints the values to set by hand in Authentication → Email and Providers when it doesn't.
 
-Pull requests that touch `supabase/` run the migrations and the smoke test against a throwaway Postgres in CI.
+Pull requests that touch `supabase/` run the migrations and the smoke test against a throwaway Postgres in CI. Migrations are append-only once a project has recorded them in `private.app_migrations`: a change to a function is a new numbered file that re-creates it (`0010_…`, `0011_…`), never an edit to a file already applied, so `migrate` can tell what is new.
 
 ## Working in this repo
 

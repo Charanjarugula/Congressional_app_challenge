@@ -57,9 +57,11 @@ struct CourtPickerView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(addingID != nil)   // a court is being added; closing now would hand it back to a closed sheet
                 }
             }
             .onChange(of: query) { _, newValue in scheduleSearch(newValue) }
+            .interactiveDismissDisabled(addingID != nil)
             .errorAlert($errorMessage, title: "Couldn’t add that court")
         }
         .preferredColorScheme(.light)

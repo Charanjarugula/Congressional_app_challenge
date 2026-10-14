@@ -97,8 +97,12 @@ $$;
 -- Partial update. Only the keys present in the patch change.
 create or replace function public.update_profile(patch jsonb) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
-declare v_user uuid := public.assert_signed_in();
+declare v_user uuid := public.assert_signed_in(); v_phone text;
 begin
+  if patch ? 'phone_e164' then
+    v_phone := nullif(btrim(coalesce(patch->>'phone_e164', '')), '');
+    if v_phone is not null and v_phone !~ '^\+[1-9][0-9]{7,14}$' then raise exception 'invalid_phone'; end if;
+  end if;
   if patch ? 'radius_mi' and (patch->>'radius_mi')::int not in (5, 10, 15, 25) then raise exception 'invalid_radius'; end if;
   if patch ? 'hit_visibility' and patch->>'hit_visibility' not in ('anyone', 'friends') then raise exception 'invalid_visibility'; end if;
 
@@ -121,10 +125,8 @@ begin
     availability_mask = case when patch ? 'availability_mask' then (patch->>'availability_mask')::int else availability_mask end,
     busy_mask_week = case when patch ? 'busy_mask_week' then (patch->>'busy_mask_week')::int else busy_mask_week end,
     calendar_provider = case when patch ? 'calendar_provider' then (patch->>'calendar_provider')::public.calendar_provider else calendar_provider end,
-    phone_e164 = case when patch ? 'phone_e164' then patch->>'phone_e164' else phone_e164 end,
-    phone_hash = case when patch ? 'phone_e164'
-      then (case when patch->>'phone_e164' is null then null else public.contact_hash(patch->>'phone_e164') end)
-      else phone_hash end,
+    phone_e164 = case when patch ? 'phone_e164' then v_phone else phone_e164 end,
+    phone_hash = case when patch ? 'phone_e164' then (case when v_phone is null then null else public.contact_hash(v_phone) end) else phone_hash end,
     hit_visibility = case when patch ? 'hit_visibility' then (patch->>'hit_visibility')::public.hit_visibility else hit_visibility end,
     coach_marks_done = case when patch ? 'coach_marks_done' then (patch->>'coach_marks_done')::boolean else coach_marks_done end
   where id = v_user;

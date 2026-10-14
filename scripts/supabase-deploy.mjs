@@ -36,7 +36,7 @@ const OTP_TEMPLATE = (verb) =>
 const SECRET_NAMES = [
   "APNS_KEY_ID", "APNS_TEAM_ID", "APNS_PRIVATE_KEY", "APNS_BUNDLE_ID",
   "APPLE_SIWA_KEY_ID", "APPLE_SIWA_PRIVATE_KEY", "APPLE_TEAM_ID", "APPLE_CLIENT_ID",
-  "WEBHOOK_SECRET", "ADMIN_EMAIL",
+  "ADMIN_EMAIL",
 ];
 
 function fail(message) {
@@ -124,10 +124,14 @@ const steps = {
     `);
     // The function must hold the same secret, in this step, so the two never disagree.
     await api("POST", `/projects/${REF}/secrets`, [{ name: "WEBHOOK_SECRET", value: webhookSecret }]);
-    // Whoever signs in with the admin address moderates: reports reach them as notifications.
+    // Whoever signs in with the admin address moderates: reports reach them as notifications. The
+    // sign-up trigger reads the address from settings, so a first sign-in after this deploy counts too.
     if (process.env.ADMIN_EMAIL) {
       const admin = process.env.ADMIN_EMAIL.toLowerCase().replace(/'/g, "''");
-      await sql(`insert into public.admin_users (user_id) select id from auth.users where lower(email) = '${admin}' on conflict do nothing;`);
+      await sql(`
+        insert into private.settings (key, value) values ('admin_email', '${admin}') on conflict (key) do update set value = excluded.value;
+        insert into public.admin_users (user_id) select id from auth.users where lower(email) = '${admin}' on conflict do nothing;
+      `);
     }
     console.log(`settings functions_url=${functionsUrl} webhook_secret=(set, shared with send-push)`);
   },

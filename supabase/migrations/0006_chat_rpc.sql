@@ -56,7 +56,7 @@ language sql stable security definer set search_path = public as $$
                 from public.chat_members m where m.chat_id = c.id and m.left_at is null),
     'member_count', (select count(*) from public.chat_members m where m.chat_id = c.id and m.left_at is null),
     'last_message_at', c.last_message_at,
-    'last_message_type', lm.type,
+    'last_message_type', case when lm.sender_id is not null and public.is_blocked_either(p_viewer, lm.sender_id) then null else lm.type end,
     'preview', case
       when lm.id is not null and lm.type = 'system' then left(public.message_text(lm.id, p_viewer), 120)
       when lm.sender_id is not null and public.is_blocked_either(p_viewer, lm.sender_id) then (

@@ -116,7 +116,7 @@ language sql stable security definer set search_path = public, extensions as $$
     'visibility', h.visibility,
     'status', h.status,
     'chat_id', h.chat_id,
-    'needs_attendance', public.needs_attendance(h.id, p_viewer),
+    'needs_attendance', case when h.status = 'played' then public.needs_attendance(h.id, p_viewer) else false end,
     'players', coalesce((
       select jsonb_agg(public.player_card(hp.user_id) || jsonb_build_object('role', hp.role) order by hp.joined_at)
       from public.hit_players hp where hp.hit_id = h.id and hp.left_at is null and hp.role = 'player'

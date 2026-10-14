@@ -210,6 +210,16 @@ begin
   update auth.users set email = 'pat@example.org' where id = v_pat;
   if (select email_hash from public.profiles where id = v_pat) <> public.contact_hash('pat@example.org') then raise exception 'email_hash not updated'; end if;
   begin
+    perform public.update_profile(jsonb_build_object('phone_e164', '(561) 555-0142'));
+    raise exception 'unformatted phone accepted';
+  exception when others then
+    if sqlerrm <> 'invalid_phone' then raise; end if;
+  end;
+  -- The support address moderates from its first sign-in.
+  insert into private.settings (key, value) values ('admin_email', 'mod@example.com') on conflict (key) do update set value = excluded.value;
+  insert into auth.users (id, email) values (gen_random_uuid(), 'Mod@Example.com');
+  if not exists (select 1 from public.admin_users a join auth.users u on u.id = a.user_id where u.email = 'Mod@Example.com') then raise exception 'admin not enrolled on sign-up'; end if;
+  begin
     perform public.update_profile(jsonb_build_object('radius_mi', 7));
     raise exception 'invalid radius accepted';
   exception when others then
@@ -253,7 +263,10 @@ begin
   select count(*) into v_n from public.reports where reported_id = b and reason = 'no_show' and auto;
   if v_n <> 1 then raise exception 'expected 1 automatic no-show report, got %', v_n; end if;
   if (public.get_hit((v_hit->>'id')::uuid)->>'needs_attendance')::boolean then raise exception 'hit still needs an answer'; end if;
-  -- Taking the "No" back restores the counters and withdraws the report; a second "No" counts once more.
+  -- Taking the "No" back restores the counters and withdraws the report (and the moderator's notice); a second "No" counts once more.
+  insert into public.admin_users (user_id) values (c);
+  select count(*) into v_n from public.notifications where user_id = c and kind = 'report';
+  if v_n <> 0 then raise exception 'moderator told about a report filed before enrolment'; end if;
   perform public.submit_attendance((v_hit->>'id')::uuid, b, true);
   if (select no_shows from public.profiles where id = b) <> 0 or (select hits_played from public.profiles where id = b) <> 1 then raise exception 'no-show not taken back'; end if;
   select count(*) into v_n from public.reports where reported_id = b and reason = 'no_show' and auto;
@@ -262,6 +275,13 @@ begin
   if (select no_shows from public.profiles where id = b) <> 1 then raise exception 'no_shows after the second no: %', (select no_shows from public.profiles where id = b); end if;
   select count(*) into v_n from public.reports where reported_id = b and reason = 'no_show' and auto;
   if v_n <> 1 then raise exception 'expected 1 automatic report after the second no, got %', v_n; end if;
+  select count(*) into v_n from public.notifications where user_id = c and kind = 'report';
+  if v_n <> 1 then raise exception 'moderator should hold exactly one report notice, got %', v_n; end if;
+  perform public.submit_attendance((v_hit->>'id')::uuid, b, true);
+  select count(*) into v_n from public.notifications where user_id = c and kind = 'report';
+  if v_n <> 0 then raise exception 'report notice outlived the withdrawn report (%)', v_n; end if;
+  perform public.submit_attendance((v_hit->>'id')::uuid, b, false);
+  delete from public.admin_users where user_id = c;
   -- Jordan says Maya showed up and adds her as a friend in the same step; his past row no longer needs an answer.
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   perform public.submit_attendance((v_hit->>'id')::uuid, a, true, true);

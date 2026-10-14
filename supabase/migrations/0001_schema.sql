@@ -320,6 +320,10 @@ begin
   insert into public.profiles (id, email_hash)
   values (new.id, case when new.email is null then null else public.contact_hash(new.email) end)
   on conflict (id) do update set email_hash = excluded.email_hash;
+  -- The support address moderates: reports reach it from its first sign-in on.
+  if new.email is not null and lower(new.email) = lower(coalesce((select value from private.settings where key = 'admin_email'), '')) then
+    insert into public.admin_users (user_id) values (new.id) on conflict do nothing;
+  end if;
   return new;
 end $$;
 

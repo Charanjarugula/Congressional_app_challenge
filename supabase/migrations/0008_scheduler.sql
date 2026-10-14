@@ -192,6 +192,7 @@ begin
     delete from public.attendance_checks where p_user in (user_id, about_user_id);
     delete from public.rate_limits where user_id = p_user;
     delete from public.apple_tokens where user_id = p_user;
+    delete from public.admin_users where user_id = p_user;
     if v_vault is not null then delete from vault.secrets where id = v_vault; end if;
     for r in select c.id from public.chats c join public.chat_members m on m.chat_id = c.id where c.type = 'dm' and m.user_id = p_user loop
       update public.chats set last_message_id = null where id = r.id;
@@ -236,6 +237,7 @@ begin
   delete from public.attendance_checks where user_id = p_user;
   delete from public.rate_limits where user_id = p_user;
   delete from public.apple_tokens where user_id = p_user;
+  delete from public.admin_users where user_id = p_user;
   if v_vault is not null then delete from vault.secrets where id = v_vault; end if;
 
   -- Direct messages go; group and hit chats keep the thread with my messages anonymized.
@@ -266,11 +268,21 @@ begin
   perform public.notify(a.user_id, 'report', 'Courtly',
     'New report: ' || replace(new.reason::text, '_', ' ') || case when new.auto then ' (automatic)' else '' end,
     'courtly://play', 'report-' || new.id::text, jsonb_build_object('report_id', new.id, 'reported_id', new.reported_id))
-  from public.admin_users a where a.user_id <> new.reporter_id;
+  from public.admin_users a where a.user_id not in (new.reporter_id, new.reported_id);
   return new;
 end $$;
 
 create trigger reports_notify after insert on public.reports for each row execute function public.reports_after_insert();
+
+-- A report that is withdrawn (a "No" taken back) or purged takes its notice with it.
+create or replace function public.reports_after_delete() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.notifications where collapse_id = 'report-' || old.id::text;
+  return old;
+end $$;
+
+create trigger reports_forget after delete on public.reports for each row execute function public.reports_after_delete();
 
 grant execute on all functions in schema public to authenticated, service_role;
 revoke execute on function public.internal_store_apple_token(uuid, text) from public, anon, authenticated;

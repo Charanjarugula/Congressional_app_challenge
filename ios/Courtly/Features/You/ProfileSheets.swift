@@ -526,9 +526,11 @@ struct EditProfileSheet: View {
         isLoadingPhoto = true   // Save waits: the photo chosen is the photo saved
         Task { @MainActor in
             defer { if load == photoLoad { isLoadingPhoto = false } }
-            guard let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) else { return }
+            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+            // Decoding and scaling a camera photo is slow; keep it off the main thread.
+            let image = await Task.detached(priority: .userInitiated) { UIImage(data: data)?.downscaled(to: 600) }.value
             guard load == photoLoad else { return }   // a newer pick has taken over
-            newPhoto = image.downscaled(to: 600)
+            newPhoto = image
         }
     }
 

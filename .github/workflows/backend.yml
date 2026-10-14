@@ -9,7 +9,7 @@ on:
         options: [dev, prod]
         default: dev
       steps:
-        description: Deploy steps, in order
+        description: Deploy steps, in order (reviewer and secrets are optional extras)
         type: string
         default: check migrate seed settings functions test
       access_token:
@@ -45,6 +45,7 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
       APPLE_CLIENT_ID: com.courtly.ios
       ADMIN_EMAIL: courtly.support@gmail.com
+      REVIEWER_PASSWORD: ${{ secrets.REVIEWER_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 

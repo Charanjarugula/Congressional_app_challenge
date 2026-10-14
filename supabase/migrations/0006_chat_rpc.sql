@@ -8,11 +8,28 @@ begin
   if exists (select 1 from public.blocked_terms t where t.term = any(v_words)) then raise exception 'filtered'; end if;
 end $$;
 
+-- System lines about friends read differently to each side: "You added Ana R. back" vs "Luis M. added you back".
+create or replace function public.message_text(p_message uuid, p_viewer uuid default auth.uid()) returns text
+language sql stable security definer set search_path = public as $$
+  select case
+    when m.type <> 'system' then m.body
+    when m.payload->>'event' = 'friend_added' and (m.payload->>'actor')::uuid = p_viewer
+      then 'You added ' || public.display_name((m.payload->>'subject')::uuid)
+    when m.payload->>'event' = 'friend_added' and (m.payload->>'subject')::uuid = p_viewer
+      then public.display_name((m.payload->>'actor')::uuid) || ' added you'
+    when m.payload->>'event' = 'friend_accepted' and (m.payload->>'actor')::uuid = p_viewer
+      then 'You added ' || public.display_name((m.payload->>'subject')::uuid) || ' back. Say hi'
+    when m.payload->>'event' = 'friend_accepted' and (m.payload->>'subject')::uuid = p_viewer
+      then public.display_name((m.payload->>'actor')::uuid) || ' added you back. Say hi'
+    else m.body end
+  from public.messages m where m.id = p_message;
+$$;
+
 create or replace function public.message_json(p_message uuid) returns jsonb
 language sql stable security definer set search_path = public as $$
   select jsonb_build_object(
     'id', m.id, 'chat_id', m.chat_id, 'sender', case when m.sender_id is null then null else public.player_card(m.sender_id) end,
-    'type', m.type, 'body', m.body, 'payload', m.payload, 'client_id', m.client_id, 'created_at', m.created_at,
+    'type', m.type, 'body', public.message_text(m.id, auth.uid()), 'payload', m.payload, 'client_id', m.client_id, 'created_at', m.created_at,
     'invite', case when m.type = 'hit_invite' then public.invite_json((m.payload->>'invite_id')::uuid) else null end
   )
   from public.messages m where m.id = p_message;
@@ -40,8 +57,11 @@ language sql stable security definer set search_path = public as $$
     'member_count', (select count(*) from public.chat_members m where m.chat_id = c.id and m.left_at is null),
     'last_message_at', c.last_message_at,
     'preview', case
+      when lm.id is not null and lm.type = 'system' then left(public.message_text(lm.id, p_viewer), 120)
       when lm.sender_id is not null and public.is_blocked_either(p_viewer, lm.sender_id) then (
-        select case when m.type = 'text' then public.display_name(m.sender_id) || ': ' || left(m.body, 120) else left(m.body, 120) end
+        select case when m.type = 'text' then public.display_name(m.sender_id) || ': ' || left(m.body, 120)
+                    when m.type = 'system' then left(public.message_text(m.id, p_viewer), 120)
+                    else left(m.body, 120) end
         from public.messages m where m.chat_id = c.id and (m.sender_id is null or not public.is_blocked_either(p_viewer, m.sender_id))
         order by m.created_at desc limit 1)
       else c.last_message_preview end,

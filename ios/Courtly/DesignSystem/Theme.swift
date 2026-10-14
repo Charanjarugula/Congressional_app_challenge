@@ -11,6 +11,8 @@ enum CourtlyColor {
     static let blueDeep = Color(hex: 0x173F9E)
     static let blueTint = Color(hex: 0xEAF0FC)
     static let green = Color(hex: 0x2F7D57)
+    static let greenTint = Color(hex: 0xE6F2EC)
+    static let placeholder = Color(hex: 0xC5C9D1)
     static let red = Color(hex: 0xC2532F)
     static let lime = Color(hex: 0xE4F24A)
     static let alertSeparator = Color(hex: 0xD8DBE0)

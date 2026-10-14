@@ -41,6 +41,13 @@ struct Profile: Codable, Equatable {
     var busyThisWeek: AvailabilityMask { AvailabilityMask(rawValue: busyMaskWeek ?? 0) }
     var radius: TravelRadius { TravelRadius(rawValue: radiusMi) ?? .ten }
 
+    /// How other players see this profile.
+    var card: PlayerCard {
+        PlayerCard(id: id, firstName: firstName, lastInitial: lastName.first.map(String.init), photoPath: photoPath,
+                   level: level, areaLabel: areaLabel, hitsPlayed: hitsPlayed, formats: formats,
+                   availabilityMask: availabilityMask, busyMaskWeek: busyMaskWeek)
+    }
+
     var homeArea: HomeArea? {
         guard let label = areaLabel, let lat = homeLat, let lng = homeLng else { return nil }
         return HomeArea(label: label, zip: zip, latitude: lat, longitude: lng)

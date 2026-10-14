@@ -83,6 +83,7 @@ final class AppSession {
         await client.signOut()
         profile = nil
         ProfileCache.save(nil)
+        SnapshotCache.clear()
         stage = .onboarding(resume: false)
     }
 

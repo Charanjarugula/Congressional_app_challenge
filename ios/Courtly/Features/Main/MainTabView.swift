@@ -102,21 +102,23 @@ struct MainTabView: View {
         let generation = openGeneration
         switch link {
         case .play:
-            await hits.loadFeed()
-            guard generation == openGeneration else { return }   // a later tap landed while the feed loaded
             selected = .play
             paths[.play] = []
+            await hits.refreshAll()
         case let .hit(id), let .check(id, _):
             selected = .myHits
             paths[.myHits] = [.hit(id)]
+            Task { await hits.refreshAll() }
         case let .request(id):
-            await hits.loadFeed()
+            if hits.needsReplyItem(requestID: id) == nil { await hits.loadFeed() }
             guard generation == openGeneration else { return }   // a later tap landed while the feed loaded
             selected = .play
             paths[.play] = [.request(id)]
+            Task { await hits.loadMyHits() }
         case let .chat(id):
             selected = .people
             paths[.people] = [.chat(id)]
+            Task { await hits.refreshAll() }
         }
     }
 

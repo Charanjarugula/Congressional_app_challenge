@@ -7,11 +7,11 @@ import Foundation
 enum AppConfig {
     #if DEBUG
     static let supabaseURL = URL(string: "https://letuvtazmtjkvivattfy.supabase.co")!
-    static let supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxldHV2dGF6bXRqa3ZpdmF0dGZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NTA5NTYsImV4cCI6MjEwNzUyNjk1Nn0.yOJ36Knjz5SrnCJTlMze28Vbkbfd-XSZirwexanaxa8"
+    static let supabaseAnonKey = "sb_publishable_2om3uiw5HBgQxNaBFEUZYA_g8Wfkxp6"
     static let apnsEnvironment = "sandbox"
     #else
     static let supabaseURL = URL(string: "https://jrlocgfyskutnusscenf.supabase.co")!
-    static let supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpybG9jZ2Z5c2t1dG51c3NjZW5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NTEwMzYsImV4cCI6MjEwNzUyNzAzNn0.jOQERNP3OuIehtTxt-gellqX1SvIjnFfLKH7sFs2wKg"
+    static let supabaseAnonKey = "sb_publishable_gt6oatTEPQt7rP3xHjHpKw_vPL2jtI3"
     static let apnsEnvironment = "production"
     #endif
 

@@ -3,6 +3,8 @@ import SwiftUI
 /// Temporary shell for the four tabs so onboarding has somewhere to land.
 /// Each tab is replaced by its designed screens in later PRs.
 struct MainTabView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
         TabView {
             PlaceholderTab(
@@ -32,6 +34,10 @@ struct MainTabView: View {
         .tint(CourtlyColor.blue)
         .preferredColorScheme(.light)
         .task { await NotificationPermission.registerIfAuthorized() }
+        .onChange(of: scenePhase) { _, phase in
+            // A push token the server didn't take (offline, a hiccup) goes again when the app comes back.
+            if phase == .active { Task { await API.Devices.retryPending() } }
+        }
     }
 }
 

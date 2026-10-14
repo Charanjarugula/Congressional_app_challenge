@@ -37,12 +37,35 @@ enum API {
     }
 
     enum Devices {
-        static func register(token: String, environment: String) async throws {
-            try await client.rpc("register_device", params: [
-                "p_token": token,
-                "p_environment": environment,
-                "p_app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0",
-            ])
+        private static let pendingKey = "apns_token_pending"
+
+        /// A token the server hasn't taken yet (offline, a hiccup), kept for the next attempt.
+        static var pendingToken: String? {
+            get { UserDefaults.standard.string(forKey: pendingKey) }
+            set { UserDefaults.standard.set(newValue, forKey: pendingKey) }
+        }
+
+        /// A failure keeps the token for `retryPending` instead of losing this device's pushes.
+        static func register(token: String, environment: String) async {
+            do {
+                try await client.rpc("register_device", params: [
+                    "p_token": token,
+                    "p_environment": environment,
+                    "p_app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0",
+                ])
+                pendingToken = nil
+            } catch {
+                pendingToken = token
+                #if DEBUG
+                print("register_device failed: \(error.localizedDescription)")
+                #endif
+            }
+        }
+
+        /// Sends the token the last attempt couldn't, if there is one.
+        static func retryPending() async {
+            guard let token = pendingToken else { return }
+            await register(token: token, environment: AppConfig.apnsEnvironment)
         }
     }
 }

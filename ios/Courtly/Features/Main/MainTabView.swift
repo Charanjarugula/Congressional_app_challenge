@@ -139,7 +139,8 @@ struct MainTabView: View {
         }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(700))
-            guard coachStep == nil, session.profile?.coachMarksDone == false else { return }
+            // Only over the Play root: a pushed screen or another tab is not where the tips point.
+            guard coachStep == nil, session.profile?.coachMarksDone == false, isAtRoot, selected == .play, deepLinks.pending == nil else { return }
             withAnimation(.easeInOut(duration: 0.25)) { coachStep = 1 }
         }
     }

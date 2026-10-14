@@ -259,6 +259,19 @@ begin
   return jsonb_build_object('deleted', true);
 end $$;
 
+-- Moderators (public.admin_users) are told about every report the moment it lands.
+create or replace function public.reports_after_insert() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  perform public.notify(a.user_id, 'report', 'Courtly',
+    'New report: ' || replace(new.reason::text, '_', ' ') || case when new.auto then ' (automatic)' else '' end,
+    'courtly://play', 'report-' || new.id::text, jsonb_build_object('report_id', new.id, 'reported_id', new.reported_id))
+  from public.admin_users a where a.user_id <> new.reporter_id;
+  return new;
+end $$;
+
+create trigger reports_notify after insert on public.reports for each row execute function public.reports_after_insert();
+
 grant execute on all functions in schema public to authenticated, service_role;
 revoke execute on function public.internal_store_apple_token(uuid, text) from public, anon, authenticated;
 revoke execute on function public.internal_apple_refresh_token(uuid) from public, anon, authenticated;

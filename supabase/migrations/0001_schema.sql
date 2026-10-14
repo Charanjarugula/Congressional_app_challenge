@@ -3,6 +3,7 @@
 
 create extension if not exists postgis with schema extensions;
 create extension if not exists pg_trgm with schema extensions;
+create extension if not exists pgcrypto with schema extensions;
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
@@ -36,7 +37,7 @@ create type public.player_source as enum ('host', 'ask', 'invite');
 create type public.notification_kind as enum (
   'join_request', 'hit_invite', 'request_accepted', 'request_declined', 'player_joined',
   'hit_cancelled', 'player_left', 'reminder_day', 'reminder_hour', 'day_after_check',
-  'friend_added', 'friend_accepted', 'message'
+  'friend_added', 'friend_accepted', 'message', 'report'
 );
 
 -- Tables -------------------------------------------------------------------------
@@ -304,12 +305,24 @@ end $$;
 create trigger profiles_touch before update on public.profiles for each row execute function public.touch_updated_at();
 create trigger hits_touch before update on public.hits for each row execute function public.touch_updated_at();
 
--- A profile row for every auth user, created the moment they sign up.
+-- The keyed hash the app computes for address-book entries, so the verified sign-in email and a
+-- typed phone number can be matched without the client choosing the hash.
+create or replace function public.contact_hash(p_value text) returns text
+language sql immutable set search_path = public, extensions as $$
+  select encode(extensions.hmac(lower(btrim(p_value)), 'courtly-contacts-v1', 'sha256'), 'hex');
+$$;
+
+-- A profile row for every auth user, created the moment they sign up, with the hash of the email
+-- they verified; it follows the email if it changes.
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id) values (new.id) on conflict (id) do nothing;
+  insert into public.profiles (id, email_hash)
+  values (new.id, case when new.email is null then null else public.contact_hash(new.email) end)
+  on conflict (id) do update set email_hash = excluded.email_hash;
   return new;
 end $$;
 
 create trigger on_auth_user_created after insert on auth.users for each row execute function public.handle_new_user();
+create trigger on_auth_user_email_changed after update of email on auth.users for each row
+  when (old.email is distinct from new.email) execute function public.handle_new_user();

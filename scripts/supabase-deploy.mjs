@@ -4,12 +4,13 @@
 // Needs SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF. No database password: migrations
 // run through the SQL endpoint, functions through the deploy endpoint.
 //
-//   node scripts/supabase-deploy.mjs check migrate seed settings functions test
+//   node scripts/supabase-deploy.mjs check migrate seed settings auth secrets functions test
 //
 // Steps run in the order given. Secrets for Edge Functions come from the environment and
 // are only sent when present (see SECRET_NAMES). The optional "reviewer" step creates or
-// updates the App Review account (reviewer@courtly.app) with REVIEWER_PASSWORD, a six-digit
-// code the reviewer types where the app asks for the email code.
+// updates the App Review account (reviewer@courtly.app) with REVIEWER_PASSWORD, a six- to
+// eight-digit code the reviewer types where the app asks for the email code. The "auth" step
+// sets the email code template, SMTP and the sign-in providers when the token allows it.
 
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -26,6 +27,11 @@ const FUNCTIONS = {
   "delete-account": { verifyJwt: true },
   "apple-token-exchange": { verifyJwt: true },
 };
+
+const OTP_TEMPLATE = (verb) =>
+  `<h2>Your Courtly code</h2>\n<p>Enter this code in the app to ${verb}:</p>\n` +
+  `<p style="font-size:28px;font-weight:700;letter-spacing:4px">{{ .Token }}</p>\n` +
+  `<p>It expires in 10 minutes. If you didn’t ask for it, you can ignore this email.</p>`;
 
 const SECRET_NAMES = [
   "APNS_KEY_ID", "APNS_TEAM_ID", "APNS_PRIVATE_KEY", "APNS_BUNDLE_ID",
@@ -116,7 +122,52 @@ const steps = {
         ('webhook_secret', '${webhookSecret.replace(/'/g, "''")}')
       on conflict (key) do update set value = excluded.value;
     `);
-    console.log(`settings functions_url=${functionsUrl} webhook_secret=(set)`);
+    // The function must hold the same secret, in this step, so the two never disagree.
+    await api("POST", `/projects/${REF}/secrets`, [{ name: "WEBHOOK_SECRET", value: webhookSecret }]);
+    // Whoever signs in with the admin address moderates: reports reach them as notifications.
+    if (process.env.ADMIN_EMAIL) {
+      const admin = process.env.ADMIN_EMAIL.toLowerCase().replace(/'/g, "''");
+      await sql(`insert into public.admin_users (user_id) select id from auth.users where lower(email) = '${admin}' on conflict do nothing;`);
+    }
+    console.log(`settings functions_url=${functionsUrl} webhook_secret=(set, shared with send-push)`);
+  },
+
+  // Email codes, their template and SMTP; Apple and Google providers. Needs a token with the auth
+  // config scope; a narrower token gets a note and the deploy carries on.
+  async auth() {
+    const config = {
+      mailer_otp_length: 6,
+      mailer_otp_exp: 600,
+      mailer_subjects_magic_link: "Your Courtly code",
+      mailer_subjects_confirmation: "Your Courtly code",
+      mailer_templates_magic_link_content: OTP_TEMPLATE("sign in"),
+      mailer_templates_confirmation_content: OTP_TEMPLATE("finish signing in"),
+    };
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      Object.assign(config, {
+        smtp_host: process.env.SMTP_HOST,
+        smtp_port: String(process.env.SMTP_PORT || "587"),
+        smtp_user: process.env.SMTP_USER,
+        smtp_pass: process.env.SMTP_PASS,
+        smtp_admin_email: process.env.SMTP_SENDER_EMAIL || process.env.SMTP_USER,
+        smtp_sender_name: "Courtly",
+        rate_limit_email_sent: 60,
+      });
+    }
+    if (process.env.APPLE_CLIENT_ID) {
+      Object.assign(config, { external_apple_enabled: true, external_apple_client_id: process.env.APPLE_CLIENT_ID });
+    }
+    if (process.env.GOOGLE_CLIENT_ID) {
+      Object.assign(config, { external_google_enabled: true, external_google_client_id: process.env.GOOGLE_CLIENT_ID });
+    }
+    try {
+      await api("PATCH", `/projects/${REF}/config/auth`, config);
+      console.log(`auth    ${Object.keys(config).join(", ")}`);
+    } catch (error) {
+      if (!/→ 40[13]/.test(error.message)) throw error;
+      console.log("auth    token lacks the auth config scope; set these in the dashboard under Authentication → Email / Providers:");
+      console.log(`        ${JSON.stringify(config, (key, value) => (/pass|secret/.test(key) ? "(set)" : value))}`);
+    }
   },
 
   async secrets() {
@@ -128,13 +179,15 @@ const steps = {
 
   async functions() {
     const dir = path.join(ROOT, "functions");
+    const shared = await walk(path.join(dir, "_shared")).catch(() => []);
     for (const slug of await readdir(dir)) {
+      if (slug === "_shared") continue;
       const config = FUNCTIONS[slug];
       if (!config) { console.log(`skip    functions/${slug} (not in FUNCTIONS)`); continue; }
       const form = new FormData();
-      const files = await walk(path.join(dir, slug));
+      const files = [...await walk(path.join(dir, slug)), ...shared];
       for (const file of files) {
-        const relative = path.posix.join("supabase", "functions", slug, path.relative(path.join(dir, slug), file).split(path.sep).join("/"));
+        const relative = path.posix.join("supabase", "functions", path.relative(dir, file).split(path.sep).join("/"));
         form.append("file", new Blob([await readFile(file)]), relative);
       }
       form.append("metadata", JSON.stringify({
@@ -150,7 +203,7 @@ const steps = {
   async reviewer() {
     const password = process.env.REVIEWER_PASSWORD;
     if (!password) { console.log("reviewer REVIEWER_PASSWORD not set, skipped"); return; }
-    if (!/^\d{6}$/.test(password)) fail("REVIEWER_PASSWORD must be exactly six digits; the app enters it as a code");
+    if (!/^\d{6,8}$/.test(password)) fail("REVIEWER_PASSWORD must be six to eight digits; the app enters it as a code");
     const literal = password.replace(/'/g, "''");
     await sql(`
       do $body$

@@ -3,7 +3,7 @@
 // Called with the user's JWT. Body: { mode?: "full" | "underage" }.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { appleClientSecret } from "./apple-jwt.ts";
+import { appleClientSecret } from "../_shared/apple-jwt.ts";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });

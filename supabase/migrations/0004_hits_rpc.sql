@@ -90,6 +90,18 @@ begin
 end $$;
 
 -- The one shape every hit screen reads.
+-- True for a played hit until the viewer has answered "did they show up?" for every other player.
+create or replace function public.needs_attendance(p_hit uuid, p_viewer uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.hits h
+    join public.hit_players o on o.hit_id = h.id and o.user_id <> p_viewer and o.left_at is null
+    where h.id = p_hit and h.status = 'played'
+      and exists (select 1 from public.hit_players me where me.hit_id = h.id and me.user_id = p_viewer and me.left_at is null)
+      and not exists (select 1 from public.attendance_checks a where a.hit_id = h.id and a.user_id = p_viewer and a.about_user_id = o.user_id)
+  );
+$$;
+
 create or replace function public.hit_json(p_hit uuid, p_viewer uuid default auth.uid()) returns jsonb
 language sql stable security definer set search_path = public, extensions as $$
   select jsonb_build_object(
@@ -104,6 +116,7 @@ language sql stable security definer set search_path = public, extensions as $$
     'visibility', h.visibility,
     'status', h.status,
     'chat_id', h.chat_id,
+    'needs_attendance', public.needs_attendance(h.id, p_viewer),
     'players', coalesce((
       select jsonb_agg(public.player_card(hp.user_id) || jsonb_build_object('role', hp.role) order by hp.joined_at)
       from public.hit_players hp where hp.hit_id = h.id and hp.left_at is null and hp.role = 'player'

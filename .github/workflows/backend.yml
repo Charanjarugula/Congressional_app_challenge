@@ -9,13 +9,9 @@ on:
         options: [dev, prod]
         default: dev
       steps:
-        description: Deploy steps, in order (reviewer and secrets are optional extras)
+        description: Deploy steps, in order (reviewer is an optional extra)
         type: string
-        default: check migrate seed settings secrets functions test
-      access_token:
-        description: Supabase access token (only if the SUPABASE_ACCESS_TOKEN secret is not set)
-        type: string
-        required: false
+        default: check migrate seed settings auth secrets functions test
   push:
     branches: [main]
     paths:
@@ -33,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ inputs.access_token || secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: ${{ (inputs.target == 'dev') && 'letuvtazmtjkvivattfy' || 'jrlocgfyskutnusscenf' }}
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
@@ -46,15 +42,18 @@ jobs:
       APPLE_CLIENT_ID: com.courtly.ios
       ADMIN_EMAIL: courtly.support@gmail.com
       REVIEWER_PASSWORD: ${{ secrets.REVIEWER_PASSWORD }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: "587"
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      SMTP_SENDER_EMAIL: courtly.support@gmail.com
     steps:
       - uses: actions/checkout@v4
-
-      - name: Mask token
-        run: echo "::add-mask::$SUPABASE_ACCESS_TOKEN"
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
       - name: Deploy
-        run: node scripts/supabase-deploy.mjs ${{ inputs.steps || 'check migrate seed settings secrets functions' }}
+        run: node scripts/supabase-deploy.mjs ${{ inputs.steps || 'check migrate seed settings auth secrets functions' }}

@@ -2,7 +2,7 @@
 -- Everything happens inside one DO block that ends by raising SMOKE_OK, which rolls the whole thing back.
 do $$
 declare
-  a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid(); d uuid := gen_random_uuid();
+  a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid(); d uuid := gen_random_uuid(); v_pat uuid := gen_random_uuid();
   v_court uuid; v_hit jsonb; v_hit_id uuid; v_req jsonb; v_req_id uuid; v_chat uuid; v_msg jsonb;
   v_feed jsonb; v_inbox jsonb; v_friend jsonb; v_invite jsonb; v_group jsonb; v_n integer;
 begin
@@ -106,6 +106,15 @@ begin
   v_hit := public.create_hit(v_court, now() + interval '3 days', 60, 'drills', 1, 'invite_only', (v_group->>'id')::uuid, null);
   v_invite := (select public.invite_json(i.id, b) from public.hit_invites i where i.hit_id = (v_hit->>'id')::uuid);
   if (v_invite->>'status') <> 'open' then raise exception 'invite not open: %', v_invite; end if;
+  if public.get_chat((v_group->>'id')::uuid)->>'last_message_type' <> 'hit_invite' then raise exception 'last_message_type: %', public.get_chat((v_group->>'id')::uuid); end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  begin
+    perform public.get_chat((v_group->>'id')::uuid);
+    raise exception 'non-member read a chat';
+  exception when others then
+    if sqlerrm <> 'not_a_member' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
   v_hit := public.claim_invite((v_invite->>'id')::uuid);
   if (v_hit->>'status') <> 'confirmed' then raise exception 'claim state: %', v_hit; end if;
@@ -191,8 +200,15 @@ begin
   if v_n <> 2 then raise exception 'expected 2 one-hour reminders (host + player), got %', v_n; end if;
 
   -- Onboarding validation and contact matching.
-  perform public.update_profile(jsonb_build_object('phone_hash', 'hash-maya', 'email_hash', 'ehash-maya', 'radius_mi', 15));
+  perform public.update_profile(jsonb_build_object('phone_e164', '+15615550142', 'email_hash', 'spoofed', 'radius_mi', 15));
   if (public.get_me()->>'radius_mi')::int <> 15 then raise exception 'update_profile radius'; end if;
+  -- Hashes are the server's: the phone hash comes from the number, the email hash from the verified sign-in email.
+  if (select phone_hash from public.profiles where id = a) <> public.contact_hash('+15615550142') then raise exception 'phone_hash not derived'; end if;
+  if (select email_hash from public.profiles where id = a) = 'spoofed' then raise exception 'client set email_hash'; end if;
+  insert into auth.users (id, email) values (v_pat, 'Pat.Lee@Example.com');
+  if (select email_hash from public.profiles where id = v_pat) <> public.contact_hash('pat.lee@example.com') then raise exception 'email_hash not set on sign-up'; end if;
+  update auth.users set email = 'pat@example.org' where id = v_pat;
+  if (select email_hash from public.profiles where id = v_pat) <> public.contact_hash('pat@example.org') then raise exception 'email_hash not updated'; end if;
   begin
     perform public.update_profile(jsonb_build_object('radius_mi', 7));
     raise exception 'invalid radius accepted';
@@ -200,7 +216,7 @@ begin
     if sqlerrm <> 'invalid_radius' then raise; end if;
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
-  v_feed := public.match_contacts(array['hash-maya', 'nothing']);
+  v_feed := public.match_contacts(array[public.contact_hash('+15615550142'), 'nothing']);
   if jsonb_array_length(v_feed) <> 1 or (v_feed->0->'player'->>'id')::uuid <> a then raise exception 'match_contacts: %', v_feed; end if;
   update public.profiles set birthday = current_date - interval '12 years' where id = b;
   begin
@@ -229,12 +245,14 @@ begin
   if (select hits_played from public.profiles where id = b) <> 1 then raise exception 'hits_played after play: %', (select hits_played from public.profiles where id = b); end if;
   -- Maya says Jordan didn't show: one no-show, one automatic report, the play no longer counts. Saying it twice changes nothing.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  if not (public.get_hit((v_hit->>'id')::uuid)->>'needs_attendance')::boolean then raise exception 'hit should need an answer'; end if;
   perform public.submit_attendance((v_hit->>'id')::uuid, b, false);
   perform public.submit_attendance((v_hit->>'id')::uuid, b, false);
   if (select no_shows from public.profiles where id = b) <> 1 then raise exception 'no_shows: %', (select no_shows from public.profiles where id = b); end if;
   if (select hits_played from public.profiles where id = b) <> 0 then raise exception 'hits_played after no-show'; end if;
   select count(*) into v_n from public.reports where reported_id = b and reason = 'no_show' and auto;
   if v_n <> 1 then raise exception 'expected 1 automatic no-show report, got %', v_n; end if;
+  if (public.get_hit((v_hit->>'id')::uuid)->>'needs_attendance')::boolean then raise exception 'hit still needs an answer'; end if;
   -- Taking the "No" back restores the counters and withdraws the report; a second "No" counts once more.
   perform public.submit_attendance((v_hit->>'id')::uuid, b, true);
   if (select no_shows from public.profiles where id = b) <> 0 or (select hits_played from public.profiles where id = b) <> 1 then raise exception 'no-show not taken back'; end if;
@@ -258,8 +276,11 @@ begin
   perform public.mark_request_seen((v_req->'viewer'->'request'->>'id')::uuid);
   if (select seen_by_requester_at from public.join_requests where id = (v_req->'viewer'->'request'->>'id')::uuid) is null then raise exception 'mark_request_seen'; end if;
 
-  -- Report with a block in one step, then undo the block.
+  -- Report with a block in one step, then undo the block. Maya moderates, so she is told.
+  insert into public.admin_users (user_id) values (a);
   perform public.report_user(c, 'rude_or_unsafe', 'kept yelling at the next court', true);
+  select count(*) into v_n from public.notifications where user_id = a and kind = 'report';
+  if v_n <> 1 then raise exception 'expected 1 report notification for the moderator, got %', v_n; end if;
   if public.relationship_to(b, c) <> 'blocked' then raise exception 'report_user also_block'; end if;
   select count(*) into v_n from public.reports where reporter_id = b and reported_id = c and also_blocked;
   if v_n <> 1 then raise exception 'report row missing'; end if;

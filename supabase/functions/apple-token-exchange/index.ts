@@ -3,7 +3,7 @@
 // Called right after sign-in with the user's JWT and { authorization_code }.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { appleClientSecret } from "./apple-jwt.ts";
+import { appleClientSecret } from "../_shared/apple-jwt.ts";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });

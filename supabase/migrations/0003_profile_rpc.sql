@@ -122,8 +122,9 @@ begin
     busy_mask_week = case when patch ? 'busy_mask_week' then (patch->>'busy_mask_week')::int else busy_mask_week end,
     calendar_provider = case when patch ? 'calendar_provider' then (patch->>'calendar_provider')::public.calendar_provider else calendar_provider end,
     phone_e164 = case when patch ? 'phone_e164' then patch->>'phone_e164' else phone_e164 end,
-    phone_hash = case when patch ? 'phone_hash' then patch->>'phone_hash' else phone_hash end,
-    email_hash = case when patch ? 'email_hash' then patch->>'email_hash' else email_hash end,
+    phone_hash = case when patch ? 'phone_e164'
+      then (case when patch->>'phone_e164' is null then null else public.contact_hash(patch->>'phone_e164') end)
+      else phone_hash end,
     hit_visibility = case when patch ? 'hit_visibility' then (patch->>'hit_visibility')::public.hit_visibility else hit_visibility end,
     coach_marks_done = case when patch ? 'coach_marks_done' then (patch->>'coach_marks_done')::boolean else coach_marks_done end
   where id = v_user;

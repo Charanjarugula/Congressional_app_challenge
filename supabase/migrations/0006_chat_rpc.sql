@@ -56,6 +56,7 @@ language sql stable security definer set search_path = public as $$
                 from public.chat_members m where m.chat_id = c.id and m.left_at is null),
     'member_count', (select count(*) from public.chat_members m where m.chat_id = c.id and m.left_at is null),
     'last_message_at', c.last_message_at,
+    'last_message_type', lm.type,
     'preview', case
       when lm.id is not null and lm.type = 'system' then left(public.message_text(lm.id, p_viewer), 120)
       when lm.sender_id is not null and public.is_blocked_either(p_viewer, lm.sender_id) then (
@@ -80,6 +81,15 @@ language sql stable security definer set search_path = public as $$
   left join public.messages lm on lm.id = c.last_message_id
   where c.id = p_chat;
 $$;
+
+-- One chat for the header and the group screen; members only.
+create or replace function public.get_chat(p_chat uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare v_user uuid := public.assert_signed_in();
+begin
+  if not public.is_chat_member(p_chat, v_user) then raise exception 'not_a_member'; end if;
+  return public.chat_json(p_chat, v_user);
+end $$;
 
 create or replace function public.create_group_chat(p_name text, p_members uuid[]) returns jsonb
 language plpgsql security definer set search_path = public as $$

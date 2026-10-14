@@ -19,6 +19,7 @@ grant execute on function
   public.create_hit(uuid, timestamptz, integer, public.play_format, integer, public.hit_visibility, uuid, timestamptz),
   public.decline_invite(uuid),
   public.get_blocked_players(),
+  public.get_chat(uuid),
   public.get_chat_page(uuid, timestamptz, uuid, integer),
   public.get_friend_suggestions(uuid[]),
   public.get_friends(),

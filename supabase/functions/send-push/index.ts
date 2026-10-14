@@ -2,7 +2,7 @@
 // Called by the database webhook with { notification_id }; authenticated by x-webhook-secret.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { signES256 } from "./apple-jwt.ts";
+import { signES256 } from "../_shared/apple-jwt.ts";
 
 const IN_APP_ONLY = new Set(["friend_added", "friend_accepted"]);
 

@@ -73,7 +73,7 @@ begin
         where h.status in ('open', 'confirmed') and h.starts_at > now() and h.spots_open > 0
           and public.feed_candidate(h.id, v_user) and not public.is_friend(v_user, h.host_id)
           and me.home_point is not null and extensions.st_dwithin(c.point, me.home_point, me.radius_mi * 1609.344)
-        limit 30
+        order by rn limit 30
       ) h
     ), '[]'::jsonb),
 
@@ -174,10 +174,7 @@ begin
     ), '[]'::jsonb),
     'past', coalesce((
       select jsonb_agg(item order by starts_at desc) from (
-        select public.hit_json(h.id, v_user) || jsonb_build_object('state', h.status::text,
-          'needs_attendance', h.status = 'played' and exists (
-            select 1 from public.hit_players o where o.hit_id = h.id and o.user_id <> v_user and o.left_at is null
-              and not exists (select 1 from public.attendance_checks a where a.hit_id = h.id and a.user_id = v_user and a.about_user_id = o.user_id))) as item,
+        select public.hit_json(h.id, v_user) || jsonb_build_object('state', h.status::text) as item,
           h.starts_at
         from public.hits h join public.hit_players hp on hp.hit_id = h.id
         where hp.user_id = v_user and hp.left_at is null and (h.status in ('played', 'cancelled', 'expired') or h.starts_at + (h.duration_min || ' minutes')::interval <= v_now)

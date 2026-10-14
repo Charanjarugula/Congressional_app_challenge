@@ -101,7 +101,13 @@ const steps = {
   },
 
   async settings() {
-    const webhookSecret = process.env.WEBHOOK_SECRET || crypto.randomBytes(32).toString("hex");
+    // Keep the webhook secret the project already has unless the environment supplies one, so a
+    // deploy without the secret configured never leaves the database and the function disagreeing.
+    let webhookSecret = process.env.WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      const rows = await sql(`select value from private.settings where key = 'webhook_secret'`);
+      webhookSecret = rows[0]?.value || crypto.randomBytes(32).toString("hex");
+    }
     process.env.WEBHOOK_SECRET = webhookSecret;
     const functionsUrl = `https://${REF}.supabase.co/functions/v1`;
     await sql(`

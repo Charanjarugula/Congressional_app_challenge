@@ -66,10 +66,13 @@ struct MainTabView: View {
         .environment(inbox)
         .task {
             Task { await inbox.load() }   // the People dot is right from the start, not from the first visit
-            await hits.refreshAll()
+            if let link = deepLinks.pending {
+                await open(link)   // loads what the screen needs; the lists refresh behind it
+            } else {
+                await hits.refreshAll()
+                startCoachMarksIfNeeded()
+            }
             await NotificationPermission.registerIfAuthorized()
-            if let link = deepLinks.pending { await open(link) }
-            startCoachMarksIfNeeded()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {

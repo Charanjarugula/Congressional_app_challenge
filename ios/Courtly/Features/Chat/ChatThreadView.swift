@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// One conversation: the hit pinned on top for hit chats, messages, and a composer.
-/// New messages arrive by polling every few seconds while the screen is open.
+/// New messages arrive over Realtime while the screen is open, with polling as the fallback.
 struct ChatThreadView: View {
     let chatID: UUID
 
@@ -9,6 +9,7 @@ struct ChatThreadView: View {
     @Environment(InboxStore.self) private var inbox
     @Environment(\.navigate) private var navigate
     @State private var chat: Chat?
+    @State private var realtime: ChatRealtime?
     @State private var showsRequestHit = false
     @State private var messages: [Message] = []
     @State private var draft = ""
@@ -67,13 +68,19 @@ struct ChatThreadView: View {
         .toolbar(.hidden, for: .tabBar)
         .task(id: chatID) {
             await load()
+            let live = ChatRealtime(chatID: chatID) { Task { await refresh() } }
+            realtime?.disconnect()
+            realtime = live
+            await live.connect()
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(4))
+                try? await Task.sleep(for: .seconds(5))
                 guard !Task.isCancelled else { break }
                 await refresh()
             }
         }
         .onDisappear {
+            realtime?.disconnect()
+            realtime = nil
             inbox.markRead(chatID)
             Task { await inbox.load() }
         }

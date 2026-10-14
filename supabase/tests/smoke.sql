@@ -586,8 +586,10 @@ begin
                  where r.details = 'long ago' and n.user_id = a) then raise exception 'moderator not told about the old report'; end if;
   perform public.check_rate_limit('purge_probe', 5, interval '1 minute');
   update public.rate_limits set window_start = now() - interval '3 days' where user_id = b and action = 'purge_probe';
+  insert into public.notifications (user_id, kind, title, body, created_at) values (a, 'message', 'Old', 'forty days ago', now() - interval '40 days');
   perform public.purge_old_reports();
   if exists (select 1 from public.reports where details = 'long ago') then raise exception 'purge kept a 100-day-old report'; end if;
+  if exists (select 1 from public.notifications where body = 'forty days ago') then raise exception 'purge kept a 40-day-old notification'; end if;
   if exists (select 1 from public.notifications n where n.kind = 'report'
              and not exists (select 1 from public.reports r where 'report-' || r.id::text = n.collapse_id)) then raise exception 'a report notice outlived its report'; end if;
   if exists (select 1 from public.rate_limits where user_id = b and action = 'purge_probe') then raise exception 'purge kept a stale rate-limit row'; end if;

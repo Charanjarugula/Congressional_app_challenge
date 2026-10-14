@@ -14,14 +14,14 @@ struct BirthdayView: View {
         OnboardingStepView(
             progress: 0.3,
             title: "When’s your birthday?",
-            subtitle: "We’ll use this to match you with players around your age."
+            subtitle: "We’ll use this to match you with players around your age.",
+            scrolls: false
         ) {
             DatePicker("Birthday", selection: $draft.birthday, in: allowedRange, displayedComponents: .date)
                 .datePickerStyle(.wheel)
                 .labelsHidden()
                 .frame(maxWidth: .infinity)
                 .frame(height: 216)
-                .clipped()
                 .padding(.top, 32)
 
             if !draft.isAdult {

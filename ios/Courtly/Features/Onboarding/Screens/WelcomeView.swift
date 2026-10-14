@@ -33,7 +33,6 @@ struct WelcomeView: View {
             .padding(.bottom, 16)
         }
         .toolbar(.hidden, for: .navigationBar)
-        .preferredColorScheme(.dark)
     }
 }
 

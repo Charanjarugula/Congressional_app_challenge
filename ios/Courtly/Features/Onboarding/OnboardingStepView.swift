@@ -8,6 +8,7 @@ struct OnboardingStepView<Content: View, Footer: View>: View {
     let progress: Double
     let title: String
     let subtitle: String?
+    let scrolls: Bool
     private let content: () -> Content
     private let footer: (() -> Footer)?
 
@@ -15,12 +16,14 @@ struct OnboardingStepView<Content: View, Footer: View>: View {
         progress: Double,
         title: String,
         subtitle: String? = nil,
+        scrolls: Bool = true,
         @ViewBuilder content: @escaping () -> Content,
         @ViewBuilder footer: @escaping () -> Footer
     ) {
         self.progress = progress
         self.title = title
         self.subtitle = subtitle
+        self.scrolls = scrolls
         self.content = content
         self.footer = footer
     }
@@ -28,31 +31,16 @@ struct OnboardingStepView<Content: View, Footer: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             ProgressHeader(progress: progress) { dismiss() }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title)
-                        .font(CourtlyFont.screenTitle)
-                        .tracking(-0.6)
-                        .lineSpacing(3)
-                        .foregroundStyle(CourtlyColor.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(CourtlyFont.secondary)
-                            .lineSpacing(3)
-                            .foregroundStyle(CourtlyColor.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 8)
-                    }
-                    content()
+            if scrolls {
+                ScrollView {
+                    stepContent
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, CourtlyMetrics.screenPadding)
-                .padding(.top, 20)
-                .padding(.bottom, 24)
+                .scrollBounceBehavior(.basedOnSize)
+                .scrollDismissesKeyboard(.interactively)
+            } else {
+                stepContent
+                Spacer(minLength: 0)
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollDismissesKeyboard(.interactively)
         }
         .background(Color.white.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -77,7 +65,31 @@ struct OnboardingStepView<Content: View, Footer: View>: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .preferredColorScheme(.light)
+    }
+
+    /// Title, subtitle and the step's own content.
+    private var stepContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(CourtlyFont.screenTitle)
+                .tracking(-0.6)
+                .lineSpacing(3)
+                .foregroundStyle(CourtlyColor.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            if let subtitle {
+                Text(subtitle)
+                    .font(CourtlyFont.secondary)
+                    .lineSpacing(3)
+                    .foregroundStyle(CourtlyColor.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
+            }
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, CourtlyMetrics.screenPadding)
+        .padding(.top, 20)
+        .padding(.bottom, 24)
     }
 }
 
@@ -86,11 +98,13 @@ extension OnboardingStepView where Footer == EmptyView {
         progress: Double,
         title: String,
         subtitle: String? = nil,
+        scrolls: Bool = true,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.progress = progress
         self.title = title
         self.subtitle = subtitle
+        self.scrolls = scrolls
         self.content = content
         self.footer = nil
     }

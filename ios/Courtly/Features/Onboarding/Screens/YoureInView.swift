@@ -51,6 +51,5 @@ struct YoureInView: View {
                 .background(Color.white.ignoresSafeArea())
         }
         .toolbar(.hidden, for: .navigationBar)
-        .preferredColorScheme(.light)
     }
 }

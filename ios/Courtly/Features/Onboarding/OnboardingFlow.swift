@@ -36,6 +36,9 @@ struct OnboardingFlow: View {
                 destination(for: route)
             }
         }
+        // Welcome is blue with white status-bar text; every other screen is light. The root
+        // view's preference wins inside a NavigationStack, so it has to change with the path.
+        .preferredColorScheme(path.isEmpty ? .dark : .light)
     }
 
     @ViewBuilder

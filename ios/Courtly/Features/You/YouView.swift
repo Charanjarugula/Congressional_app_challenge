@@ -138,7 +138,7 @@ struct YouView: View {
             if on && settings.authorizationStatus == .notDetermined {
                 notificationsOn = await NotificationPermission.request()
             } else if let url = URL(string: UIApplication.openSettingsURLString) {
-                UIApplication.shared.open(url)
+                _ = await UIApplication.shared.open(url)
             }
         }
     }

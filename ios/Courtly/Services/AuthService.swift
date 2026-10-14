@@ -46,9 +46,7 @@ final class SupabaseAuthService: AuthService {
         // Apple requires revoking the token on account deletion; the code is single-use and short-lived,
         // so it is exchanged right away. Failure here must not block sign-in.
         if let codeData = credential.authorizationCode, let code = String(data: codeData, encoding: .utf8) {
-            Task {
-                let _: [String: Bool]? = try? await client.invoke("apple-token-exchange", body: ["authorization_code": code])
-            }
+            Task { try? await API.Account.exchangeAppleCode(code) }
         }
     }
 

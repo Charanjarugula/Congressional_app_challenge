@@ -223,6 +223,12 @@ enum API {
     }
 
     enum Account {
+        /// Hands Apple's one-time authorization code to the backend, which keeps the refresh token it
+        /// yields so the sign-in can be revoked when the account is deleted.
+        static func exchangeAppleCode(_ code: String) async throws {
+            let _: [String: Bool]? = try await client.invoke("apple-token-exchange", body: ["authorization_code": code])
+        }
+
         /// The server removes hits, chats, photos and the sign-in; the device forgets everything afterwards.
         static func delete() async throws {
             struct Receipt: Decodable {

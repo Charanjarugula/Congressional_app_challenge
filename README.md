@@ -38,11 +38,15 @@ To run on a device, choose your team under Signing & Capabilities. The bundle id
 
 Every read and write is one database function (`get_play_feed`, `create_hit`, `send_message`, ...) called through `API.swift`. Row-level security guards direct table access; the functions run as security definer and check the caller themselves. Only those entry points are callable over the API: helpers such as `hit_json` or `chat_json` have no grant, so a new function the app should call needs `grant execute ... to authenticated` in its migration (see `0009_function_grants.sql`). Errors raised as short codes (`hit_full`, `already_requested`) are turned into plain sentences in `BackendMessages.swift`.
 
-The Play and My Hits tabs keep the last response on disk so they paint before the network answers. Open chats, the People list and the hit tabs listen over Supabase Realtime (`RealtimeListener.swift`) for rows they are allowed to see and refresh at once; a slow poll stays on as the fallback.
+Play, My Hits, the People list and the profile keep the last response on disk so they paint before the network answers. Open chats, the People list and the hit tabs listen over Supabase Realtime (`RealtimeHub.swift`, one connection for the app) for rows they are allowed to see and refresh at once; a slow poll stays on as the fallback.
 
 ## Deploying the backend
 
-The **Backend deploy** workflow (Actions tab) takes a target (`dev` or `prod`) and the steps to run. It needs the `SUPABASE_ACCESS_TOKEN` repository secret. Function secrets (APNs key, Apple sign-in key, Gmail app password) are set the same way; `scripts/supabase-deploy.mjs` lists them.
+The **Backend deploy** workflow (Actions tab) takes a target (`dev` or `prod`) and the steps to run. Repository secrets it reads: `SUPABASE_ACCESS_TOKEN` (required), `WEBHOOK_SECRET` and `REVIEWER_PASSWORD` (keep the push webhook and the App Review account in agreement with what is deployed), `APNS_KEY_ID`, `APNS_TEAM_ID` and `APNS_PRIVATE_KEY` (push and Sign in with Apple), `GOOGLE_CLIENT_ID`, `SMTP_USER` and `SMTP_PASS` (email codes through Gmail). `scripts/supabase-deploy.mjs` lists which step uses which.
+
+### Auth configuration
+
+Email sign-in sends a six-digit code, so the Supabase project needs: OTP length 6 and expiry 600 s; the Magic Link and Confirm signup templates containing `{{ .Token }}`; and an SMTP server (the built-in mailer allows two emails an hour). Sign in with Apple needs the Apple provider enabled with the bundle id as client id; Google needs the iOS client id. The deploy's `auth` step sets all of this from the secrets above when the access token has the auth-config scope, and prints the values to set by hand in Authentication → Email and Providers when it doesn't.
 
 Pull requests that touch `supabase/` run the migrations and the smoke test against a throwaway Postgres in CI.
 

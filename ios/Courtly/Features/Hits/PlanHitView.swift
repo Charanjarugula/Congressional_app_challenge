@@ -1,11 +1,18 @@
 import SwiftUI
 
 /// The Plan a hit form: when, where, what, how many spots, who can join.
+/// Opened from a chat it becomes "Request a hit": the open spots go to that chat as a card.
 struct PlanHitView: View {
     @Environment(HitsStore.self) private var hits
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
+    let inviteChat: Chat?
     let onPosted: (Hit) -> Void
+
+    init(inviteTo chat: Chat? = nil, onPosted: @escaping (Hit) -> Void) {
+        inviteChat = chat
+        self.onPosted = onPosted
+    }
 
     @State private var day = Calendar.current.startOfDay(for: Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now)
     @State private var time = Calendar.current.date(bySettingHour: 18, minute: 30, second: 0, of: .now) ?? .now
@@ -16,6 +23,8 @@ struct PlanHitView: View {
     @State private var court: Court?
     @State private var courts: [Court] = []
     @State private var expanded: Field?
+    @State private var customExpiry: Date?
+    @State private var showsExpiryPicker = false
     @State private var showsCourtPicker = false
     @State private var isPosting = false
     @State private var didSeed = false
@@ -35,6 +44,23 @@ struct PlanHitView: View {
 
     private var canPost: Bool {
         court != nil && startsAt > Date.now.addingTimeInterval(15 * 60) && !isPosting
+    }
+
+    /// When the request card stops taking claims: 8 PM the evening before, or two hours before
+    /// the hit, whichever comes first. Never in the past.
+    private var inviteExpiry: Date {
+        if let customExpiry, customExpiry > .now, customExpiry < startsAt { return customExpiry }
+        let calendar = Calendar.current
+        let eveningBefore = calendar.date(bySettingHour: 20, minute: 0, second: 0, of: calendar.date(byAdding: .day, value: -1, to: startsAt) ?? startsAt) ?? startsAt
+        var expiry = min(startsAt.addingTimeInterval(-2 * 3600), eveningBefore)
+        if expiry <= .now {
+            expiry = min(startsAt.addingTimeInterval(-30 * 60), Date.now.addingTimeInterval(12 * 3600))
+        }
+        return expiry
+    }
+
+    private var postTitle: String {
+        inviteChat.map { "Send to \($0.title)" } ?? "Post hit"
     }
 
     var body: some View {
@@ -57,6 +83,9 @@ struct PlanHitView: View {
                     }
                     label("Spots to fill")
                     spotsRow
+                    if inviteChat != nil {
+                        expiryRow
+                    }
                     label("Who can join")
                     HStack(spacing: 8) {
                         ForEach([HitVisibility.anyone, .friends]) { option in
@@ -70,7 +99,7 @@ struct PlanHitView: View {
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            PrimaryButton(title: "Post hit", isEnabled: canPost, isLoading: isPosting, action: post)
+            PrimaryButton(title: postTitle, isEnabled: canPost, isLoading: isPosting, action: post)
                 .padding(.horizontal, CourtlyMetrics.screenPadding)
                 .padding(.top, 8)
                 .padding(.bottom, 16)
@@ -92,7 +121,7 @@ struct PlanHitView: View {
 
     private var navigationRow: some View {
         ZStack {
-            Text("Plan a hit")
+            Text(inviteChat == nil ? "Plan a hit" : "Request a hit")
                 .font(CourtlyFont.bodySemibold)
                 .foregroundStyle(CourtlyColor.ink)
             HStack {
@@ -178,6 +207,38 @@ struct PlanHitView: View {
         .buttonStyle(PressableButtonStyle())
     }
 
+    private var expiryRow: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Open until \(HitFormatting.day.string(from: inviteExpiry)) \(HitFormatting.clock.string(from: inviteExpiry))")
+                    .font(CourtlyFont.secondary)
+                    .foregroundStyle(CourtlyColor.secondary)
+                Spacer()
+                Button(showsExpiryPicker ? "Done" : "Change") {
+                    withAnimation(.easeInOut(duration: 0.2)) { showsExpiryPicker.toggle() }
+                }
+                .font(CourtlyFont.secondary)
+                .foregroundStyle(CourtlyColor.blue)
+            }
+            .padding(.horizontal, 4)
+            .padding(.top, 12)
+            if showsExpiryPicker {
+                DatePicker(
+                    "Open until",
+                    selection: Binding(get: { inviteExpiry }, set: { customExpiry = $0 }),
+                    in: Date.now...startsAt,
+                    displayedComponents: [.date, .hourAndMinute]
+                )
+                .datePickerStyle(.compact)
+                .tint(CourtlyColor.blue)
+                .padding(.horizontal, 16)
+                .frame(height: 48)
+                .background(RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous).fill(CourtlyColor.card))
+                .padding(.top, 8)
+            }
+        }
+    }
+
     private var spotsRow: some View {
         HStack {
             Text(spots == 1 ? "1 player" : "\(spots) players")
@@ -244,7 +305,8 @@ struct PlanHitView: View {
             do {
                 let hit = try await hits.create(
                     courtID: court.id, startsAt: startsAt, durationMin: duration,
-                    format: format, spots: spots, visibility: visibility
+                    format: format, spots: spots, visibility: visibility,
+                    inviteChatID: inviteChat?.id, inviteExpiresAt: inviteChat == nil ? nil : inviteExpiry
                 )
                 isPosting = false
                 dismiss()

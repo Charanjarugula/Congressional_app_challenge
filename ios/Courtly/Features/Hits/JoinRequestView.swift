@@ -18,26 +18,33 @@ struct JoinRequestView: View {
                     hitCard(item.hit)
                     SectionHeader(title: "Wants to join", top: 24)
                     Card {
-                        HStack(spacing: 14) {
-                            PlayerAvatar(card: player, size: 56)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(player.displayName)
-                                    .font(.system(size: 20, weight: .bold))
-                                    .tracking(-0.3)
-                                    .foregroundStyle(CourtlyColor.ink)
-                                if !player.levelAndArea.isEmpty {
-                                    Text(player.levelAndArea)
-                                        .font(CourtlyFont.secondary)
+                        Button {
+                            navigate(.player(player.id))
+                        } label: {
+                            HStack(spacing: 14) {
+                                PlayerAvatar(card: player, size: 56)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(player.displayName)
+                                        .font(.system(size: 20, weight: .bold))
+                                        .tracking(-0.3)
+                                        .foregroundStyle(CourtlyColor.ink)
+                                    if !player.levelAndArea.isEmpty {
+                                        Text(player.levelAndArea)
+                                            .font(CourtlyFont.secondary)
+                                            .foregroundStyle(CourtlyColor.secondary)
+                                    }
+                                    Text(player.hitsPlayed == 1 ? "1 hit played" : "\(player.hitsPlayed) hits played")
+                                        .font(CourtlyFont.caption)
                                         .foregroundStyle(CourtlyColor.secondary)
                                 }
-                                Text(player.hitsPlayed == 1 ? "1 hit played" : "\(player.hitsPlayed) hits played")
-                                    .font(CourtlyFont.caption)
-                                    .foregroundStyle(CourtlyColor.secondary)
+                                Spacer(minLength: 8)
+                                ChevronMark()
                             }
-                            Spacer(minLength: 0)
+                            .padding(.vertical, 14)
+                            .padding(.horizontal, 16)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.vertical, 14)
-                        .padding(.horizontal, 16)
+                        .buttonStyle(.plain)
                     }
                     HStack(spacing: 8) {
                         ActionButton(title: "Decline", style: .grouped, isLoading: working == false) { respond(accept: false) }

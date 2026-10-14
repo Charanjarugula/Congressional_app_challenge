@@ -157,20 +157,27 @@ struct HitDetailView: View {
         VStack(alignment: .leading, spacing: 0) {
             SectionHeader(title: "Host", top: 24)
             Card {
-                HStack(spacing: 14) {
-                    PlayerAvatar(card: hit.host, size: 48)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(hit.host.displayName)
-                            .font(CourtlyFont.bodySemibold)
-                            .foregroundStyle(CourtlyColor.ink)
-                        Text(hostDetail(hit.host))
-                            .font(CourtlyFont.secondary)
-                            .foregroundStyle(CourtlyColor.secondary)
+                Button {
+                    navigate(.player(hit.host.id))
+                } label: {
+                    HStack(spacing: 14) {
+                        PlayerAvatar(card: hit.host, size: 48)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(hit.host.displayName)
+                                .font(CourtlyFont.bodySemibold)
+                                .foregroundStyle(CourtlyColor.ink)
+                            Text(hostDetail(hit.host))
+                                .font(CourtlyFont.secondary)
+                                .foregroundStyle(CourtlyColor.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        ChevronMark()
                     }
-                    Spacer(minLength: 0)
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .contentShape(Rectangle())
                 }
-                .padding(.vertical, 14)
-                .padding(.horizontal, 16)
+                .buttonStyle(.plain)
             }
         }
     }

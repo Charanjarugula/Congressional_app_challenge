@@ -188,6 +188,7 @@ struct MainTabView: View {
         case let .hit(id): HitDetailView(hitID: id)
         case let .request(id): JoinRequestView(requestID: id)
         case let .chat(id): ChatThreadView(chatID: id)
+        case let .groupInfo(id): GroupInfoView(chatID: id)
         case let .player(id): PlayerProfileView(playerID: id)
         case .addFriends: AddFriendsView()
         case .newGroup: NewGroupView()

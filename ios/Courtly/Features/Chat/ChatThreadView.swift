@@ -95,16 +95,23 @@ struct ChatThreadView: View {
 
     // MARK: - Pieces
 
+    /// DMs open the other player's profile, groups open the member list, hit chats open the hit.
     private var header: some View {
         Button {
-            if let other = chat?.others(than: me).first, chat?.type == .dm {
-                navigate(.player(other.id))
+            guard let chat else { return }
+            switch chat.type {
+            case .dm:
+                if let other = chat.others(than: me).first { navigate(.player(other.id)) }
+            case .group:
+                navigate(.groupInfo(chat.id))
+            case .hit:
+                if let hit = chat.hit { navigate(.hit(hit.id)) }
             }
         } label: {
             headerContent
         }
         .buttonStyle(.plain)
-        .disabled(chat?.type != .dm)
+        .disabled(chat == nil)
     }
 
     private var headerContent: some View {

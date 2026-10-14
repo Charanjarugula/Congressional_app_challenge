@@ -27,7 +27,7 @@ begin
   perform public.add_friend(rv);
   perform public.send_message((v_dm->>'dm_chat_id')::uuid, gen_random_uuid(), 'Hey! Saw you’re in Wellington too. Up for a hit this week?');
   perform set_config('request.jwt.claims', json_build_object('sub', rv, 'role', 'authenticated')::text, true);
-  perform public.send_message((v_dm->>'dm_chat_id')::uuid, gen_random_uuid(), 'Definitely. Thursday evening works for me');
+  perform public.send_message((v_dm->>'dm_chat_id')::uuid, gen_random_uuid(), 'Definitely. Tomorrow evening works for me');
   perform set_config('request.jwt.claims', json_build_object('sub', luis, 'role', 'authenticated')::text, true);
   perform public.add_friend(rv);
   perform set_config('request.jwt.claims', json_build_object('sub', rv, 'role', 'authenticated')::text, true);

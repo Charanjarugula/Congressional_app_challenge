@@ -514,16 +514,21 @@ begin
   perform public.run_hit_scheduler();
   if (select status from public.hits where id = v_hit_id) is distinct from 'played' then raise exception 'three-player hit not marked played'; end if;
   select no_shows into v_n from public.profiles where id = b;
-  perform public.submit_attendance(v_hit_id, b, false);
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  perform public.submit_attendance(v_hit_id, b, false);   -- Alex files the first "No": Maya, a moderator, is told
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   perform public.submit_attendance(v_hit_id, b, false);
   if (select no_shows from public.profiles where id = b) <> v_n + 1 then raise exception 'two "No" answers counted twice'; end if;
   if (select count(*) from public.reports where hit_id = v_hit_id and reported_id = b and auto) <> 1 then raise exception 'expected one automatic report'; end if;
-  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
-  perform public.submit_attendance(v_hit_id, b, true);
-  if (select reporter_id from public.reports where hit_id = v_hit_id and reported_id = b and auto) is distinct from c then raise exception 'report did not pass to the player still saying no'; end if;
-  if (select no_shows from public.profiles where id = b) <> v_n + 1 then raise exception 'absence lifted while alex still says no'; end if;
+  if not exists (select 1 from public.notifications n join public.reports r on n.collapse_id = 'report-' || r.id::text
+                 where n.user_id = a and n.kind = 'report' and r.hit_id = v_hit_id and r.auto) then raise exception 'moderator not told about the automatic report'; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  perform public.submit_attendance(v_hit_id, b, true);    -- Alex takes it back: the report becomes Maya's, and her notice about it goes
+  if (select reporter_id from public.reports where hit_id = v_hit_id and reported_id = b and auto) is distinct from a then raise exception 'report did not pass to the player still saying no'; end if;
+  if exists (select 1 from public.notifications n join public.reports r on n.collapse_id = 'report-' || r.id::text
+             where n.user_id = a and n.kind = 'report' and r.hit_id = v_hit_id and r.auto) then raise exception 'moderator still told about her own report'; end if;
+  if (select no_shows from public.profiles where id = b) <> v_n + 1 then raise exception 'absence lifted while maya still says no'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   perform public.submit_attendance(v_hit_id, b, true);
   if exists (select 1 from public.reports where hit_id = v_hit_id and reported_id = b and auto) then raise exception 'report kept after both took it back'; end if;
   if (select no_shows from public.profiles where id = b) <> v_n then raise exception 'absence not lifted'; end if;

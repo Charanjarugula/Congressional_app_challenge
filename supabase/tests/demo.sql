@@ -28,6 +28,10 @@ begin
   if not exists (select 1 from public.messages m where m.sender_id = rv and m.body like 'Thanks! Saturday mornings%') then
     raise exception 'DEMO_CHECK the reviewer''s group message is missing';
   end if;
-  -- The conversation with Ana, the group, and the two hit chats.
-  if jsonb_array_length(i) < 4 then raise exception 'DEMO_CHECK inbox has % chats (wanted 4)', jsonb_array_length(i); end if;
+  -- The conversation with Ana (carrying their hit tomorrow), the group, and the thread with Luis for the reviewer's own hit.
+  if jsonb_array_length(i) < 3 then raise exception 'DEMO_CHECK inbox has % chats (wanted 3)', jsonb_array_length(i); end if;
+  if (select count(*) from jsonb_array_elements(i) e where e->>'type' = 'dm' and e->'hit' is not null and e->'hit' <> 'null'::jsonb) < 2 then
+    raise exception 'DEMO_CHECK the direct messages should each carry a hit: %', i;
+  end if;
+  if exists (select 1 from jsonb_array_elements(i) e where e->>'type' = 'hit') then raise exception 'DEMO_CHECK a two-player hit opened a chat of its own: %', i; end if;
 end $$;

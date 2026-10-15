@@ -2,7 +2,7 @@
 -- Everything happens inside one DO block that ends by raising SMOKE_OK, which rolls the whole thing back.
 do $$
 declare
-  a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid(); d uuid := gen_random_uuid(); v_pat uuid := gen_random_uuid();
+  a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid(); d uuid := gen_random_uuid(); v_pat uuid := gen_random_uuid(); v_pat2 uuid := gen_random_uuid();
   v_court uuid; v_hit jsonb; v_hit_id uuid; v_req jsonb; v_req_id uuid; v_chat uuid; v_msg jsonb;
   v_feed jsonb; v_inbox jsonb; v_friend jsonb; v_invite jsonb; v_group jsonb; v_n integer; v_dm uuid; v_page jsonb;
 begin
@@ -601,7 +601,7 @@ begin
   -- Suspension closes the player's future hits the way a host cancel does, cancels what they had pending,
   -- refuses them a spot, shows them nothing, and lifting it leaves the hits closed.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
-  v_hit := public.create_hit(v_court, now() + interval '6 days', 60, 'casual', 1, 'anyone');
+  v_hit := public.create_hit(v_court, now() + interval '7 days', 60, 'casual', 1, 'anyone');
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
   v_req := public.request_to_join((v_hit->>'id')::uuid);
   perform private.suspend_user(c, true);
@@ -641,6 +641,99 @@ begin
   if has_table_privilege('authenticated', 'public.chats', 'select') then raise exception 'chats rows are readable raw'; end if;
   if not has_table_privilege('authenticated', 'public.messages', 'select') then raise exception 'messages must stay readable for realtime'; end if;
   if not has_function_privilege('service_role', 'public.internal_delete_account(uuid, text)', 'execute') then raise exception 'service role lost internal_delete_account'; end if;
+
+  -- One chat per hit. Two players share their DM and may write there without being friends; a third player moves
+  -- the hit into a chat of its own, named after the hit; a hit born from a group lives in the group; leaving a DM-hosted
+  -- hit keeps the DM. A declined player can't ask again; a player can't hold two hits at once; cancelling tells whoever
+  -- was still waiting; blocking takes a player out of the blocker's hit; the day-after answer closes after three days.
+  insert into public.profiles (id, first_name, last_name, birthday, level, formats, zip, area_label, home_point, onboarding_completed_at)
+  values (v_pat2, 'Pat', 'Lee', '1992-07-07', 'intermediate', '{casual}', '33414', 'Wellington, FL',
+          extensions.st_setsrid(extensions.st_makepoint(-80.2414, 26.6618), 4326), now());
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_hit := public.create_hit(v_court, now() + interval '9 days', 60, 'casual', 2, 'anyone');
+  v_hit_id := (v_hit->>'id')::uuid;
+  if (v_hit->>'chat_id') is not null then raise exception 'a hit with nobody in it opened a chat: %', v_hit; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.remove_friend(b);
+  v_hit := public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+  v_chat := (v_hit->>'chat_id')::uuid;
+  if v_chat is distinct from public.find_dm_chat(a, b) then raise exception 'two-player hit did not use the dm: %', v_hit; end if;
+  if (public.get_chat(v_chat)->'hit'->>'id')::uuid is distinct from v_hit_id then raise exception 'dm does not pin the hit: %', public.get_chat(v_chat); end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  if public.relationship_to(b, a) = 'friend' then raise exception 'maya and jordan should not be friends here'; end if;
+  perform public.send_message(v_chat, gen_random_uuid(), 'see you at 9');   -- not friends, but a hit together
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  begin
+    perform public.create_hit(v_court, now() + interval '9 days 30 minutes', 60, 'singles', 1, 'anyone');
+    raise exception 'host booked two hits at once';
+  exception when others then
+    if sqlerrm <> 'overlaps_hit' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, false);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  begin
+    perform public.request_to_join(v_hit_id);
+    raise exception 'asked again after a no';
+  exception when others then
+    if sqlerrm <> 'already_declined' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_hit := public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+  if (v_hit->>'chat_id')::uuid = v_chat then raise exception 'third player left the hit in the dm: %', v_hit; end if;
+  v_chat := (v_hit->>'chat_id')::uuid;
+  if (select type from public.chats where id = v_chat) <> 'hit' then raise exception 'promoted chat is not a hit chat'; end if;
+  if public.chat_display_name(v_chat, b) not like 'Casual · %' then raise exception 'hit chat name: %', public.chat_display_name(v_chat, b); end if;
+  if not public.is_chat_member(v_chat, a) or not public.is_chat_member(v_chat, b) or not public.is_chat_member(v_chat, c) then raise exception 'promoted chat is missing a player'; end if;
+  if not exists (select 1 from public.messages where chat_id = public.find_dm_chat(a, b) and payload->>'event' = 'hit_moved') then raise exception 'the dm was not told the hit moved'; end if;
+  if (public.get_chat(public.find_dm_chat(a, b))->'hit'->>'id')::uuid is not distinct from v_hit_id then raise exception 'dm still pins a hit that moved'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.leave_hit(v_hit_id);
+  if public.is_chat_member(v_chat, b) then raise exception 'leaver kept in the hit chat'; end if;
+  -- Blocking: Maya blocks Alex, who is in her hit; he is out and the spot is open.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.block_user(c);
+  if public.is_hit_member(v_hit_id, c) then raise exception 'blocked player still in the hit'; end if;
+  if (select spots_open from public.hits where id = v_hit_id) <> 2 then raise exception 'blocked player''s spot not reopened'; end if;
+  perform public.unblock_user(c);
+  -- Cancelling with a request still waiting: the requester hears about it.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.request_to_join(v_hit_id);
+  select count(*) into v_n from public.notifications where user_id = b and kind = 'request_declined';
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.cancel_hit(v_hit_id);
+  if (select count(*) from public.notifications where user_id = b and kind = 'request_declined') <> v_n + 1 then raise exception 'pending requester not told of the cancel'; end if;
+  -- A hit born from a group stays in the group when a member claims it.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_hit := public.create_hit(v_court, now() + interval '10 days', 60, 'drills', 2, 'invite_only', (v_group->>'id')::uuid, null);
+  v_invite := (select public.invite_json(i.id, b) from public.hit_invites i where i.hit_id = (v_hit->>'id')::uuid);
+  perform public.add_friend(a);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.add_friend(b);
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.add_chat_members((v_group->>'id')::uuid, array[a]);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_hit := public.claim_invite((v_invite->>'id')::uuid);
+  if (v_hit->>'chat_id')::uuid is distinct from (v_group->>'id')::uuid then raise exception 'group-born hit left the group: %', v_hit; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.cancel_hit((v_hit->>'id')::uuid);
+  -- The day-after answer closes after three days.
+  update public.hits set starts_at = now() - interval '4 days' where id = (select h.id from public.hits h where h.status = 'played' order by h.starts_at desc limit 1) returning id into v_hit_id;
+  if public.needs_attendance(v_hit_id, a) then raise exception 'attendance still asked after three days'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  begin
+    perform public.submit_attendance(v_hit_id, b, true);
+    raise exception 'attendance accepted after three days';
+  exception when others then
+    if sqlerrm not in ('attendance_closed', 'not_a_player') then raise; end if;
+  end;
+
 
   -- Underage deletion removes a half-onboarded account outright, with the friend request and DM it opened.
   insert into public.profiles (id, first_name, last_name) values (d, 'Sam', 'Lee');

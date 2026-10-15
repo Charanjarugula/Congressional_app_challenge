@@ -81,7 +81,11 @@ struct HitDetailView: View {
             }
             Button("Stay", role: .cancel) {}
         } message: {
-            Text("Your spot opens back up and the host is told.")
+            if let hit, hit.viewer.isHost, let next = hit.players.first {
+                Text("\(next.card.firstName) takes over as host. The hit goes on without you.")
+            } else {
+                Text("Your spot opens back up and the host is told.")
+            }
         }
         .sheet(isPresented: $showsCalendar) {
             if let hit {
@@ -131,9 +135,6 @@ struct HitDetailView: View {
                     if hit.isLive {
                         ActionButton(title: "Add to calendar", style: .grouped) { showsCalendar = true }
                     }
-                }
-                if hit.isLive && hit.viewer.isHost && hit.chatId != nil && hit.spotsOpen > 0 {
-                    ActionButton(title: "Invite more players", style: .grouped) { showsInvite = true }
                 }
             }
         }
@@ -223,7 +224,15 @@ struct HitDetailView: View {
     @ViewBuilder
     private func footer(_ hit: Hit) -> some View {
         if hit.isLive {
+            if hit.isMember && hit.spotsOpen > 0 {
+                ActionButton(title: "Invite friends", style: .grouped) { showsInvite = true }
+                    .padding(.top, 20)
+            }
             if hit.viewer.isHost {
+                if !hit.players.isEmpty {
+                    DestructiveTextButton(title: "Leave hit") { showsLeaveAlert = true }
+                        .padding(.top, 8)
+                }
                 DestructiveTextButton(title: "Cancel hit") { showsCancelAlert = true }
                     .padding(.top, 8)
             } else if hit.viewer.isPlayer {

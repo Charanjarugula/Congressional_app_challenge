@@ -14,7 +14,6 @@ struct PeopleView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                header
                 searchField
                 content
             }
@@ -23,6 +22,7 @@ struct PeopleView: View {
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "People", art: .people) }
         .refreshable { await inbox.load() }
         .task(id: isActive) {
             guard isActive else { return }
@@ -34,14 +34,6 @@ struct PeopleView: View {
                 await inbox.load()
             }
         }
-    }
-
-    private var header: some View {
-        Text("People")
-            .font(CourtlyFont.largeTitle)
-            .tracking(-0.8)
-            .foregroundStyle(CourtlyColor.ink)
-            .frame(height: 52)
     }
 
     private var searchField: some View {
@@ -65,7 +57,8 @@ struct PeopleView: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 40)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.separator))
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.card))
+        .padding(.top, 16)
         .padding(.bottom, 12)
     }
 

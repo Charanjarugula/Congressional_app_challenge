@@ -181,7 +181,7 @@ struct CourtPickerView: View {
             guard !Task.isCancelled else { return }
             let request = MKLocalSearch.Request()
             request.naturalLanguageQuery = trimmed
-            request.resultTypes = .pointOfInterest
+            request.resultTypes = [.pointOfInterest, .address]
             if let area = session.profile?.homeArea {
                 request.region = MKCoordinateRegion(
                     center: CLLocationCoordinate2D(latitude: area.latitude, longitude: area.longitude),
@@ -230,11 +230,12 @@ private struct PlaceResult: Identifiable {
     }
 
     init?(item: MKMapItem) {
-        guard let name = item.name, !name.isEmpty else { return nil }
-        self.name = name
         coordinate = PlaceDetails.coordinate(of: item)
         address = PlaceDetails.street(of: item)
         city = PlaceDetails.city(of: item)
+        // A plain address has no name of its own; the street stands in.
+        guard let name = (item.name ?? address)?.nilIfEmpty else { return nil }
+        self.name = name
         if #available(iOS 18, *) {
             appleID = item.identifier?.rawValue
         } else {

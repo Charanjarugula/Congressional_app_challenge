@@ -42,7 +42,7 @@ struct GlassTabBar: View {
                         Text(tab.title)
                             .font(.system(size: 11, weight: .semibold))
                     }
-                    .foregroundStyle(selected == tab ? CourtlyColor.blue : CourtlyColor.secondary)
+                    .foregroundStyle(selected == tab ? CourtlyColor.lime : Color.white.opacity(0.65))
                     .frame(maxWidth: .infinity)
                     .frame(height: 64)
                     .overlay(alignment: .topTrailing) {
@@ -62,16 +62,8 @@ struct GlassTabBar: View {
         }
         .background {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 32, style: .continuous)
-                        .fill(Color.white.opacity(0.72))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 32, style: .continuous)
-                        .strokeBorder(Color.black.opacity(0.06), lineWidth: 0.5)
-                )
-                .shadow(color: CourtlyColor.ink.opacity(0.10), radius: 12, y: 6)
+                .fill(CourtlyColor.ink)
+                .shadow(color: CourtlyColor.ink.opacity(0.25), radius: 12, y: 6)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 6)
@@ -79,26 +71,26 @@ struct GlassTabBar: View {
 }
 
 /// "Plan a hit", floating above the tab bar on Play.
-struct PlanHitPill: View {
+/// The one big plus, bottom right on Play and People: lime, navy glyph.
+struct PlusButton: View {
+    let label: String
     let action: () -> Void
 
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("Plan a hit")
-                    .font(CourtlyFont.bodySemibold)
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 20)
-            .frame(height: 52)
+    static var face: some View {
+        Image(systemName: "plus")
+            .font(.system(size: 26, weight: .bold))
+            .foregroundStyle(CourtlyColor.ink)
+            .frame(width: 56, height: 56)
             .background(
-                Capsule()
-                    .fill(CourtlyColor.blue)
-                    .shadow(color: CourtlyColor.blue.opacity(0.3), radius: 12, y: 8)
+                Circle()
+                    .fill(CourtlyColor.lime)
+                    .shadow(color: CourtlyColor.ink.opacity(0.2), radius: 12, y: 8)
             )
-        }
-        .buttonStyle(PressableButtonStyle())
+    }
+
+    var body: some View {
+        Button(action: action) { Self.face }
+            .buttonStyle(PressableButtonStyle())
+            .accessibilityLabel(label)
     }
 }

@@ -36,7 +36,13 @@ final class HitsStore {
     // MARK: - Loading
 
     @MainActor
-    func loadFeed() async {
+    /// Hits the player asked to join on this screen. A background reload keeps them in place, marked
+    /// Requested, so the ask can be taken back; a pull to refresh lets them go.
+    private var held: [Hit] = []
+
+    @MainActor
+    func loadFeed(userInitiated: Bool = false) async {
+        if userInitiated { held = [] }
         feedGeneration += 1
         let generation = feedGeneration
         isLoadingFeed = true
@@ -50,7 +56,16 @@ final class HitsStore {
             // through could not be read by the next player.
             let samePlayer = await SupabaseClient.shared.session?.userID == owner
             guard samePlayer, generation == feedGeneration, let owner else { return }
-            feed = fresh
+            var merged = fresh
+            for hit in held where !merged.fromFriends.contains(where: { $0.id == hit.id }) && !merged.nearYou.contains(where: { $0.id == hit.id }) {
+                if let index = (feed?.fromFriends ?? []).firstIndex(where: { $0.id == hit.id }) {
+                    merged.fromFriends.insert(hit, at: min(index, merged.fromFriends.count))
+                } else {
+                    let index = (feed?.nearYou ?? []).firstIndex(where: { $0.id == hit.id }) ?? merged.nearYou.count
+                    merged.nearYou.insert(hit, at: min(index, merged.nearYou.count))
+                }
+            }
+            feed = merged
             feedError = nil
             SnapshotCache.save(fresh, key: "play_feed", account: owner)
             try? await UNUserNotificationCenter.current().setBadgeCount(fresh.badge)
@@ -148,9 +163,11 @@ final class HitsStore {
     @MainActor
     func requestToJoin(_ hitID: UUID) async throws -> Hit {
         let hit = try await API.Hits.requestToJoin(hitID)
-        feed?.fromFriends.removeAll { $0.id == hitID }
-        feed?.nearYou.removeAll { $0.id == hitID }
         replace(hit)
+        if let kept = feed?.fromFriends.first(where: { $0.id == hitID }) ?? feed?.nearYou.first(where: { $0.id == hitID }) {
+            held.removeAll { $0.id == hitID }
+            held.append(kept)
+        }
         refreshSoon()
         return hit
     }
@@ -158,7 +175,13 @@ final class HitsStore {
     @MainActor
     func cancelRequest(_ requestID: UUID, hitID: UUID) async throws {
         try await API.Hits.cancelRequest(requestID)
+        held.removeAll { $0.id == hitID }
         myHits?.upcoming.removeAll { $0.id == hitID && $0.rowState == .pending }
+        if var current = feed {
+            for index in current.fromFriends.indices where current.fromFriends[index].id == hitID { current.fromFriends[index].viewer.request = nil }
+            for index in current.nearYou.indices where current.nearYou[index].id == hitID { current.nearYou[index].viewer.request = nil }
+            feed = current
+        }
         refreshSoon()
     }
 
@@ -201,7 +224,11 @@ final class HitsStore {
     func leave(_ hitID: UUID) async throws -> Hit {
         let hit = try await API.Hits.leave(hitID)
         myHits?.upcoming.removeAll { $0.id == hitID }
-        feed?.myUpcomingCount = max(0, (feed?.myUpcomingCount ?? 1) - 1)
+        // Read before writing: reading `feed` inside its own modify access trips the exclusivity check.
+        if var current = feed {
+            current.myUpcomingCount = max(0, current.myUpcomingCount - 1)
+            feed = current
+        }
         refreshSoon()
         return hit
     }
@@ -210,7 +237,11 @@ final class HitsStore {
     func cancel(_ hitID: UUID) async throws -> Hit {
         let hit = try await API.Hits.cancel(hitID)
         myHits?.upcoming.removeAll { $0.id == hitID }
-        feed?.myUpcomingCount = max(0, (feed?.myUpcomingCount ?? 1) - 1)
+        // Read before writing: reading `feed` inside its own modify access trips the exclusivity check.
+        if var current = feed {
+            current.myUpcomingCount = max(0, current.myUpcomingCount - 1)
+            feed = current
+        }
         refreshSoon()
         return hit
     }

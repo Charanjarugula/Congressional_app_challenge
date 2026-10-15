@@ -49,24 +49,16 @@ struct MainTabView: View {
                     Button("Add friends", systemImage: "person.badge.plus") { paths[.people, default: []].append(.addFriends) }
                     Button("New group", systemImage: "person.3") { paths[.people, default: []].append(.newGroup) }
                 } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 56, height: 56)
-                        .background(
-                            Circle()
-                                .fill(CourtlyColor.blue)
-                                .shadow(color: CourtlyColor.blue.opacity(0.3), radius: 12, y: 8)
-                        )
+                    PlusButton.face
                 }
                 .accessibilityLabel("Add friends or start a group")
                 .padding(.trailing, 20)
                 .padding(.bottom, 16)
             }
-            if isAtRoot && selected == .play && (showsPlanPill || coachStep == 3) {
-                PlanHitPill { isPlanning = true }
+            if isAtRoot && (selected == .play || selected == .myHits) {
+                PlusButton(label: "Plan a hit") { isPlanning = true }
                     .overlay(
-                        Capsule()
+                        Circle()
                             .stroke(Color.white.opacity(0.35), lineWidth: 4)
                             .opacity(coachStep == 3 ? 1 : 0)
                     )
@@ -262,10 +254,6 @@ struct MainTabView: View {
         }
     }
 
-    /// The empty-state card on Play has its own button, so the pill steps aside.
-    private var showsPlanPill: Bool {
-        (hits.feed?.myUpcomingCount ?? 1) > 0
-    }
 
     private var dots: Set<MainTab> {
         var tabs = Set<MainTab>()

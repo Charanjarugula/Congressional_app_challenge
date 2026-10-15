@@ -204,7 +204,11 @@ final class HitsStore {
     func leave(_ hitID: UUID) async throws -> Hit {
         let hit = try await API.Hits.leave(hitID)
         myHits?.upcoming.removeAll { $0.id == hitID }
-        feed?.myUpcomingCount = max(0, (feed?.myUpcomingCount ?? 1) - 1)
+        // Read before writing: reading `feed` inside its own modify access trips the exclusivity check.
+        if var current = feed {
+            current.myUpcomingCount = max(0, current.myUpcomingCount - 1)
+            feed = current
+        }
         refreshSoon()
         return hit
     }
@@ -213,7 +217,11 @@ final class HitsStore {
     func cancel(_ hitID: UUID) async throws -> Hit {
         let hit = try await API.Hits.cancel(hitID)
         myHits?.upcoming.removeAll { $0.id == hitID }
-        feed?.myUpcomingCount = max(0, (feed?.myUpcomingCount ?? 1) - 1)
+        // Read before writing: reading `feed` inside its own modify access trips the exclusivity check.
+        if var current = feed {
+            current.myUpcomingCount = max(0, current.myUpcomingCount - 1)
+            feed = current
+        }
         refreshSoon()
         return hit
     }

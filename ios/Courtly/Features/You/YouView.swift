@@ -112,6 +112,7 @@ struct YouView: View {
                 Toggle("Notifications", isOn: Binding(get: { notificationsOn }, set: { setNotifications($0) }))
                     .labelsHidden()
                     .tint(CourtlyColor.green)
+                    .allowsHitTesting(false)   // the row takes the tap, so one tap never flips it twice
             }
             .padding(.horizontal, 16)
             .frame(height: 50)

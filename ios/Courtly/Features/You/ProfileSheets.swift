@@ -463,7 +463,7 @@ struct NameSheet: View {
     }
 
     var body: some View {
-        SheetScaffold(title: "Name", canSave: canSave, isSaving: isSaving, detents: [.medium], onSave: save) {
+        SheetScaffold(title: "Name", canSave: canSave, isSaving: isSaving, onSave: save) {
             SectionLabel(title: "First name")
                 .padding(.bottom, 8)
             FieldBox(fill: CourtlyColor.card) {

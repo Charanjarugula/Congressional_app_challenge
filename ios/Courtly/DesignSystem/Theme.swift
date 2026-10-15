@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Visual tokens from the design handoff. Every color and type size in the app comes from here.
+/// The app's visual tokens. Every color and type size in the app comes from here.
 enum CourtlyColor {
     static let ink = Color(hex: 0x0E1726)
     static let secondary = Color(hex: 0x5B6577)

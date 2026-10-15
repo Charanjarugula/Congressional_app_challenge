@@ -42,6 +42,11 @@ enum API {
             try await client.rpc("get_friend_suggestions", params: ["p_known_ids": knownIDs.map(\.uuidString)])
         }
 
+        /// Players, open hits this week and courts near the player, for a new player's first screens.
+        static func areaPulse() async throws -> AreaPulse {
+            try await client.rpc("get_area_pulse")
+        }
+
         static func friends() async throws -> [Friend] {
             try await client.rpc("get_friends")
         }

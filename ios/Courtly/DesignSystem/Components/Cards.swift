@@ -295,8 +295,12 @@ struct SegmentedControl: View {
                                     .fill(CourtlyColor.ink)
                             }
                         }
+                        // The whole segment takes the tap, not just the letters: an unselected
+                        // segment has no fill, and a plain button only hits what it draws.
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(selectedIndex == index ? [.isSelected] : [])
             }
         }
         .padding(2)

@@ -51,6 +51,12 @@ struct MainTabView: View {
                 } label: {
                     PlusButton.face
                 }
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(0.35), lineWidth: 4)
+                        .opacity(coachStep == 2 ? 1 : 0)
+                )
+                .anchorPreference(key: CoachAnchorKey.self, value: .bounds) { ["pill": $0] }
                 .accessibilityLabel("Add friends or start a group")
                 .padding(.trailing, 20)
                 .padding(.bottom, 16)

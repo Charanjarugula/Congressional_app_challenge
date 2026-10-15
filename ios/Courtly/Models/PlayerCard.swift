@@ -122,3 +122,15 @@ extension Array where Element == String {
         isEmpty ? nil : (count == 1 ? "1 mutual friend" : "\(count) mutual friends")
     }
 }
+
+/// What is going on near the player: `get_area_pulse`.
+struct AreaPulse: Codable, Equatable {
+    let players: Int
+    let openHits: Int
+    let courts: Int
+    let radiusMi: Int
+    let areaLabel: String?
+
+    /// "Wellington" from "Wellington, FL".
+    var town: String? { areaLabel?.components(separatedBy: ",").first }
+}

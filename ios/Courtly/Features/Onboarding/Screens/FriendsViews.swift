@@ -52,23 +52,25 @@ struct PersonSuggestion: Identifiable {
     var id: UUID { card.id }
 }
 
-/// 14 · People to play with. Contacts already on Courtly, then recommendations. Adds happen immediately.
+/// 14 · Players near you. What is going on nearby, then contacts already on Courtly, then players near
+/// you. Adding sends a friend request right away; tapping Requested takes it back.
 struct PeopleToPlayWithView: View {
     @Bindable var draft: OnboardingDraft
     let onContinue: () -> Void
 
+    @State private var pulse: AreaPulse?
     @State private var contacts: [PersonSuggestion] = []
-    @State private var recommended: [PersonSuggestion] = []
-    @State private var added: Set<UUID> = []
-    @State private var busy: Set<UUID> = []   // one request per person at a time, so Add then Added can't cross
+    @State private var nearby: [PersonSuggestion] = []
+    @State private var requested: Set<UUID> = []
+    @State private var busy: Set<UUID> = []   // one request per person at a time, so Add then Requested can't cross
     @State private var isLoading = true
     @State private var errorMessage: String?
 
     var body: some View {
         OnboardingStepView(
             progress: 0.9,
-            title: "People to play with",
-            subtitle: "Add a few now so your first hit is easy to set up."
+            title: "Players near you",
+            subtitle: subtitle
         ) {
             if isLoading {
                 ProgressView()
@@ -76,36 +78,32 @@ struct PeopleToPlayWithView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 48)
             } else {
+                if let pulse {
+                    PulseTiles(pulse: pulse)
+                        .padding(.top, 20)
+                }
+
                 if !contacts.isEmpty {
+                    SectionLabel(title: "From your contacts")
+                        .padding(.top, 24)
+                        .padding(.bottom, 4)
+                    playerList(contacts)
+                }
+
+                if !nearby.isEmpty {
                     HStack(alignment: .firstTextBaseline) {
-                        SectionLabel(title: "From your contacts")
+                        SectionLabel(title: contacts.isEmpty ? "Say hi to a few" : "Also near you")
                         Spacer()
                         inviteLink
                     }
                     .padding(.top, 24)
                     .padding(.bottom, 4)
-                    playerList(contacts, style: .tint)
+                    playerList(nearby)
                 }
 
-                if !recommended.isEmpty {
-                    SectionLabel(title: "Recommended for you")
+                if contacts.isEmpty && nearby.isEmpty {
+                    firstHere
                         .padding(.top, 24)
-                        .padding(.bottom, 4)
-                    playerList(recommended, style: .muted)
-                }
-
-                if contacts.isEmpty && recommended.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(draft.contactsGranted ? "None of your contacts are on Courtly yet." : "No suggestions yet.")
-                            .font(CourtlyFont.bodySemibold)
-                            .foregroundStyle(CourtlyColor.ink)
-                        Text("You can add people from a hit or from People once you’re in.")
-                            .font(CourtlyFont.secondary)
-                            .foregroundStyle(CourtlyColor.secondary)
-                        inviteLink
-                            .padding(.top, 8)
-                    }
-                    .padding(.top, 28)
                 }
 
                 if let errorMessage {
@@ -114,31 +112,64 @@ struct PeopleToPlayWithView: View {
                 }
             }
         } footer: {
-            PrimaryButton(title: "Continue", action: onContinue)
+            PrimaryButton(title: requested.isEmpty ? "Continue" : "Continue · \(requested.count) requested", action: onContinue)
         }
         .task { await load() }
     }
 
+    private var subtitle: String {
+        guard let town = pulse?.town else { return "Add a few people now so your first hit is easy to set up." }
+        return "Here’s who plays around \(town). Add a few so your first hit is easy to set up."
+    }
+
+    /// Nobody nearby yet: say so plainly, and make inviting a partner the next step.
+    private var firstHere: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("You’re one of the first players\(pulse?.town.map { " around \($0)" } ?? " here")")
+                .font(CourtlyFont.bodySemibold)
+                .foregroundStyle(CourtlyColor.ink)
+            Text("Invite the people you already hit with. Once they join, their hits show up on Play and yours show up for them.")
+                .font(CourtlyFont.secondary)
+                .foregroundStyle(CourtlyColor.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ShareLink(item: inviteText) {
+                Text("Invite a hitting partner")
+                    .font(CourtlyFont.secondarySemibold)
+                    .foregroundStyle(CourtlyColor.ink)
+                    .padding(.horizontal, 16)
+                    .frame(height: 40)
+                    .background(Capsule().fill(CourtlyColor.lime))
+            }
+            .padding(.top, 8)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(CourtlyColor.groupedBackground))
+    }
+
+    private var inviteText: String {
+        "Join me on Courtly, the easiest way to find a tennis partner\(pulse?.town.map { " around \($0)" } ?? "")."
+    }
+
     private var inviteLink: some View {
-        ShareLink(item: "Join me on Courtly, the easiest way to find a tennis partner in Palm Beach County.") {
+        ShareLink(item: inviteText) {
             Text("Invite more")
                 .font(CourtlyFont.captionSemibold)
                 .foregroundStyle(CourtlyColor.blue)
         }
     }
 
-    private func playerList(_ people: [PersonSuggestion], style: InitialsAvatar.Style) -> some View {
+    private func playerList(_ people: [PersonSuggestion]) -> some View {
         VStack(spacing: 0) {
             ForEach(Array(people.enumerated()), id: \.element.id) { index, person in
                 if index > 0 {
                     HairlineSeparator()
                 }
                 PlayerSuggestionRow(
+                    card: person.card,
                     name: person.displayName,
                     detail: person.detail,
-                    initials: person.card.initials,
-                    avatarStyle: style,
-                    isAdded: added.contains(person.id)
+                    isAdded: requested.contains(person.id)
                 ) {
                     toggle(person.card.id)
                 }
@@ -147,6 +178,7 @@ struct PeopleToPlayWithView: View {
     }
 
     private func load() async {
+        async let pulseCall = try? API.People.areaPulse()
         var knownIDs: [UUID] = []
         if draft.contactsGranted {
             do {
@@ -169,61 +201,99 @@ struct PeopleToPlayWithView: View {
         }
         do {
             let suggestions = try await API.People.suggestions(knownIDs: knownIDs)
-            recommended = suggestions
-                .filter { suggestion in !knownIDs.contains(suggestion.id) }
+            nearby = suggestions
+                .filter { !knownIDs.contains($0.id) }
                 .map { PersonSuggestion(card: $0.card, displayName: $0.card.displayName, detail: $0.reason ?? $0.card.levelAndArea) }
         } catch {
-            errorMessage = "Couldn’t load suggestions. \(error.localizedDescription)"
+            errorMessage = "Couldn’t load players near you. \(error.localizedDescription)"
         }
+        pulse = await pulseCall
         isLoading = false
     }
 
     private func toggle(_ id: UUID) {
         guard !busy.contains(id) else { return }
         busy.insert(id)
-        let wasAdded = added.contains(id)
-        if wasAdded { added.remove(id) } else { added.insert(id) }
+        let wasRequested = requested.contains(id)
+        if wasRequested { requested.remove(id) } else { requested.insert(id) }
         Task { @MainActor in
             defer { busy.remove(id) }
             do {
-                if wasAdded {
-                    try await API.People.removeFriend(id)
+                if wasRequested {
+                    _ = try await API.People.cancelFriendRequest(id)
                 } else {
                     _ = try await API.People.addFriend(id)
                 }
             } catch {
-                if wasAdded { added.insert(id) } else { added.remove(id) }
+                if wasRequested { requested.insert(id) } else { requested.remove(id) }
                 errorMessage = error.localizedDescription
             }
         }
     }
 }
 
-/// 64pt row: avatar, name + level · distance, Add/Added pill.
+/// Three numbers that show the app is alive nearby: players, open hits this week, courts.
+struct PulseTiles: View {
+    let pulse: AreaPulse
+
+    var body: some View {
+        HStack(spacing: 10) {
+            tile(pulse.players, pulse.players == 1 ? "player" : "players")
+            tile(pulse.openHits, pulse.openHits == 1 ? "open hit this week" : "open hits this week")
+            tile(pulse.courts, pulse.courts == 1 ? "court" : "courts")
+        }
+        .accessibilityElement(children: .combine)
+        .overlay(alignment: .bottomLeading) {
+            Text("Within \(pulse.radiusMi) mi")
+                .font(CourtlyFont.caption)
+                .foregroundStyle(CourtlyColor.secondary)
+                .offset(y: 22)
+        }
+        .padding(.bottom, 22)
+    }
+
+    private func tile(_ value: Int, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(value)")
+                .font(CourtlyFont.rounded(26))
+                .foregroundStyle(CourtlyColor.ink)
+            Text(label)
+                .font(CourtlyFont.caption)
+                .foregroundStyle(CourtlyColor.secondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(CourtlyColor.groupedBackground))
+    }
+}
+
+/// 64pt row: photo or initials, name and why they're suggested, Add / Requested.
 struct PlayerSuggestionRow: View {
+    let card: PlayerCard
     let name: String
     let detail: String
-    let initials: String
-    var avatarStyle: InitialsAvatar.Style = .tint
     let isAdded: Bool
     let onToggle: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
-            InitialsAvatar(initials: initials, size: 44, style: avatarStyle)
+            PlayerAvatar(card: card, size: 44)
             VStack(alignment: .leading, spacing: 1) {
                 Text(name)
                     .font(CourtlyFont.bodySemibold)
                     .foregroundStyle(CourtlyColor.ink)
+                    .lineLimit(1)
                 Text(detail)
                     .font(CourtlyFont.caption)
                     .foregroundStyle(CourtlyColor.secondary)
+                    .lineLimit(1)
             }
             Spacer(minLength: 8)
             PillButton(
-                title: isAdded ? "Added" : "Add",
+                title: isAdded ? "Requested" : "Add",
                 style: isAdded ? .tint : .filled,
-                showsCheck: isAdded,
                 action: onToggle
             )
         }

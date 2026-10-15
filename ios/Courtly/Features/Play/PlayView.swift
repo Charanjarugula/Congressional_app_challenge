@@ -16,12 +16,6 @@ struct PlayView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text("Play")
-                    .font(CourtlyFont.largeTitle)
-                    .tracking(-0.8)
-                    .foregroundStyle(CourtlyColor.ink)
-                    .frame(height: 52)
-
                 if let feed = hits.feed {
                     content(feed)
                 } else if let error = hits.lastError, !hits.isLoadingFeed {
@@ -34,10 +28,12 @@ struct PlayView: View {
                 }
             }
             .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.top, 4)
             .padding(.bottom, 96)
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "Play") }
         .refreshable { await hits.loadFeed() }
     }
 

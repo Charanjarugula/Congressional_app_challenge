@@ -286,14 +286,13 @@ struct SegmentedControl: View {
                 } label: {
                     Text(option)
                         .font(CourtlyFont.captionSemibold)
-                        .foregroundStyle(selectedIndex == index ? CourtlyColor.ink : CourtlyColor.secondary)
+                        .foregroundStyle(selectedIndex == index ? .white : CourtlyColor.secondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 32)
                         .background {
                             if selectedIndex == index {
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color.white)
-                                    .shadow(color: CourtlyColor.ink.opacity(0.12), radius: 1.5, y: 1)
+                                    .fill(CourtlyColor.ink)
                             }
                         }
                 }
@@ -301,7 +300,7 @@ struct SegmentedControl: View {
             }
         }
         .padding(2)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(CourtlyColor.separator))
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(CourtlyColor.card))
     }
 }
 

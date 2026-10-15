@@ -42,7 +42,7 @@ struct GlassTabBar: View {
                         Text(tab.title)
                             .font(.system(size: 11, weight: .semibold))
                     }
-                    .foregroundStyle(selected == tab ? CourtlyColor.blue : CourtlyColor.secondary)
+                    .foregroundStyle(selected == tab ? CourtlyColor.lime : Color.white.opacity(0.65))
                     .frame(maxWidth: .infinity)
                     .frame(height: 64)
                     .overlay(alignment: .topTrailing) {
@@ -62,16 +62,8 @@ struct GlassTabBar: View {
         }
         .background {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 32, style: .continuous)
-                        .fill(Color.white.opacity(0.72))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 32, style: .continuous)
-                        .strokeBorder(Color.black.opacity(0.06), lineWidth: 0.5)
-                )
-                .shadow(color: CourtlyColor.ink.opacity(0.10), radius: 12, y: 6)
+                .fill(CourtlyColor.ink)
+                .shadow(color: CourtlyColor.ink.opacity(0.25), radius: 12, y: 6)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 6)
@@ -87,6 +79,7 @@ struct PlanHitPill: View {
             HStack(spacing: 8) {
                 Image(systemName: "plus")
                     .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(CourtlyColor.lime)
                 Text("Plan a hit")
                     .font(CourtlyFont.bodySemibold)
             }
@@ -95,8 +88,8 @@ struct PlanHitPill: View {
             .frame(height: 52)
             .background(
                 Capsule()
-                    .fill(CourtlyColor.blue)
-                    .shadow(color: CourtlyColor.blue.opacity(0.3), radius: 12, y: 8)
+                    .fill(CourtlyColor.ink)
+                    .shadow(color: CourtlyColor.ink.opacity(0.3), radius: 12, y: 8)
             )
         }
         .buttonStyle(PressableButtonStyle())

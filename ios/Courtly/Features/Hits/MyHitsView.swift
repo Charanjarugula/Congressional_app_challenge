@@ -14,11 +14,7 @@ struct MyHitsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text("My Hits")
-                    .font(CourtlyFont.largeTitle)
-                    .tracking(-0.8)
-                    .foregroundStyle(CourtlyColor.ink)
-                    .frame(height: 52)
+                Color.clear.frame(height: 16)
                 SegmentedControl(options: ["Upcoming", "Past"], selectedIndex: $segment)
                 content
             }
@@ -27,6 +23,7 @@ struct MyHitsView: View {
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "My Hits") }
         .refreshable { await hits.loadMyHits() }
     }
 
@@ -104,13 +101,15 @@ struct MyHitsView: View {
             navigate(.hit(hit.id))
         } label: {
             HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(HitFormatting.day.string(from: hit.startsAt))
+                VStack(spacing: 0) {
+                    Text(HitFormatting.day.string(from: hit.startsAt).uppercased())
+                        .font(.system(size: 12, weight: .bold))
                     Text(HitFormatting.clock.string(from: hit.startsAt))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                 }
-                .font(CourtlyFont.rounded(17))
                 .foregroundStyle(CourtlyColor.ink)
-                .frame(width: 76, alignment: .leading)
+                .frame(width: 64, height: 52)
+                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.lime))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(hit.counterpart(for: me)?.displayName ?? "Your hit") · \(hit.format.shortTitle)")

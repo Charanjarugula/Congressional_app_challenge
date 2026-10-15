@@ -13,11 +13,6 @@ struct YouView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text("You")
-                    .font(CourtlyFont.largeTitle)
-                    .tracking(-0.8)
-                    .foregroundStyle(CourtlyColor.ink)
-                    .frame(height: 52)
                 if let profile = session.profile {
                     content(profile)
                 } else {
@@ -31,6 +26,7 @@ struct YouView: View {
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "You") }
         .refreshable { await session.refreshProfile() }
         .sheet(item: $sheet) { which in
             switch which {
@@ -62,7 +58,7 @@ struct YouView: View {
                     .minimumScaleFactor(0.8)
             }
         }
-        .padding(.top, 8)
+        .padding(.top, 20)
 
         Button {
             sheet = .editProfile

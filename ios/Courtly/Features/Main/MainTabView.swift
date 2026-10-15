@@ -50,13 +50,13 @@ struct MainTabView: View {
                     Button("New group", systemImage: "person.3") { paths[.people, default: []].append(.newGroup) }
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(CourtlyColor.ink)
                         .frame(width: 56, height: 56)
                         .background(
                             Circle()
-                                .fill(CourtlyColor.blue)
-                                .shadow(color: CourtlyColor.blue.opacity(0.3), radius: 12, y: 8)
+                                .fill(CourtlyColor.lime)
+                                .shadow(color: CourtlyColor.ink.opacity(0.2), radius: 12, y: 8)
                         )
                 }
                 .accessibilityLabel("Add friends or start a group")

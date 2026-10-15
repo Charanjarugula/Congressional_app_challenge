@@ -84,7 +84,7 @@ struct PillButton: View {
             HStack(spacing: 6) {
                 if showsCheck {
                     CheckmarkShape()
-                        .stroke(CourtlyColor.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .stroke(style == .filled ? CourtlyColor.ink : CourtlyColor.blue, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                         .frame(width: 9, height: 5)
                 }
                 Text(title)
@@ -92,8 +92,8 @@ struct PillButton: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .foregroundStyle(style == .filled ? .white : CourtlyColor.blue)
-            .background(Capsule().fill(style == .filled ? CourtlyColor.blue : CourtlyColor.blueTint))
+            .foregroundStyle(style == .filled ? CourtlyColor.ink : CourtlyColor.blue)
+            .background(Capsule().fill(style == .filled ? CourtlyColor.lime : CourtlyColor.blueTint))
         }
         .buttonStyle(PressableButtonStyle())
     }

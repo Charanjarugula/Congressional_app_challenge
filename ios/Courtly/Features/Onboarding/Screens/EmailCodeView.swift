@@ -9,6 +9,7 @@ struct EmailCodeView: View {
 
     @State private var code = ""
     @State private var isVerifying = false
+    @State private var resendAvailableAt = Date.now.addingTimeInterval(60)   // the first code just went out
     @State private var isResending = false
     @State private var message: String?
     @State private var messageIsError = false
@@ -46,13 +47,18 @@ struct EmailCodeView: View {
                     .padding(.top, 10)
             }
 
-            Button(action: resend) {
-                Text(isResending ? "Sending…" : "Resend code")
-                    .font(CourtlyFont.secondarySemibold)
-                    .foregroundStyle(CourtlyColor.blue)
+            // A minute between codes, which is also what the server allows; counting down beats an error.
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let wait = max(0, Int(resendAvailableAt.timeIntervalSince(context.date).rounded(.up)))
+                Button(action: resend) {
+                    Text(isResending ? "Sending…" : wait > 0 ? "Resend code in \(wait)s" : "Resend code")
+                        .font(CourtlyFont.secondarySemibold)
+                        .foregroundStyle(wait > 0 ? CourtlyColor.secondary : CourtlyColor.blue)
+                        .monospacedDigit()
+                }
+                .buttonStyle(.plain)
+                .disabled(isResending || wait > 0)
             }
-            .buttonStyle(.plain)
-            .disabled(isResending)
             .padding(.top, 20)
         } footer: {
             PrimaryButton(title: "Continue", isEnabled: canContinue, isLoading: isVerifying, action: verify)
@@ -81,13 +87,14 @@ struct EmailCodeView: View {
     }
 
     private func resend() {
-        guard !isResending else { return }
+        guard !isResending, resendAvailableAt <= .now else { return }
         isResending = true
         Task { @MainActor in
             do {
                 try await AppEnvironment.auth.sendEmailCode(to: email)
                 messageIsError = false
                 message = "Sent a new code."
+                resendAvailableAt = .now.addingTimeInterval(60)
             } catch {
                 messageIsError = true
                 message = error.localizedDescription

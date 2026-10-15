@@ -4,6 +4,7 @@ import SwiftUI
 struct PlayerTiles: View {
     let hit: Hit
     let me: UUID?
+    @Environment(\.navigate) private var navigate
 
     var body: some View {
         let cards = hit.everyone
@@ -11,16 +12,23 @@ struct PlayerTiles: View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: min(4, max(1, cards.count + openCount)))
         LazyVGrid(columns: columns, spacing: 8) {
             ForEach(cards) { card in
-                VStack(spacing: 4) {
-                    PlayerAvatar(card: card, size: 28)
-                    Text(card.id == me ? "You" : card.firstName)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(CourtlyColor.ink)
-                        .lineLimit(1)
+                // Everyone but you opens their profile, so a member can see, add or report anyone in the hit.
+                Button { navigate(.player(card.id, hitID: hit.id)) } label: {
+                    VStack(spacing: 4) {
+                        PlayerAvatar(card: card, size: 28)
+                        Text(card.id == me ? "You" : card.firstName)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(CourtlyColor.ink)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 64)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.groupedBackground))
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 64)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.groupedBackground))
+                .buttonStyle(PressableButtonStyle())
+                .disabled(card.id == me)
+                .accessibilityLabel(card.id == me ? "You" : "\(card.displayName), open profile")
             }
             ForEach(0..<openCount, id: \.self) { _ in
                 VStack(spacing: 4) {

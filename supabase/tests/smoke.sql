@@ -897,6 +897,18 @@ begin
     perform set_config('request.jwt.claims', json_build_object('sub', v_demo, 'role', 'authenticated')::text, true);
     if (public.get_area_pulse()->>'players')::int < 1 then raise exception 'demo pulse empty'; end if;
     if jsonb_array_length(public.search_players('Nia')) <> 1 then raise exception 'demo account cannot find a real player by name'; end if;
+    -- A fresh calendar snapshot counts; one older than 7 days hides nothing.
+    perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);
+    perform public.save_busy_week(2097151);
+    if not public.busy_at(v_new, ((date_trunc('day', now() at time zone 'America/New_York') + interval '1 day 18 hours') at time zone 'America/New_York')) then raise exception 'fresh busy week ignored'; end if;
+    update public.profiles set busy_mask_week_at = now() - interval '8 days' where id = v_new;
+    if public.busy_at(v_new, ((date_trunc('day', now() at time zone 'America/New_York') + interval '1 day 18 hours') at time zone 'America/New_York')) then raise exception 'stale busy week still hiding hits'; end if;
+    perform public.save_busy_week(0);
+    -- The hit carries where the viewer stands with each person and their day-after answers.
+    if (public.hit_json((v_demo_hit->>'id')::uuid, v_new)->'viewer'->'relationships'->0->>'relationship') <> 'none' then
+      raise exception 'hit_json relationships: %', public.hit_json((v_demo_hit->>'id')::uuid, v_new)->'viewer';
+    end if;
+    if jsonb_typeof(public.hit_json((v_demo_hit->>'id')::uuid, v_new)->'viewer'->'attendance') <> 'array' then raise exception 'hit_json attendance missing'; end if;
     -- No home area yet: nothing to count, no error.
     update public.profiles set home_point = null where id = v_new;
     perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);

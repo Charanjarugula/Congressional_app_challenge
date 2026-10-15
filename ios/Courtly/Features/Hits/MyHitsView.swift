@@ -85,7 +85,7 @@ struct MyHitsView: View {
                 .font(.system(size: 20, weight: .bold))
                 .tracking(-0.3)
                 .foregroundStyle(CourtlyColor.ink)
-            Text("Hits you’ve played show up here the day after.")
+            Text("Hits you’ve played show up here once they’re over.")
                 .font(CourtlyFont.secondary)
                 .foregroundStyle(CourtlyColor.secondary)
                 .multilineTextAlignment(.center)
@@ -122,16 +122,8 @@ struct MyHitsView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
-                if hit.rowState == .openWaiting {
-                    Text("Invite")
-                        .font(CourtlyFont.secondarySemibold)
-                        .foregroundStyle(CourtlyColor.blue)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(CourtlyColor.blueTint))
-                } else {
-                    ChevronMark()
-                }
+                // The whole row opens the hit, where Invite lives; no pill that looks like its own button.
+                ChevronMark()
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 16)

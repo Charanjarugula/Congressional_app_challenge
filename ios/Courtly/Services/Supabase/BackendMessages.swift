@@ -37,7 +37,7 @@ enum BackendMessages {
         case "missing_members": "Pick at least one friend."
         case "not_a_group": "That isn’t a group chat."
         case "cannot_add_self", "cannot_block_self", "cannot_report_self": "That’s you."
-        case "invalid_radius", "invalid_visibility": "That choice isn’t available."
+        case "invalid_radius", "invalid_visibility", "invalid_mask": "That choice isn’t available."
         case "not_signed_in": "You’re signed out."
         case "no_profile": "We couldn’t find your profile. Sign in again."
         case "account_suspended": "This account has been suspended."

@@ -52,7 +52,13 @@ struct ChatThreadView: View {
                                     .foregroundStyle(CourtlyColor.secondary)
                                     .padding(.top, index == 0 ? 0 : 6)
                             }
-                            MessageRow(message: message, isMine: message.sender?.id == me, showsAvatar: chat?.type != .dm) { reporting = message }
+                            MessageRow(
+                                message: message,
+                                isMine: message.sender?.id == me,
+                                showsAvatar: chat?.type != .dm,
+                                startsRun: startsRun(at: index),
+                                onOpenSender: { navigate(.player($0)) }
+                            ) { reporting = message }
                         }
                         Color.clear
                             .frame(height: 1)
@@ -236,6 +242,13 @@ struct ChatThreadView: View {
     }
 
     /// A time label before the first message and whenever more than 30 minutes pass.
+    /// A text message whose sender differs from the one just above it (or follows a timestamp).
+    private func startsRun(at index: Int) -> Bool {
+        guard index > 0 else { return true }
+        let previous = messages[index - 1]
+        return previous.type != .text || previous.sender?.id != messages[index].sender?.id || showsTimestamp(at: index)
+    }
+
     private func showsTimestamp(at index: Int) -> Bool {
         guard index > 0 else { return true }
         return messages[index].createdAt.timeIntervalSince(messages[index - 1].createdAt) > 30 * 60
@@ -365,6 +378,9 @@ private struct MessageRow: View {
     let message: Message
     let isMine: Bool
     let showsAvatar: Bool
+    /// First of a run from the same sender: the name goes above it in group and hit chats.
+    var startsRun = true
+    var onOpenSender: (UUID) -> Void = { _ in }
     var onReport: () -> Void = {}
 
     var body: some View {
@@ -390,9 +406,21 @@ private struct MessageRow: View {
                 if isMine {
                     Spacer(minLength: 60)
                 } else if showsAvatar, let sender = message.sender {
-                    PlayerAvatar(card: sender, size: 28)
+                    Button { onOpenSender(sender.id) } label: { PlayerAvatar(card: sender, size: 28) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(sender.displayName), open profile")
                 }
-                bubble
+                if !isMine && showsAvatar && startsRun, let sender = message.sender {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(sender.displayName)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(CourtlyColor.secondary)
+                            .padding(.leading, 4)
+                        bubble
+                    }
+                } else {
+                    bubble
+                }
                 if !isMine { Spacer(minLength: 60) }
             }
         }

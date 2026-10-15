@@ -43,9 +43,14 @@ struct PlanHitView: View {
         return calendar.date(bySettingHour: parts.hour ?? 18, minute: parts.minute ?? 30, second: 0, of: day) ?? day
     }
 
+    private var tooSoon: Bool { startsAt <= Date.now.addingTimeInterval(15 * 60) }
+
     private var canPost: Bool {
-        court != nil && startsAt > Date.now.addingTimeInterval(15 * 60) && !isPosting
+        court != nil && !tooSoon && !isPosting
     }
+
+    /// "Who can see my hits: Friends only" on You wins over the chip, so the chip says so.
+    private var friendsOnlyProfile: Bool { session.profile?.hitVisibility == "friends" }
 
     /// When the request card stops taking claims: 8 PM the evening before, or two hours before
     /// the hit, whichever comes first. Never in the past.
@@ -102,7 +107,15 @@ struct PlanHitView: View {
                     HStack(spacing: 8) {
                         ForEach([HitVisibility.anyone, .friends]) { option in
                             Chip(title: option.title, isSelected: visibility == option) { visibility = option }
+                                .disabled(option == .anyone && friendsOnlyProfile)
+                                .opacity(option == .anyone && friendsOnlyProfile ? 0.4 : 1)
                         }
+                    }
+                    if friendsOnlyProfile {
+                        Text("Your hits are set to Friends only on the You tab.")
+                            .font(CourtlyFont.caption)
+                            .foregroundStyle(CourtlyColor.secondary)
+                            .padding(.top, 6)
                     }
                 }
                 .padding(.horizontal, CourtlyMetrics.screenPadding)
@@ -112,6 +125,17 @@ struct PlanHitView: View {
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
+                if tooSoon {
+                    Text("Pick a time at least 15 minutes from now.")
+                        .font(CourtlyFont.caption)
+                        .foregroundStyle(CourtlyColor.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else if court == nil {
+                    Text("Pick a court to post.")
+                        .font(CourtlyFont.caption)
+                        .foregroundStyle(CourtlyColor.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 SafetyNote()
                 PrimaryButton(title: postTitle, isEnabled: canPost, isLoading: isPosting, action: post)
             }
@@ -305,6 +329,7 @@ struct PlanHitView: View {
                 format = first
                 spots = Self.defaultSpots(for: first)
             }
+            if friendsOnlyProfile { visibility = .friends }
         }
         do {
             let list = try await API.Courts.nearby(limit: 30)

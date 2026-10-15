@@ -81,10 +81,24 @@ struct Hit: Codable, Identifiable, Equatable {
             let expiresAt: Date
         }
 
+        /// A day-after answer the viewer already gave about someone.
+        struct Answer: Codable, Equatable {
+            let userId: UUID
+            let showedUp: Bool
+        }
+
+        /// Where the viewer stands with someone in the hit.
+        struct Standing: Codable, Equatable {
+            let userId: UUID
+            let relationship: Relationship
+        }
+
         var isHost: Bool
         var isPlayer: Bool
         var request: Request?
         var invite: Invite?
+        var attendance: [Answer]? = nil
+        var relationships: [Standing]? = nil
     }
 
     /// Row state from `get_my_hits`.
@@ -125,6 +139,13 @@ struct Hit: Codable, Identifiable, Equatable {
     var isMember: Bool { viewer.isHost || viewer.isPlayer }
     var isFull: Bool { spotsOpen <= 0 }
     var hasPendingRequest: Bool { viewer.request?.status == .pending }
+    /// The host already said no; asking again would only fail.
+    var wasDeclined: Bool { viewer.request?.status == .declined }
+
+    /// Where the viewer stands with this person, from the server; `.none` when unknown.
+    func relationship(with id: UUID) -> Relationship {
+        viewer.relationships?.first { $0.userId == id }?.relationship ?? .none
+    }
 
     var openInvite: Viewer.Invite? {
         guard let invite = viewer.invite, invite.status == .open, invite.expiresAt > .now else { return nil }

@@ -17,7 +17,9 @@ struct PeopleToPlayWithView: View {
     @State private var pulse: AreaPulse?
     @State private var contacts: [PersonSuggestion] = []
     @State private var nearby: [PersonSuggestion] = []
-    @State private var requested: Set<UUID> = []
+    /// Where the player stands with each person shown: from contact matches, then from taps here.
+    @State private var standings: [UUID: Relationship] = [:]
+    private var requestedCount: Int { standings.values.filter { $0 == .requested }.count }
     @State private var busy: Set<UUID> = []   // one request per person at a time, so Add then Requested can't cross
     @State private var isLoading = true
     @State private var isCheckingContacts = false
@@ -98,7 +100,7 @@ struct PeopleToPlayWithView: View {
                 }
             }
         } footer: {
-            PrimaryButton(title: requested.isEmpty ? "Continue" : "Continue · \(requested.count) requested", action: onContinue)
+            PrimaryButton(title: requestedCount == 0 ? "Continue" : "Continue · \(requestedCount) requested", action: onContinue)
         }
         .task { await load() }
     }
@@ -155,7 +157,7 @@ struct PeopleToPlayWithView: View {
                     card: person.card,
                     name: person.displayName,
                     detail: person.detail,
-                    isAdded: requested.contains(person.id)
+                    standing: standings[person.id] ?? .none
                 ) {
                     toggle(person.card.id)
                 }
@@ -182,7 +184,7 @@ struct PeopleToPlayWithView: View {
                 }
                 knownIDs = contacts.map(\.id)
                 // Anyone already asked shows Requested, not a second Add.
-                requested.formUnion(matches.filter { $0.relationship == .requested }.map(\.player.id))
+                for match in matches { if let r = match.relationship, r != .none { standings[match.player.id] = r } }
             } catch {
                 errorMessage = "Couldn’t check your contacts. \(error.localizedDescription)"
             }
@@ -214,18 +216,21 @@ struct PeopleToPlayWithView: View {
     private func toggle(_ id: UUID) {
         guard !busy.contains(id) else { return }
         busy.insert(id)
-        let wasRequested = requested.contains(id)
-        if wasRequested { requested.remove(id) } else { requested.insert(id) }
+        let before = standings[id] ?? .none
+        guard before != .friend && before != .blocked else { busy.remove(id); return }
+        // Requested → take it back; anything else → add (adding someone who asked you accepts them).
+        standings[id] = before == .requested ? Relationship.none : .requested
         Task { @MainActor in
             defer { busy.remove(id) }
             do {
-                if wasRequested {
+                if before == .requested {
                     _ = try await API.People.cancelFriendRequest(id)
                 } else {
-                    _ = try await API.People.addFriend(id)
+                    let result = try await API.People.addFriend(id)
+                    standings[id] = Relationship(rawValue: result.relationship) ?? .requested
                 }
             } catch {
-                if wasRequested { requested.insert(id) } else { requested.remove(id) }
+                standings[id] = before
                 errorMessage = error.localizedDescription
             }
         }
@@ -242,7 +247,7 @@ struct PulseTiles: View {
                 tile(pulse.players, pulse.players == 1 ? "player nearby" : "players nearby", icon: "person.2.fill")
                 tile(pulse.openHits, pulse.openHits == 1 ? "open hit this week" : "open hits this week", icon: "tennisball.fill")
             }
-            Text("Within \(pulse.radiusMi) miles\(pulse.town.map { " of \($0)" } ?? "")")
+            Text(pulse.town.map { "Around \($0)" } ?? "In your area")
                 .font(CourtlyFont.caption)
                 .foregroundStyle(CourtlyColor.secondary)
                 .padding(.horizontal, 2)
@@ -280,7 +285,7 @@ struct PlayerSuggestionRow: View {
     let card: PlayerCard
     let name: String
     let detail: String
-    let isAdded: Bool
+    let standing: Relationship
     let onToggle: () -> Void
 
     var body: some View {
@@ -297,11 +302,17 @@ struct PlayerSuggestionRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            PillButton(
-                title: isAdded ? "Requested" : "Add",
-                style: isAdded ? .tint : .filled,
-                action: onToggle
-            )
+            switch standing {
+            case .friend:
+                PillButton(title: "Friends", style: .tint, showsCheck: true) {}
+                    .disabled(true)
+            case .requested:
+                PillButton(title: "Requested", style: .tint, action: onToggle)
+            case .requestedMe:
+                PillButton(title: "Confirm", style: .filled, action: onToggle)
+            case .none, .blocked:
+                PillButton(title: "Add", style: .filled, action: onToggle)
+            }
         }
         .frame(height: 64)
     }

@@ -55,7 +55,10 @@ struct PlayView: View {
     private func loadDiscovery() async {
         async let people = try? API.People.suggestions(knownIDs: [])
         async let area = try? API.People.areaPulse()
-        if let people = await people { suggestions = people }
+        if let people = await people {
+            suggestions = people
+            requested = []   // the server only suggests people with no request either way, so start clean
+        }
         pulse = await area
     }
 
@@ -159,7 +162,8 @@ struct PlayView: View {
     private var emptyExploreDetail: String {
         if let pulse, pulse.players > 0 {
             let who = pulse.players == 1 ? "1 player plays" : "\(pulse.players) players play"
-            return "\(who) within \(pulse.radiusMi) mi. Post a time and they can ask to join."
+            let area = pulse.town.map { "around \($0)" } ?? "in your area"
+            return "\(who) \(area). Post a time and they can ask to join."
         }
         return "Widen the distance in Filters, or post a time and players nearby can ask to join."
     }

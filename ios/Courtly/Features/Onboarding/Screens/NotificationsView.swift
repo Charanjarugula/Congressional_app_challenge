@@ -15,9 +15,9 @@ struct NotificationsView: View {
         ) {
             VStack(spacing: 10) {
                 NotificationPreviewCard(
-                    title: "Jordan accepted",
+                    title: "Jordan R. accepted you",
                     time: "now",
-                    message: "Thu 6:30 PM at Wellington Tennis Center. Tap to confirm.",
+                    message: "Thu 6:30 PM at Wellington Tennis Center. You’re in.",
                     isPrimary: true
                 )
                 NotificationPreviewCard(

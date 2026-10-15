@@ -28,6 +28,11 @@ enum API {
             try await client.rpc("update_profile", params: ["patch": patch])
         }
 
+        /// Saves this week's calendar busy blocks with a fresh timestamp; older snapshots stop counting.
+        static func saveBusyWeek(_ mask: Int) async throws {
+            try await client.rpc("save_busy_week", params: ["p_mask": mask])
+        }
+
         static func completeOnboarding() async throws -> Courtly.Profile {
             try await client.rpc("complete_onboarding")
         }

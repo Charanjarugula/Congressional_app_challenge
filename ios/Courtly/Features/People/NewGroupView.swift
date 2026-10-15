@@ -41,7 +41,12 @@ struct NewGroupView: View {
                             .foregroundStyle(CourtlyColor.blue)
                     }
                 } else if friends.isEmpty {
-                    QuietCard(title: "No friends yet", detail: "Groups are made of friends. Add some first.")
+                    VStack(spacing: 12) {
+                        QuietCard(title: "No friends yet", detail: "Groups are made of friends. Add some first.")
+                        Button("Add friends") { navigate(.addFriends) }
+                            .font(CourtlyFont.secondarySemibold)
+                            .foregroundStyle(CourtlyColor.blue)
+                    }
                 } else {
                     CardRows(items: friends) { friend in
                         Button {

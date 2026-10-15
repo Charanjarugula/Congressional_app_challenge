@@ -121,7 +121,10 @@ struct MainTabView: View {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
-                Task { await hits.refreshAll() }
+                Task {
+                    await session.refreshCalendarBusy()   // before the feed, so it filters with this week's calendar
+                    await hits.refreshAll()
+                }
                 Task { await inbox.load() }
                 Task { await API.Devices.retryPending() }
                 startLiveUpdates()

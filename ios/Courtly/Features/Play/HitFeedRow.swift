@@ -44,6 +44,7 @@ struct HitFeedRow: View {
                         detail("calendar", "\(HitFormatting.dayAndDate.string(from: hit.startsAt)) · \(HitFormatting.clock.string(from: hit.startsAt)) · \(hit.durationMin) min")
                         detail("mappin.and.ellipse", [hit.court.name, hit.court.address].compactMap { $0 }.joined(separator: ", "))
                         detail("person.2", playersLine)
+                        detail("figure.tennis", hostLine)
                     }
                     if hit.players.count > 0 {
                         AvatarStack(cards: hit.everyone, size: 28)
@@ -64,6 +65,12 @@ struct HitFeedRow: View {
             }
         }
         .errorAlert($errorMessage, title: "Couldn’t ask to join")
+    }
+
+    /// "Hosted by Luis · Advanced · 12 hits played"
+    private var hostLine: String {
+        let played = hit.host.hitsPlayed == 1 ? "1 hit played" : "\(hit.host.hitsPlayed) hits played"
+        return ["Hosted by \(hit.host.firstName)", hit.host.level?.title, played].compactMap { $0 }.joined(separator: " · ")
     }
 
     private var playersLine: String {

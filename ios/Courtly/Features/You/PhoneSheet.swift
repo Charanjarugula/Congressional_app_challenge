@@ -20,7 +20,7 @@ struct PhoneSheet: View {
                     .keyboardType(.phonePad)
                     .textContentType(.telephoneNumber)
             }
-            Text("Your number is stored with your profile. A hashed version is used to help friends who have your number find you.")
+            Text("Optional. Stored with your profile and never shown to other players.")
                 .font(CourtlyFont.caption)
                 .foregroundStyle(CourtlyColor.secondary)
                 .padding(.top, 10)

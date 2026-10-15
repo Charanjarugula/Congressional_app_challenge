@@ -53,7 +53,7 @@ struct PeopleToPlayWithView: View {
                                 Text("Find friends from contacts")
                                     .font(CourtlyFont.bodySemibold)
                                     .foregroundStyle(CourtlyColor.ink)
-                                Text("See who already plays. Only hashed numbers and emails are checked.")
+                                Text("See who already plays. Only hashed email addresses are checked.")
                                     .font(CourtlyFont.caption)
                                     .foregroundStyle(CourtlyColor.secondary)
                                     .fixedSize(horizontal: false, vertical: true)

@@ -173,6 +173,13 @@ struct ChatThreadView: View {
             if let chat {
                 if chat.type == .group {
                     InitialsAvatar(initials: String(chat.title.prefix(2)).uppercased(), size: 32, style: .muted)
+                } else if chat.type == .hit {
+                    // A hit chat is about the hit, not one person in it.
+                    Image(systemName: "tennisball.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(CourtlyColor.ink)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(CourtlyColor.lime))
                 } else if let other = chat.others(than: me).first {
                     PlayerAvatar(card: other, size: 32)
                 }

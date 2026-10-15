@@ -118,6 +118,10 @@ struct MainTabView: View {
             startLiveUpdates()
         }
         .onDisappear { stopLiveUpdates() }
+        // Friend requests aren't pushed live; opening People always shows the latest.
+        .onChange(of: selected) { _, tab in
+            if tab == .people { Task { await inbox.load() } }
+        }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:

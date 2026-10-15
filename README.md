@@ -1,6 +1,20 @@
+<p align="center">
+  <img src="ios/Courtly/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="96" alt="Courtly app icon">
+</p>
+
 # Courtly
 
-iOS app that helps recreational tennis players in Palm Beach County get on court. The unit is a **hit**: one time, one public court, one format, one or more open spots. Post an open hit or invite someone; when accepted it is confirmed and a chat opens. Four tabs: Play, My Hits, People, You.
+**Find a tennis partner for this week, at a public court near you.** Courtly is an iOS app for recreational players in Palm Beach County, Florida.
+
+In development; not yet in the App Store. The privacy policy, terms and support contact live at [courtly-sage.vercel.app](https://courtly-sage.vercel.app).
+
+## The problem
+
+Palm Beach County has many free public courts and plenty of people who would play more if they had someone to play with. Finding that someone for Saturday morning usually means a group text, a few maybes, and a court that stays empty. Players new to the area, or new to the game, often have nobody to ask at all.
+
+## What Courtly does
+
+You post a **hit**: one time, one public court, the kind of tennis you want (casual rally, singles, doubles or drills) and how many spots are open. Friends and nearby players see it and ask to join; when you accept, the hit is confirmed and a chat opens for it. You can invite a friend or a whole group straight to a hit, mark the hours you are usually free so the right hits reach you, and after you play, say who showed up. The app is where hits get found and organized; the website is a landing page with the policies and the support address.
 
 ## Stack
 

@@ -87,7 +87,7 @@ struct PlayerProfileView: View {
         }
         .sheet(isPresented: $showsMutuals) {
             if let profile {
-                MutualFriendsSheet(name: profile.card.firstName, friends: profile.mutualCards) { id in
+                PlayersSheet(title: "Friends with \(profile.card.firstName)", players: profile.mutualCards) { id in
                     showsMutuals = false
                     navigate(.player(id))
                 }
@@ -287,61 +287,6 @@ struct PlayerProfileView: View {
         await inbox.load()
         await hits.refreshAll()
         navigate.pop()
-    }
-}
-
-/// Who you both know, from the "Friends with" line.
-private struct MutualFriendsSheet: View {
-    let name: String
-    let friends: [PlayerCard]
-    let open: (UUID) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Capsule()
-                .fill(CourtlyColor.placeholder)
-                .frame(width: 36, height: 5)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 10)
-                .padding(.bottom, 18)
-            Text("Friends with \(name)")
-                .font(CourtlyFont.sheetTitle)
-                .tracking(-0.4)
-                .foregroundStyle(CourtlyColor.ink)
-            ScrollView {
-                CardRows(items: friends) { friend in
-                    Button {
-                        open(friend.id)
-                    } label: {
-                        HStack(spacing: 14) {
-                            PlayerAvatar(card: friend, size: 44)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(friend.displayName)
-                                    .font(CourtlyFont.bodySemibold)
-                                    .foregroundStyle(CourtlyColor.ink)
-                                Text(friend.levelAndArea)
-                                    .font(CourtlyFont.caption)
-                                    .foregroundStyle(CourtlyColor.secondary)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 16)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 16)
-            }
-            TextActionButton(title: "Done") { dismiss() }
-        }
-        .padding(.horizontal, CourtlyMetrics.screenPadding)
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.hidden)
-        .presentationCornerRadius(20)
     }
 }
 

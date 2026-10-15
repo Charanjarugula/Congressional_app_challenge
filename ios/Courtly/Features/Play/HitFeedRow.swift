@@ -10,6 +10,7 @@ struct HitFeedRow: View {
     @Environment(HitsStore.self) private var hits
     @Environment(\.navigate) private var navigate
     @State private var isJoining = false
+    @State private var showsPlayers = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -42,34 +43,45 @@ struct HitFeedRow: View {
             if isExpanded {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 10) {
+                        Button { showsPlayers = true } label: {
+                            HStack(spacing: 10) {
+                                AvatarStack(cards: hit.everyone, size: 26)
+                                Text(playersLine)
+                                    .font(CourtlyFont.secondary)
+                                    .foregroundStyle(CourtlyColor.ink)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                         Text("\(HitFormatting.dayAndDate.string(from: hit.startsAt)) · \(HitFormatting.clock.string(from: hit.startsAt)) · \(hit.durationMin) min")
                             .font(CourtlyFont.secondary)
                             .foregroundStyle(CourtlyColor.ink)
                         Button(action: openInMaps) {
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(hit.court.name)
-                                    .font(CourtlyFont.secondary)
-                                    .foregroundStyle(CourtlyColor.ink)
-                                if let address = hit.court.address {
-                                    Text(address)
+                                if showsCourtName {
+                                    Text(hit.court.name)
                                         .font(CourtlyFont.secondary)
-                                        .foregroundStyle(CourtlyColor.blue)
+                                        .foregroundStyle(CourtlyColor.ink)
                                 }
+                                Text(fullAddress)
+                                    .font(CourtlyFont.secondary)
+                                    .foregroundStyle(CourtlyColor.blue)
                             }
                             .multilineTextAlignment(.leading)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Open \(hit.court.name) in Maps")
-                        HStack(spacing: 10) {
-                            AvatarStack(cards: hit.everyone, size: 26)
-                            Text(playersLine)
-                                .font(CourtlyFont.secondary)
-                                .foregroundStyle(CourtlyColor.secondary)
-                        }
+                        .accessibilityLabel("Open in Maps")
                     }
                     if hit.hasPendingRequest {
-                        ActionButton(title: "Requested", style: .grouped, isEnabled: false) {}
+                        VStack(spacing: 6) {
+                            ActionButton(title: "Requested", style: .grouped, isEnabled: false) {}
+                            Button("Cancel request") { cancel() }
+                                .font(CourtlyFont.secondarySemibold)
+                                .foregroundStyle(CourtlyColor.red)
+                                .frame(maxWidth: .infinity)
+                                .disabled(isJoining)
+                        }
                     } else {
                         ActionButton(title: "Request to join", isLoading: isJoining) { join() }
                     }
@@ -79,15 +91,49 @@ struct HitFeedRow: View {
                 .transition(.opacity)
             }
         }
+        .sheet(isPresented: $showsPlayers) {
+            PlayersSheet(title: "Who's in", players: hit.everyone) { id in
+                showsPlayers = false
+                navigate(.player(id))
+            }
+        }
         .errorAlert($errorMessage, title: "Couldn’t ask to join")
     }
 
-    /// "2 in · 1 spot open · Advanced host"
+    /// "Ana and Luis · 1 spot open"
     private var playersLine: String {
-        let inCount = 1 + hit.players.count
-        return [inCount == 1 ? "\(hit.host.firstName) so far" : "\(inCount) in", "\(hit.spotsLabel) open", hit.host.level.map { "\($0.title) host" }]
-            .compactMap { $0 }
-            .joined(separator: " · ")
+        let names = hit.everyone.prefix(2).map(\.firstName)
+        let rest = hit.everyone.count - names.count
+        let who: String
+        switch (names.count, rest) {
+        case (1, _): who = names[0]
+        case (2, 0): who = "\(names[0]) and \(names[1])"
+        default: who = "\(names.joined(separator: ", ")) and \(rest) more"
+        }
+        return "\(who) · \(hit.spotsLabel) open"
+    }
+
+    /// Street and city together; the name only when the court has one of its own.
+    private var fullAddress: String {
+        let parts = [hit.court.address, hit.court.city].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? hit.court.name : parts.joined(separator: ", ")
+    }
+
+    private var showsCourtName: Bool {
+        !hit.court.name.isEmpty && hit.court.name != hit.court.address && hit.court.name != fullAddress
+    }
+
+    private func cancel() {
+        guard let request = hit.viewer.request else { return }
+        isJoining = true
+        Task { @MainActor in
+            do {
+                try await hits.cancelRequest(request.id, hitID: hit.id)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isJoining = false
+        }
     }
 
     private func openInMaps() {

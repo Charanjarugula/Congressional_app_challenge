@@ -132,9 +132,6 @@ struct HitDetailView: View {
                         ActionButton(title: "Add to calendar", style: .grouped) { showsCalendar = true }
                     }
                 }
-                if hit.isLive && hit.viewer.isHost && hit.chatId != nil && hit.spotsOpen > 0 {
-                    ActionButton(title: "Invite more players", style: .grouped) { showsInvite = true }
-                }
             }
         }
         .padding(20)
@@ -223,6 +220,10 @@ struct HitDetailView: View {
     @ViewBuilder
     private func footer(_ hit: Hit) -> some View {
         if hit.isLive {
+            if hit.isMember && hit.spotsOpen > 0 {
+                ActionButton(title: "Invite friends", style: .grouped) { showsInvite = true }
+                    .padding(.top, 20)
+            }
             if hit.viewer.isHost {
                 DestructiveTextButton(title: "Cancel hit") { showsCancelAlert = true }
                     .padding(.top, 8)

@@ -148,8 +148,6 @@ final class HitsStore {
     @MainActor
     func requestToJoin(_ hitID: UUID) async throws -> Hit {
         let hit = try await API.Hits.requestToJoin(hitID)
-        feed?.fromFriends.removeAll { $0.id == hitID }
-        feed?.nearYou.removeAll { $0.id == hitID }
         replace(hit)
         refreshSoon()
         return hit
@@ -159,6 +157,11 @@ final class HitsStore {
     func cancelRequest(_ requestID: UUID, hitID: UUID) async throws {
         try await API.Hits.cancelRequest(requestID)
         myHits?.upcoming.removeAll { $0.id == hitID && $0.rowState == .pending }
+        if var current = feed {
+            for index in current.fromFriends.indices where current.fromFriends[index].id == hitID { current.fromFriends[index].viewer.request = nil }
+            for index in current.nearYou.indices where current.nearYou[index].id == hitID { current.nearYou[index].viewer.request = nil }
+            feed = current
+        }
         refreshSoon()
     }
 

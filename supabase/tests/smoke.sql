@@ -223,19 +223,15 @@ begin
   -- Onboarding validation and contact matching.
   perform public.update_profile(jsonb_build_object('phone_e164', '+15615550142', 'email_hash', 'spoofed', 'radius_mi', 15));
   if (public.get_me()->>'radius_mi')::int <> 15 then raise exception 'update_profile radius'; end if;
-  -- Hashes are the server's: the phone hash comes from the number, the email hash from the verified sign-in email.
+  -- Hashes are the server's: no phone hash, and the email hash only from the verified sign-in email.
   if (select phone_hash from public.profiles where id = a) is not null then raise exception 'phone number hashed for matching (unverified)'; end if;
   if (select email_hash from public.profiles where id = a) = 'spoofed' then raise exception 'client set email_hash'; end if;
   insert into auth.users (id, email) values (v_pat, 'Pat.Lee@Example.com');
   if (select email_hash from public.profiles where id = v_pat) <> public.contact_hash('pat.lee@example.com') then raise exception 'email_hash not set on sign-up'; end if;
   update auth.users set email = 'pat@example.org' where id = v_pat;
   if (select email_hash from public.profiles where id = v_pat) <> public.contact_hash('pat@example.org') then raise exception 'email_hash not updated'; end if;
-  begin
-    perform public.update_profile(jsonb_build_object('phone_e164', '(561) 555-0142'));
-    raise exception 'unformatted phone accepted';
-  exception when others then
-    if sqlerrm <> 'invalid_phone' then raise; end if;
-  end;
+  -- Phone numbers aren't collected at all (0025): whatever is sent, nothing is stored.
+  if (select phone_e164 from public.profiles where id = a) is not null then raise exception 'a phone number was stored'; end if;
   -- The support address moderates from its first sign-in.
   insert into private.settings (key, value) values ('admin_email', 'mod@example.com') on conflict (key) do update set value = excluded.value;
   insert into auth.users (id, email) values (gen_random_uuid(), 'Mod@Example.com');
@@ -954,6 +950,57 @@ begin
     update public.profiles set home_point = null where id = v_new;
     perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);
     if (public.get_area_pulse()->>'players')::int <> 0 then raise exception 'pulse without a home area'; end if;
+  end;
+
+  -- Time zones follow the court; the host can edit a hit and the players hear about a move (0025).
+  declare
+    v_la jsonb; v_la_hit jsonb; v_la_req jsonb; v_moved jsonb; v_at timestamptz := date_trunc('hour', now()) + interval '20 days';
+  begin
+    if public.time_label(v_at, 'America/Los_Angeles') = public.time_label(v_at, 'America/New_York') then
+      raise exception 'time labels ignore the zone';
+    end if;
+    perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+    v_la := public.add_court('Griffith Park Tennis', '3401 Riverside Dr', 'Los Angeles', 34.12, -118.27, null, null, null, 'America/Los_Angeles');
+    if v_la->>'time_zone' <> 'America/Los_Angeles' then raise exception 'court time zone not kept: %', v_la; end if;
+    begin
+      perform public.add_court('Nowhere Court', null, null, 34.0, -118.0, null, null, null, 'Mars/Olympus');
+    exception when others then raise exception 'a bad time zone should fall back, not fail: %', sqlerrm;
+    end;
+    v_la_hit := public.create_hit((v_la->>'id')::uuid, v_at, 90, 'singles', 2, 'anyone');
+    if public.hit_push_label((v_la_hit->>'id')::uuid) not like '%' || to_char(v_at at time zone 'America/Los_Angeles', 'FMHH12:MI AM') || '%' then
+      raise exception 'push label not in the court''s zone: %', public.hit_push_label((v_la_hit->>'id')::uuid);
+    end if;
+    perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+    v_la_req := public.request_to_join((v_la_hit->>'id')::uuid);
+    begin
+      perform public.update_hit((v_la_hit->>'id')::uuid, (v_la->>'id')::uuid, v_at, 90, 'singles', 2, 'anyone');
+      raise exception 'a player edited someone else''s hit';
+    exception when others then
+      if sqlerrm <> 'not_host' then raise; end if;
+    end;
+    perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+    perform public.respond_to_request((v_la_req->'viewer'->'request'->>'id')::uuid, true);
+    begin
+      perform public.update_hit((v_la_hit->>'id')::uuid, (v_la->>'id')::uuid, v_at, 90, 'singles', 0, 'anyone');
+      raise exception 'spots dropped below the players already in';
+    exception when others then
+      if sqlerrm <> 'invalid_spots' then raise; end if;
+    end;
+    v_moved := public.update_hit((v_la_hit->>'id')::uuid, (v_la->>'id')::uuid, v_at + interval '1 day', 120, 'singles', 3, 'anyone');
+    if (v_moved->>'spots_open')::int <> 2 or (v_moved->>'duration_min')::int <> 120 then raise exception 'edit state: %', v_moved; end if;
+    if not exists (select 1 from public.notifications where user_id = b and kind = 'hit_changed') then raise exception 'player not told the hit moved'; end if;
+    if not exists (select 1 from public.messages m where m.chat_id = (v_moved->>'chat_id')::uuid and m.payload->>'event' = 'hit_changed') then
+      raise exception 'hit chat not told the hit moved';
+    end if;
+    if public.message_text((select m.id from public.messages m where m.chat_id = (v_moved->>'chat_id')::uuid
+                            and m.payload->>'event' = 'hit_changed' limit 1), a) not like 'You moved the hit to %' then
+      raise exception 'host not told in their own words';
+    end if;
+    perform public.cancel_hit((v_la_hit->>'id')::uuid);
+    -- The player's zone follows the iPhone; one Postgres doesn't know keeps the last good one.
+    perform public.update_profile('{"time_zone": "America/Chicago"}'::jsonb);
+    perform public.update_profile('{"time_zone": "Mars/Olympus"}'::jsonb);
+    if public.player_time_zone(a) <> 'America/Chicago' then raise exception 'player zone: %', public.player_time_zone(a); end if;
   end;
 
   -- A single message can be reported; its text stays with the report. Only the sender's own message, seen by the reporter.

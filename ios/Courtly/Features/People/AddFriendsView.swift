@@ -18,6 +18,7 @@ struct AddFriendsView: View {
     @State private var relationships: [UUID: Relationship] = [:]
     @State private var adding: UUID?
     @State private var errorMessage: String?
+    @State private var pendingRequest: PendingFriendRequest?
     @FocusState private var searchFocused: Bool
 
     private var trimmedQuery: String { query.trimmingCharacters(in: .whitespaces) }
@@ -71,6 +72,7 @@ struct AddFriendsView: View {
         .toolbar(.hidden, for: .tabBar)
         .onChange(of: query) { _, newValue in scheduleSearch(newValue) }
         .task { await loadSuggestions() }
+        .takeBackRequestDialog($pendingRequest) { cancelRequest($0) }
         .errorAlert($errorMessage)
     }
 
@@ -158,7 +160,9 @@ struct AddFriendsView: View {
             PillButton(title: "Added", style: .tint, showsCheck: true) {}
                 .disabled(true)
         case .requested:
-            PillButton(title: "Requested", style: .tint) { cancelRequest(card) }
+            PillButton(title: "Requested", style: .tint) {
+                pendingRequest = PendingFriendRequest(id: card.id, firstName: card.firstName)
+            }
                 .disabled(adding != nil)
         case .requestedMe:
             PillButton(title: adding == card.id ? "Confirming…" : "Confirm") { respond(card, accept: true) }
@@ -269,13 +273,13 @@ struct AddFriendsView: View {
         }
     }
 
-    /// Tapping "Requested" takes the request back.
-    private func cancelRequest(_ card: PlayerCard) {
-        adding = card.id
+    /// Tapping "Requested", then confirming, takes the request back.
+    private func cancelRequest(_ id: UUID) {
+        adding = id
         Task { @MainActor in
             do {
-                _ = try await API.People.cancelFriendRequest(card.id)
-                relationships[card.id] = Relationship.none   // explicit: a bare .none would delete the entry
+                _ = try await API.People.cancelFriendRequest(id)
+                relationships[id] = Relationship.none   // explicit: a bare .none would delete the entry
                 await inbox.load()
             } catch {
                 errorMessage = error.localizedDescription

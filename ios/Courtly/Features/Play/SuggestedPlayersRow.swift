@@ -10,6 +10,7 @@ struct SuggestedPlayersRow: View {
     @Environment(\.navigate) private var navigate
     @State private var busy: Set<UUID> = []
     @State private var errorMessage: String?
+    @State private var pendingRequest: PendingFriendRequest?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -32,6 +33,7 @@ struct SuggestedPlayersRow: View {
             }
             .padding(.horizontal, -CourtlyMetrics.screenPadding)   // cards run to the screen edges
         }
+        .takeBackRequestDialog($pendingRequest) { toggle($0) }
         .errorAlert($errorMessage, title: "Couldn’t send the request")
     }
 
@@ -54,7 +56,13 @@ struct SuggestedPlayersRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            Button { toggle(player.id) } label: {
+            Button {
+                if isRequested {
+                    pendingRequest = PendingFriendRequest(id: player.id, firstName: player.card.firstName)
+                } else {
+                    toggle(player.id)
+                }
+            } label: {
                 Text(isRequested ? "Requested" : "Add")
                     .font(CourtlyFont.captionSemibold)
                     .foregroundStyle(isRequested ? CourtlyColor.ink : .white)

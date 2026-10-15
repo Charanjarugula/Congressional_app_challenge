@@ -2,13 +2,13 @@ import Contacts
 import CryptoKit
 import Foundation
 
-/// A contact's hashed phone number or email, with the name from the address book for display.
+/// A contact's hashed email, with the name from the address book for display.
 struct HashedContact {
     let hash: String
     let displayName: String
 }
 
-/// Reads the address book and hashes every phone number and email on the phone.
+/// Reads the address book and hashes every email address in it, on the device.
 /// Only the hashes are sent to the backend; raw numbers never leave the device.
 struct ContactsService {
     func requestAccess() async -> Bool {
@@ -45,15 +45,6 @@ struct ContactsService {
             }
         }
         return result
-    }
-
-    /// E.164 for US numbers: "(561) 555-0142" → "+15615550142". Anything unrecognized is skipped.
-    static func normalizePhone(_ raw: String) -> String? {
-        let digits = raw.filter(\.isNumber)
-        if raw.hasPrefix("+"), digits.count >= 10 { return "+" + digits }
-        if digits.count == 10 { return "+1" + digits }
-        if digits.count == 11, digits.hasPrefix("1") { return "+" + digits }
-        return nil
     }
 
     static func hash(_ value: String) -> String {

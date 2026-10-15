@@ -37,7 +37,7 @@ struct ExploreFilters: Equatable {
     func apply(to hits: [Hit], calendar: Calendar = .current) -> [Hit] {
         let kept = hits.filter { hit in
             matchesDay(hit.startsAt, calendar: calendar)
-                && (times.isEmpty || AvailabilityMask.slot(for: hit.startsAt, calendar: calendar).map { times.contains($0.block) } == true)
+                && (times.isEmpty || AvailabilityMask.slot(for: hit.startsAt, calendar: hit.calendar).map { times.contains($0.block) } == true)
                 && (formats.isEmpty || formats.contains(hit.format))
                 && (levels.isEmpty || hit.host.level.map { levels.contains($0) } == true)
         }

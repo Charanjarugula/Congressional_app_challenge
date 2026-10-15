@@ -54,7 +54,7 @@ struct HitFeedRow: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        Text("\(HitFormatting.dayAndDate.string(from: hit.startsAt)) · \(HitFormatting.clock.string(from: hit.startsAt)) · \(hit.durationMin) min")
+                        Text("\(hit.dateText) · \(hit.clockText) · \(hit.durationMin) min")
                             .font(CourtlyFont.secondary)
                             .foregroundStyle(CourtlyColor.ink)
                         Button(action: openInMaps) {

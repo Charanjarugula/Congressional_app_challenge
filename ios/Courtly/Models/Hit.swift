@@ -166,15 +166,45 @@ struct Hit: Codable, Identifiable, Equatable {
 
     // MARK: Labels
 
-    /// "Thu · 6:30 PM"
-    var timeLabel: String {
-        "\(HitFormatting.day.string(from: startsAt)) · \(HitFormatting.clock.string(from: startsAt))"
+    /// Times read in the court's zone: a hit happens where the court is.
+    var zone: TimeZone { court.zone }
+
+    /// The court is in another zone than this iPhone right now.
+    var isInAnotherZone: Bool {
+        zone.secondsFromGMT(for: startsAt) != TimeZone.current.secondsFromGMT(for: startsAt)
     }
 
-    /// "Thu 6:30 PM"
-    var shortTimeLabel: String {
-        "\(HitFormatting.day.string(from: startsAt)) \(HitFormatting.clock.string(from: startsAt))"
+    /// A calendar in the court's zone, for "is it an evening hit" style questions.
+    var calendar: Calendar {
+        var calendar = Calendar.current
+        calendar.timeZone = zone
+        return calendar
     }
+
+    /// "Thu, Oct 16"
+    var dateText: String { HitFormatting.string("EEE, MMM d", startsAt, in: zone) }
+
+    /// "Thu"
+    var dayText: String { HitFormatting.string("EEE", startsAt, in: zone) }
+
+    /// "6:30 PM", or "6:30 PM EDT" when the court is in another zone.
+    var clockText: String {
+        let clock = HitFormatting.string("h:mm a", startsAt, in: zone)
+        guard isInAnotherZone else { return clock }
+        return "\(clock) \(zone.abbreviation(for: startsAt) ?? "")".trimmingCharacters(in: .whitespaces)
+    }
+
+    /// "3:30 PM your time", only when the court is in another zone.
+    var yourTimeNote: String? {
+        guard isInAnotherZone else { return nil }
+        return "\(HitFormatting.string("EEE h:mm a", startsAt, in: .current)) your time"
+    }
+
+    /// "Thu · 6:30 PM"
+    var timeLabel: String { "\(dayText) · \(clockText)" }
+
+    /// "Thu 6:30 PM"
+    var shortTimeLabel: String { "\(dayText) \(clockText)" }
 
     /// "Casual hitting · 90 min"
     var formatLine: String { "\(format.title) · \(durationMin) min" }
@@ -207,7 +237,8 @@ struct Hit: Codable, Identifiable, Equatable {
     }
 }
 
-/// Shared date and distance formatting for hit screens. Times show in the device's zone.
+/// Shared date and distance formatting for hit screens. The fixed formatters use the device's zone;
+/// hit times go through `string(_:_:in:)` with the court's zone.
 enum HitFormatting {
     static let day = formatter("EEE")
     static let clock = formatter("h:mm a")
@@ -247,6 +278,21 @@ enum HitFormatting {
         if hours >= 1 { return "\(hours)h left" }
         return "\(max(1, Int(seconds / 60)))m left"
     }
+
+    /// Formats in a given zone (a court's), with one cached formatter per format and zone.
+    static func string(_ format: String, _ date: Date, in zone: TimeZone) -> String {
+        let key = "\(format)|\(zone.identifier)"
+        zonedLock.lock()
+        defer { zonedLock.unlock() }
+        if let cached = zoned[key] { return cached.string(from: date) }
+        let formatter = Self.formatter(format)
+        formatter.timeZone = zone
+        zoned[key] = formatter
+        return formatter.string(from: date)
+    }
+
+    private static let zonedLock = NSLock()
+    nonisolated(unsafe) private static var zoned: [String: DateFormatter] = [:]
 
     private static func formatter(_ format: String) -> DateFormatter {
         let formatter = DateFormatter()

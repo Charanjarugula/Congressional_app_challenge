@@ -39,7 +39,6 @@ struct YouView: View {
         .sheet(item: $sheet) { which in
             switch which {
             case .name: NameSheet()
-            case .phone: PhoneSheet()
             case .availability: AvailabilitySheet()
             case .level: LevelSheet()
             case .formats: FormatsSheet()
@@ -91,12 +90,6 @@ struct YouView: View {
             HairlineSeparator()
             // The sign-in address: shown, not editable.
             ValueRow(title: "Email", value: email ?? "—")
-            HairlineSeparator()
-            SettingsRow(
-                title: "Phone",
-                value: profile.phoneE164.map(PhoneSheet.format) ?? "Add",
-                valueColor: profile.phoneE164 == nil ? CourtlyColor.blue : CourtlyColor.secondary
-            ) { sheet = .phone }
         }
 
         group(label: "Tennis") {

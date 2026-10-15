@@ -69,6 +69,7 @@ final class OnboardingDraft {
             "availability_mask": Int(availability.rawValue),
             "busy_mask_week": Int(busyThisWeek.rawValue),
             "calendar_provider": (calendar?.provider ?? CalendarProvider.none).rawValue,
+            "time_zone": TimeZone.current.identifier,
         ]
         if let gender { patch["gender"] = gender.rawValue }
         if let level { patch["level"] = level.rawValue }

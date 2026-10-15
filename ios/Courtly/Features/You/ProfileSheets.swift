@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 enum ProfileSheet: String, Identifiable {
-    case name, phone, availability, level, formats, area
+    case name, availability, level, formats, area
 
     var id: String { rawValue }
 }

@@ -24,6 +24,7 @@ struct PeopleToPlayWithView: View {
     @State private var isLoading = true
     @State private var isCheckingContacts = false
     @State private var errorMessage: String?
+    @State private var pendingRequest: PendingFriendRequest?
 
     var body: some View {
         OnboardingStepView(
@@ -103,6 +104,7 @@ struct PeopleToPlayWithView: View {
             PrimaryButton(title: requestedCount == 0 ? "Continue" : "Continue · \(requestedCount) requested", action: onContinue)
         }
         .task { await load() }
+        .takeBackRequestDialog($pendingRequest) { toggle($0) }
     }
 
     private var subtitle: String {
@@ -159,7 +161,11 @@ struct PeopleToPlayWithView: View {
                     detail: person.detail,
                     standing: standings[person.id] ?? Relationship.none
                 ) {
-                    toggle(person.card.id)
+                    if standings[person.id] == .requested {
+                        pendingRequest = PendingFriendRequest(id: person.card.id, firstName: person.card.firstName)
+                    } else {
+                        toggle(person.card.id)
+                    }
                 }
             }
         }

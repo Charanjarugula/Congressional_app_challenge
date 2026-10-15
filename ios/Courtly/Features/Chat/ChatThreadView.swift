@@ -351,8 +351,8 @@ private struct PinnedHitBar: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(HitFormatting.day.string(from: hit.startsAt))
-                    Text(HitFormatting.clock.string(from: hit.startsAt))
+                    Text(hit.dayText)
+                    Text(hit.clockText)
                 }
                 .font(CourtlyFont.rounded(15))
                 .foregroundStyle(CourtlyColor.ink)

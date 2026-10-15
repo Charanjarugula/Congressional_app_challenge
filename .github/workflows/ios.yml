@@ -49,6 +49,38 @@ jobs:
         if: failure()
         run: grep -E "error:" build.log | head -100 || tail -100 build.log
 
+  test:
+    name: Unit tests on iOS Simulator
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pick an available iPhone simulator
+        id: simulator
+        run: |
+          name=$(xcrun simctl list devices available -j | python3 -c 'import json, sys
+          devices = [d["name"] for runtime in json.load(sys.stdin)["devices"].values() for d in runtime if d["isAvailable"] and d["name"].startswith("iPhone")]
+          print(devices[-1])')
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Testing on $name"
+
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project ios/Courtly.xcodeproj \
+            -scheme Courtly \
+            -destination "platform=iOS Simulator,name=${{ steps.simulator.outputs.name }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee test.log | grep -E "^(Test Suite|Test Case .* (passed|failed)|Executed|\*\*|error:|.*: error:)" || true
+          grep -q "TEST SUCCEEDED" test.log
+          grep -E "Executed [0-9]+ tests" test.log | tail -1
+
+      - name: Show failures
+        if: failure()
+        run: grep -E "error:|failed" test.log | head -100 || tail -100 test.log
+
   config:
     name: Config check
     runs-on: ubuntu-latest

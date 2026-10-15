@@ -8,6 +8,7 @@ enum AppRoute: Hashable {
     case groupInfo(UUID)
     case player(UUID, hitID: UUID? = nil)
     case addFriends
+    case friendRequests
     case newGroup
     case account
     case blockedPlayers

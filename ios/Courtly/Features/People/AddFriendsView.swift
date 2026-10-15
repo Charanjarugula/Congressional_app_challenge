@@ -56,7 +56,7 @@ struct AddFriendsView: View {
                     QuietCard(title: "No suggestions yet", detail: "Add a friend or join a hit and people you cross paths with show up here.")
                 } else {
                     CardRows(items: suggestions) { suggestion in
-                        personRow(suggestion.card, subtitle: suggestion.reason ?? suggestion.card.levelAndArea, relationship: relationship(for: suggestion.id, fallback: .none))
+                        personRow(suggestion.card, subtitle: suggestion.mutualFriends.mutualLabel ?? suggestion.reason ?? suggestion.card.levelAndArea, relationship: relationship(for: suggestion.id, fallback: .none))
                     }
                 }
             }
@@ -148,10 +148,10 @@ struct AddFriendsView: View {
             PillButton(title: "Added", style: .tint, showsCheck: true) {}
                 .disabled(true)
         case .requested:
-            PillButton(title: "Requested", style: .tint) {}
-                .disabled(true)
+            PillButton(title: "Requested", style: .tint) { cancelRequest(card) }
+                .disabled(adding != nil)
         case .requestedMe:
-            PillButton(title: adding == card.id ? "Adding…" : "Add back") { add(card) }
+            PillButton(title: adding == card.id ? "Confirming…" : "Confirm") { respond(card, accept: true) }
                 .disabled(adding != nil)
         case .none, .blocked:
             PillButton(title: adding == card.id ? "Adding…" : "Add") { add(card) }
@@ -160,10 +160,7 @@ struct AddFriendsView: View {
     }
 
     private func subtitle(for result: SearchedPlayer) -> String {
-        if !result.mutualFriends.isEmpty {
-            let names = result.mutualFriends.prefix(2).joined(separator: " and ")
-            return "Friends with \(names)"
-        }
+        if let mutual = result.mutualFriends.mutualLabel { return mutual }
         return result.card.levelAndArea.isEmpty ? "On Courtly" : result.card.levelAndArea
     }
 
@@ -234,6 +231,36 @@ struct AddFriendsView: View {
         if let matches = try? await API.People.matchContacts(hashes: hashed.map(\.hash)) {
             var seen = Set<UUID>()
             contactMatches = matches.filter { seen.insert($0.player.id).inserted }
+        }
+    }
+
+    private func respond(_ card: PlayerCard, accept: Bool) {
+        adding = card.id
+        Task { @MainActor in
+            do {
+                let result = try await API.People.respondFriendRequest(card.id, accept: accept)
+                relationships[card.id] = Relationship(rawValue: result.relationship) ?? .none
+                inbox.removeRequest(from: card.id)
+                await inbox.load()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            adding = nil
+        }
+    }
+
+    /// Tapping "Requested" takes the request back.
+    private func cancelRequest(_ card: PlayerCard) {
+        adding = card.id
+        Task { @MainActor in
+            do {
+                _ = try await API.People.cancelFriendRequest(card.id)
+                relationships[card.id] = .none
+                await inbox.load()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            adding = nil
         }
     }
 

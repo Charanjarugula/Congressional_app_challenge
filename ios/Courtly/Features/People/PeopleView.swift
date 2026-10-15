@@ -43,6 +43,25 @@ struct PeopleView: View {
                 .tracking(-0.8)
                 .foregroundStyle(CourtlyColor.ink)
             Spacer()
+            Button {
+                navigate(.friendRequests)
+            } label: {
+                Image(systemName: "person.badge.clock")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(inbox.requestCount > 0 ? CourtlyColor.ink : CourtlyColor.secondary)
+                    .frame(width: 40, height: 40)
+                    .background(
+                        Circle()
+                            .fill(Color.white)
+                            .shadow(color: CourtlyColor.ink.opacity(0.08), radius: 4, y: 2)
+                    )
+                    .overlay(alignment: .topTrailing) {
+                        CountBadge(count: inbox.requestCount)
+                            .offset(x: 5, y: -4)
+                    }
+            }
+            .buttonStyle(PressableButtonStyle())
+            .accessibilityLabel(inbox.requestCount > 0 ? "\(inbox.requestCount) friend requests" : "Friend requests")
             Menu {
                 Button("Add friends", systemImage: "person.badge.plus") { navigate(.addFriends) }
                 Button("New group chat", systemImage: "person.3") { navigate(.newGroup) }
@@ -93,6 +112,10 @@ struct PeopleView: View {
 
     @ViewBuilder
     private var content: some View {
+        if query.isEmpty, let requests = inbox.requests, !requests.incoming.isEmpty {
+            requestsRow(requests.incoming)
+                .padding(.bottom, 12)
+        }
         if let all = inbox.chats {
             let shown = filtered(all)
             if all.isEmpty {
@@ -117,6 +140,55 @@ struct PeopleView: View {
             ProgressView()
                 .frame(maxWidth: .infinity)
                 .padding(.top, 80)
+        }
+    }
+
+    /// One row above the chats while someone is waiting on you, like a message-requests folder.
+    private func requestsRow(_ incoming: [FriendRequest]) -> some View {
+        Button {
+            navigate(.friendRequests)
+        } label: {
+            HStack(spacing: 14) {
+                ZStack(alignment: .bottomTrailing) {
+                    if incoming.count >= 2 {
+                        PlayerAvatar(card: incoming[1].card, size: 36)
+                            .frame(width: 52, height: 52, alignment: .topLeading)
+                        PlayerAvatar(card: incoming[0].card, size: 36)
+                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                    } else if let first = incoming.first {
+                        PlayerAvatar(card: first.card, size: 52)
+                    }
+                }
+                .frame(width: 52, height: 52)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Friend requests")
+                        .font(CourtlyFont.bodySemibold)
+                        .foregroundStyle(CourtlyColor.ink)
+                    Text(requestsPreview(incoming))
+                        .font(CourtlyFont.secondarySemibold)
+                        .foregroundStyle(CourtlyColor.blue)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                CountBadge(count: incoming.count)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(CourtlyColor.placeholder)
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(CourtlyColor.card))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func requestsPreview(_ incoming: [FriendRequest]) -> String {
+        let names = incoming.prefix(2).map(\.card.firstName)
+        switch incoming.count {
+        case 1: return "\(names[0]) wants to be friends"
+        case 2: return "\(names[0]) and \(names[1]) want to be friends"
+        default: return "\(names[0]), \(names[1]) and \(incoming.count - 2) more"
         }
     }
 

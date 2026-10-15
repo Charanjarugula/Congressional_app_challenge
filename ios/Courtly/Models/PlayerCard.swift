@@ -49,6 +49,26 @@ struct SuggestedPlayer: Codable, Identifiable {
     let formats: [PlayFormat]
     let reason: String?
     let source: String?
+    var mutualFriends: [String] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case id, firstName, lastInitial, photoPath, level, areaLabel, hitsPlayed, formats, reason, source, mutualFriends
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        firstName = try c.decode(String.self, forKey: .firstName)
+        lastInitial = try c.decodeIfPresent(String.self, forKey: .lastInitial)
+        photoPath = try c.decodeIfPresent(String.self, forKey: .photoPath)
+        level = try c.decodeIfPresent(PlayerLevel.self, forKey: .level)
+        areaLabel = try c.decodeIfPresent(String.self, forKey: .areaLabel)
+        hitsPlayed = try c.decodeIfPresent(Int.self, forKey: .hitsPlayed) ?? 0
+        formats = try c.decodeIfPresent([PlayFormat].self, forKey: .formats) ?? []
+        reason = try c.decodeIfPresent(String.self, forKey: .reason)
+        source = try c.decodeIfPresent(String.self, forKey: .source)
+        mutualFriends = try c.decodeIfPresent([String].self, forKey: .mutualFriends) ?? []
+    }
 
     var card: PlayerCard {
         PlayerCard(id: id, firstName: firstName, lastInitial: lastInitial, photoPath: photoPath, level: level,
@@ -59,4 +79,46 @@ struct SuggestedPlayer: Codable, Identifiable {
 struct FriendshipResult: Codable {
     let relationship: String
     let dmChatId: UUID?
+}
+
+/// A `get_friend_requests` row: who asked (or whom you asked), who you both know, and when.
+struct FriendRequest: Codable, Identifiable {
+    let card: PlayerCard
+    let mutualFriends: [String]
+    let requestedAt: Date?
+
+    var id: UUID { card.id }
+
+    private enum CodingKeys: String, CodingKey {
+        case mutualFriends, requestedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        card = try PlayerCard(from: decoder)
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        mutualFriends = try container.decodeIfPresent([String].self, forKey: .mutualFriends) ?? []
+        requestedAt = try container.decodeIfPresent(Date.self, forKey: .requestedAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        try card.encode(to: encoder)
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(mutualFriends, forKey: .mutualFriends)
+        try container.encodeIfPresent(requestedAt, forKey: .requestedAt)
+    }
+}
+
+/// Requests waiting on you, and the ones you sent that haven't been answered.
+struct FriendRequests: Codable {
+    var incoming: [FriendRequest]
+    var outgoing: [FriendRequest]
+
+    static let empty = FriendRequests(incoming: [], outgoing: [])
+}
+
+extension Array where Element == String {
+    /// "3 mutual friends", "1 mutual friend", or nil.
+    var mutualLabel: String? {
+        isEmpty ? nil : (count == 1 ? "1 mutual friend" : "\(count) mutual friends")
+    }
 }

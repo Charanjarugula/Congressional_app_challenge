@@ -67,35 +67,38 @@ begin
   select count(*) into v_n from public.notifications where user_id = a and kind = 'message';
   if v_n <> 1 then raise exception 'host should get 1 message push, got %', v_n; end if;
 
-  -- Friends: Alex adds Jordan (pending, DM created), Jordan adds back (accepted).
+  -- Friends: Alex asks Jordan. Nothing opens until Jordan confirms; Jordan sees the request and the badge counts it.
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
   v_friend := public.add_friend(b);
-  if (v_friend->>'relationship') <> 'requested' then raise exception 'add_friend: %', v_friend; end if;
-  begin
-    perform public.send_message((v_friend->>'dm_chat_id')::uuid, gen_random_uuid(), 'hi');
-    raise exception 'dm allowed before add-back';
-  exception when others then
-    if sqlerrm <> 'not_friends' then raise; end if;
-  end;
-  -- Same for a hit request card.
-  v_hit := public.create_hit(v_court, now() + interval '6 days', 60, 'singles', 1, 'anyone');
-  begin
-    perform public.send_hit_invite((v_hit->>'id')::uuid, (v_friend->>'dm_chat_id')::uuid, b);
-    raise exception 'hit request allowed before add-back';
-  exception when others then
-    if sqlerrm <> 'not_friends' then raise; end if;
-  end;
+  if (v_friend->>'relationship') <> 'requested' or (v_friend->>'dm_chat_id') is not null then raise exception 'add_friend: %', v_friend; end if;
+  if public.find_dm_chat(b, c) is not null then raise exception 'a request opened a dm'; end if;
+  if public.friend_request_count(b) <> 1 then raise exception 'jordan should have one request waiting'; end if;
+  select count(*) into v_n from public.notifications where user_id = b and kind = 'friend_added';
+  if v_n <> 1 then raise exception 'jordan should be told once, got %', v_n; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
-  v_friend := public.add_friend(c);
-  if (v_friend->>'relationship') <> 'friend' then raise exception 'add back: %', v_friend; end if;
+  v_feed := public.get_friend_requests();
+  if jsonb_array_length(v_feed->'incoming') <> 1 or (v_feed->'incoming'->0->>'id')::uuid <> c then raise exception 'jordan''s requests: %', v_feed; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  v_feed := public.get_friend_requests();
+  if jsonb_array_length(v_feed->'outgoing') <> 1 or (v_feed->'outgoing'->0->>'id')::uuid <> b then raise exception 'alex''s sent requests: %', v_feed; end if;
+  -- Asking again is a quiet no-op: no second notice.
+  v_friend := public.add_friend(b);
+  if (v_friend->>'relationship') <> 'requested' then raise exception 'second add: %', v_friend; end if;
+  select count(*) into v_n from public.notifications where user_id = b and kind = 'friend_added';
+  if v_n <> 1 then raise exception 'a repeated add notified again (%)', v_n; end if;
+  v_hit := public.create_hit(v_court, now() + interval '6 days', 60, 'singles', 1, 'anyone');
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_friend := public.add_friend(c);   -- adding someone who asked you is confirming
+  if (v_friend->>'relationship') <> 'friend' or (v_friend->>'dm_chat_id') is null then raise exception 'add back: %', v_friend; end if;
+  if public.friend_request_count(b) <> 0 then raise exception 'confirmed request still counted'; end if;
   -- The system line reads from each side.
   v_inbox := public.get_inbox();
-  if not exists (select 1 from jsonb_array_elements(v_inbox) x where x->>'id' = v_friend->>'dm_chat_id' and x->>'preview' = 'You added Alex O. back. Say hi') then
+  if not exists (select 1 from jsonb_array_elements(v_inbox) x where x->>'id' = v_friend->>'dm_chat_id' and x->>'preview' = 'You and Alex O. are now friends. Say hi') then
     raise exception 'adder preview: %', v_inbox;
   end if;
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
   v_inbox := public.get_inbox();
-  if not exists (select 1 from jsonb_array_elements(v_inbox) x where x->>'id' = v_friend->>'dm_chat_id' and x->>'preview' = 'Jordan T. added you back. Say hi') then
+  if not exists (select 1 from jsonb_array_elements(v_inbox) x where x->>'id' = v_friend->>'dm_chat_id' and x->>'preview' = 'Jordan T. accepted your request. Say hi') then
     raise exception 'added preview: %', v_inbox;
   end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
@@ -456,9 +459,11 @@ begin
   if exists (select 1 from jsonb_array_elements(public.get_friends()) e where (e->>'id')::uuid = b) then raise exception 'remove_friend left jordan on maya''s list'; end if;
   v_friend := public.add_friend(b);
   if (v_friend->>'relationship') <> 'requested' then raise exception 'add after removal: %', v_friend; end if;
-  if (v_friend->>'dm_chat_id')::uuid is distinct from v_dm then raise exception 'add-back opened a second dm: %', v_friend; end if;
+  if (v_friend->>'dm_chat_id') is not null then raise exception 'a request after removal opened a dm: %', v_friend; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
-  if (public.add_friend(a)->>'relationship') <> 'friend' then raise exception 'add back after removal'; end if;
+  v_friend := public.respond_friend_request(a, true);
+  if (v_friend->>'relationship') <> 'friend' then raise exception 'confirm after removal: %', v_friend; end if;
+  if (v_friend->>'dm_chat_id')::uuid is distinct from v_dm then raise exception 'add-back opened a second dm: %', v_friend; end if;
 
   -- The blocked list is the blocker's own and empties on unblock.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
@@ -734,6 +739,46 @@ begin
     if sqlerrm not in ('attendance_closed', 'not_a_player') then raise; end if;
   end;
 
+
+  -- Friend requests: deleting one is silent, taking one back is clean, and the badge counts what waits.
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  v_n := public.badge_count(a);
+  perform public.add_friend(a);
+  if public.badge_count(a) <> v_n + 1 then raise exception 'badge did not count the request'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_friend := public.respond_friend_request(v_pat2, false);
+  if (v_friend->>'relationship') <> 'none' then raise exception 'delete request: %', v_friend; end if;
+  if public.relationship_to(v_pat2, a) <> 'requested' then raise exception 'the asker should still see requested, got %', public.relationship_to(v_pat2, a); end if;
+  if public.relationship_to(a, v_pat2) <> 'none' then raise exception 'deleted request still shows: %', public.relationship_to(a, v_pat2); end if;
+  if public.friend_request_count(a) <> 0 or jsonb_array_length(public.get_friend_requests()->'incoming') <> 0 then raise exception 'deleted request still listed'; end if;
+  if exists (select 1 from public.notifications where user_id = a and kind = 'friend_added' and collapse_id = 'friend-' || v_pat2::text) then raise exception 'deleted request kept its notice'; end if;
+  begin
+    perform public.respond_friend_request(v_pat2, true);
+    raise exception 'answered a deleted request';
+  exception when others then
+    if sqlerrm <> 'request_not_found' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  select count(*) into v_n from public.notifications where user_id = a and kind = 'friend_added';
+  perform public.add_friend(a);   -- asking again after a quiet delete: nothing happens, nobody is told
+  if (select count(*) from public.notifications where user_id = a and kind = 'friend_added') <> v_n then raise exception 'a deleted request re-notified'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_friend := public.add_friend(v_pat2);   -- Maya changes her mind: that confirms it
+  if (v_friend->>'relationship') <> 'friend' or (v_friend->>'dm_chat_id') is null then raise exception 'add after delete: %', v_friend; end if;
+  v_feed := public.get_player(v_pat2);
+  if v_feed->>'relationship' <> 'friend' or (v_feed->>'dm_chat_id') is null or jsonb_typeof(v_feed->'mutual_cards') <> 'array' then raise exception 'get_player after confirm: %', v_feed; end if;
+  perform public.remove_friend(v_pat2);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  perform public.add_friend(a);
+  v_friend := public.cancel_friend_request(a);
+  if (v_friend->>'relationship') <> 'none' or public.relationship_to(a, v_pat2) <> 'none' then raise exception 'cancel request: %', v_friend; end if;
+  if exists (select 1 from public.notifications where user_id = a and kind = 'friend_added' and collapse_id = 'friend-' || v_pat2::text) then raise exception 'cancelled request kept its notice'; end if;
+  begin
+    perform public.cancel_friend_request(a);
+    raise exception 'cancelled twice';
+  exception when others then
+    if sqlerrm <> 'request_not_found' then raise; end if;
+  end;
 
   -- Underage deletion removes a half-onboarded account outright, with the friend request and DM it opened.
   insert into public.profiles (id, first_name, last_name) values (d, 'Sam', 'Lee');

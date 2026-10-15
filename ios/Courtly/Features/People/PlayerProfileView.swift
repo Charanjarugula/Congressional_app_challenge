@@ -16,6 +16,7 @@ struct PlayerProfileView: View {
     @State private var showsBlockAlert = false
     @State private var showsReport = false
     @State private var showsInviteToHit = false
+    @State private var showsCancelRequest = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -31,6 +32,34 @@ struct PlayerProfileView: View {
                             InfoRow(title: "What", value: profile.card.formats.isEmpty ? "Not set" : profile.card.formats.map(\.shortTitle).joined(separator: ", "))
                             HairlineSeparator()
                             InfoRow(title: "Usually free", value: AvailabilityMask(rawValue: profile.card.availabilityMask ?? 0).shortDescription)
+                        }
+                    }
+                    if !profile.mutualCards.isEmpty {
+                        SectionHeader(title: profile.mutualCards.count == 1 ? "1 mutual friend" : "\(profile.mutualCards.count) mutual friends", top: 24)
+                        CardRows(items: profile.mutualCards) { friend in
+                            Button {
+                                navigate(.player(friend.id))
+                            } label: {
+                                HStack(spacing: 14) {
+                                    PlayerAvatar(card: friend, size: 40)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(friend.displayName)
+                                            .font(CourtlyFont.bodySemibold)
+                                            .foregroundStyle(CourtlyColor.ink)
+                                        Text(friend.levelAndArea)
+                                            .font(CourtlyFont.caption)
+                                            .foregroundStyle(CourtlyColor.secondary)
+                                    }
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(CourtlyColor.placeholder)
+                                }
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 16)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     if !profile.openHits.isEmpty {
@@ -73,6 +102,10 @@ struct PlayerProfileView: View {
             }
             Button("Block", role: .destructive) { showsBlockAlert = true }
             Button("Report", role: .destructive) { showsReport = true }
+        }
+        .confirmationDialog("Cancel your friend request?", isPresented: $showsCancelRequest, titleVisibility: .visible) {
+            Button("Cancel request", role: .destructive) { cancelRequest() }
+            Button("Keep it", role: .cancel) {}
         }
         .alert("Block \(profile?.card.firstName ?? "this player")?", isPresented: $showsBlockAlert) {
             Button("Block", role: .destructive) { block() }
@@ -141,11 +174,11 @@ struct PlayerProfileView: View {
                     if let chatID = profile.dmChatId { navigate(.chat(chatID)) }
                 }
             case .requested:
-                ActionButton(title: "Requested", style: .grouped, isEnabled: false) {}
+                ActionButton(title: "Requested", style: .grouped, isLoading: isWorking) { showsCancelRequest = true }
                 ActionButton(title: "Message", style: .grouped, isEnabled: false) {}
             case .requestedMe:
-                ActionButton(title: "Add back", isLoading: isWorking) { addFriend() }
-                ActionButton(title: "Message", style: .grouped, isEnabled: false) {}
+                ActionButton(title: "Confirm", isLoading: isWorking) { respond(accept: true) }
+                ActionButton(title: "Delete", style: .grouped, isLoading: isWorking) { respond(accept: false) }
             case .none, .blocked:
                 ActionButton(title: "Add friend", isLoading: isWorking) { addFriend() }
                 ActionButton(title: "Message", style: .grouped, isEnabled: false) {}
@@ -169,6 +202,36 @@ struct PlayerProfileView: View {
         Task { @MainActor in
             do {
                 _ = try await API.People.addFriend(playerID)
+                await load()
+                await inbox.load()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isWorking = false
+        }
+    }
+
+    private func respond(accept: Bool) {
+        isWorking = true
+        Task { @MainActor in
+            do {
+                _ = try await API.People.respondFriendRequest(playerID, accept: accept)
+                inbox.removeRequest(from: playerID)
+                await load()
+                await inbox.load()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isWorking = false
+        }
+    }
+
+    private func cancelRequest() {
+        isWorking = true
+        Task { @MainActor in
+            do {
+                _ = try await API.People.cancelFriendRequest(playerID)
+                inbox.removeRequest(from: playerID)
                 await load()
                 await inbox.load()
             } catch {

@@ -5,6 +5,8 @@ import Observation
 @Observable
 final class InboxStore {
     private(set) var chats: [Chat]?
+    /// Friend requests waiting on the player and the ones they sent. Loaded with the chats.
+    private(set) var requests: FriendRequests?
     private(set) var isLoading = false
     private(set) var lastError: String?
 
@@ -12,7 +14,10 @@ final class InboxStore {
     init(account: UUID?) {
         guard let account else { return }
         chats = SnapshotCache.load([Chat].self, key: "inbox", account: account)
+        requests = SnapshotCache.load(FriendRequests.self, key: "friend_requests", account: account)
     }
+
+    var requestCount: Int { requests?.incoming.count ?? 0 }
 
     var unreadCount: Int {
         chats?.reduce(0) { $0 + $1.unreadCount } ?? 0
@@ -29,7 +34,9 @@ final class InboxStore {
         defer { if mine == generation { isLoading = false } }
         let owner = await SupabaseClient.shared.session?.userID
         do {
+            async let requestsCall = API.People.friendRequests()
             let fresh = try await API.Chats.inbox()
+            let freshRequests = try? await requestsCall
             // Same player (a sign-out mid-flight must not refill the list), then, with no await in
             // between, still the newest load; the file goes under the account that fetched it.
             let samePlayer = await SupabaseClient.shared.session?.userID == owner
@@ -37,10 +44,23 @@ final class InboxStore {
             chats = fresh
             lastError = nil
             SnapshotCache.save(fresh, key: "inbox", account: owner)
+            if let freshRequests {
+                requests = freshRequests
+                SnapshotCache.save(freshRequests, key: "friend_requests", account: owner)
+            }
         } catch {
             guard mine == generation, !(error is CancellationError), (error as? URLError)?.code != .cancelled else { return }
             lastError = error.localizedDescription
         }
+    }
+
+    /// Drop a request from the list right away; the next load confirms it.
+    @MainActor
+    func removeRequest(from userID: UUID) {
+        guard var current = requests else { return }
+        current.incoming.removeAll { $0.id == userID }
+        current.outgoing.removeAll { $0.id == userID }
+        requests = current
     }
 
     /// Zero a chat's unread count right away; the next load confirms it.

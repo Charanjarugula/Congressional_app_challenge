@@ -196,6 +196,10 @@ struct MainTabView: View {
             selected = .people
             paths[.people] = [.chat(id)]
             Task { await hits.refreshAll() }
+        case .friendRequests:
+            selected = .people
+            paths[.people] = [.friendRequests]
+            Task { await inbox.load() }
         }
     }
 
@@ -247,7 +251,7 @@ struct MainTabView: View {
     private var dots: Set<MainTab> {
         var tabs = Set<MainTab>()
         if hits.needsReplyCount > 0 { tabs.insert(.play) }
-        if inbox.unreadCount > 0 { tabs.insert(.people) }
+        if inbox.unreadCount > 0 || inbox.requestCount > 0 { tabs.insert(.people) }
         return tabs
     }
 
@@ -296,6 +300,7 @@ struct MainTabView: View {
         case let .groupInfo(id): GroupInfoView(chatID: id)
         case let .player(id, hitID): PlayerProfileView(playerID: id, hitID: hitID)
         case .addFriends: AddFriendsView()
+        case .friendRequests: FriendRequestsView()
         case .newGroup: NewGroupView()
         case .account: AccountView()
         case .blockedPlayers: BlockedPlayersView()

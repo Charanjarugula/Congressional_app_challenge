@@ -13,16 +13,11 @@ build/
 .swiftpm/
 
 # Secrets and keys
-ios/Config/Secrets.xcconfig
 *.p8
 *.p12
 *.mobileprovision
 .env
 .env.*
-
-# Supabase local state
-supabase/.temp/
-supabase/.branches/
 
 # Node
 node_modules/

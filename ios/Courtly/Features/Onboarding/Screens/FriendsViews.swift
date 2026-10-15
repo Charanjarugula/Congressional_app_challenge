@@ -101,7 +101,8 @@ struct PeopleToPlayWithView: View {
                     playerList(nearby)
                 }
 
-                if contacts.isEmpty && nearby.isEmpty {
+                // Only when the lists really came back empty; a failed load says so below instead.
+                if contacts.isEmpty && nearby.isEmpty && errorMessage == nil {
                     firstHere
                         .padding(.top, 24)
                 }

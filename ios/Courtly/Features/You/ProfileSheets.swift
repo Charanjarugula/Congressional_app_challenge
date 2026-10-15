@@ -455,6 +455,7 @@ struct EditProfileSheet: View {
     @State private var lastName = ""
     @State private var pickerItem: PhotosPickerItem?
     @State private var newPhoto: UIImage?
+    @State private var photoToCrop: CropTarget?
     @State private var photoLoad = 0
     @State private var isLoadingPhoto = false
     @State private var seeded = false
@@ -548,6 +549,16 @@ struct EditProfileSheet: View {
             lastName = profile.lastName
         }
         .onChange(of: pickerItem) { _, item in loadPhoto(item) }
+        .fullScreenCover(item: $photoToCrop) { target in
+            PhotoCropView(image: target.image) {
+                photoToCrop = nil
+                pickerItem = nil
+            } onChoose: { cropped in
+                newPhoto = cropped
+                photoToCrop = nil
+                pickerItem = nil   // the same photo can be picked and framed again
+            }
+        }
         .errorAlert($errorMessage, title: "Couldn’t save")
     }
 
@@ -576,10 +587,11 @@ struct EditProfileSheet: View {
         Task { @MainActor in
             defer { if load == photoLoad { isLoadingPhoto = false } }
             guard let data = try? await item.loadTransferable(type: Data.self) else { return }
-            // Decoding and scaling a camera photo is slow; keep it off the main thread.
-            let image = await Task.detached(priority: .userInitiated) { UIImage(data: data)?.downscaled(to: 600) }.value
-            guard load == photoLoad else { return }   // a newer pick has taken over
-            newPhoto = image
+            // Decoding and scaling a camera photo is slow; keep it off the main thread. Kept large
+            // enough that zooming in on a face in the cropper stays sharp.
+            let image = await Task.detached(priority: .userInitiated) { UIImage(data: data)?.downscaled(to: 1800) }.value
+            guard load == photoLoad, let image else { return }   // a newer pick has taken over
+            photoToCrop = CropTarget(image: image)
         }
     }
 
@@ -607,6 +619,12 @@ struct EditProfileSheet: View {
             isSaving = false
         }
     }
+}
+
+/// A picked photo waiting to be framed.
+struct CropTarget: Identifiable {
+    let id = UUID()
+    let image: UIImage
 }
 
 extension UIImage {

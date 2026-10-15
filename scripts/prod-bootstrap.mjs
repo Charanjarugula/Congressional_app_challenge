@@ -46,8 +46,9 @@ if (old && old.status === "ACTIVE_HEALTHY") {
   console.log(`pause   ${OLD_REF} is already ${old?.status ?? "gone"}`);
 }
 
-// 2. A fresh project, unless one by that name (other than the old one) already exists.
-let fresh = projects.find((p) => p.name === NEW_NAME && p.id !== OLD_REF);
+// 2. A fresh project: the one PROD_REF names, else one by NEW_NAME (other than the old one), else created.
+// The listing can lag a project made in the dashboard moments ago, which is what PROD_REF is for.
+let fresh = process.env.PROD_REF ? { id: process.env.PROD_REF } : projects.find((p) => p.name === NEW_NAME && p.id !== OLD_REF);
 if (!fresh) {
   // The token may not list organizations; every project carries its organization's id.
   const orgID = old?.organization_id ?? projects[0]?.organization_id ?? (await api("GET", "/organizations"))[0]?.id;

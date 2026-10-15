@@ -4,9 +4,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { appleClientSecret } from "../_shared/apple-jwt.ts";
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+import { json } from "../_shared/http.ts";
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method" }, 405);

@@ -4,18 +4,168 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Courtly</title>
-<link rel="stylesheet" href="styles.css">
+<meta name="description" content="Courtly helps recreational tennis players get on court. Post a hit at a public court, or ask to join one. When it’s confirmed, a chat opens.">
+<meta name="theme-color" content="#1F5BD8">
+<meta property="og:title" content="Courtly">
+<meta property="og:description" content="Courtly helps recreational tennis players get on court. Post a hit at a public court, or ask to join one. When it’s confirmed, a chat opens.">
+<meta property="og:image" content="/icon.png">
+<link rel="icon" type="image/png" href="/icon.png">
+<link rel="apple-touch-icon" href="/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script>document.documentElement.classList.add('js')</script>
+<script src="/site.js" defer></script>
 </head>
-<body>
-<header><a href="/">Courtly</a><nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/support">Support</a></nav></header>
-<main>
-<article>
-<h1>Play more tennis. Plan less.</h1>
-<p class="muted">Courtly helps recreational tennis players in Palm Beach County get on court. Post a hit at a public court, or ask to join one. When it’s confirmed, a chat opens.</p>
+<body class="home">
+<a class="skip" href="#main">Skip to content</a>
+<div class="hero on-blue">
+<svg class="hero-lines" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path pathLength="1" d="M1000 -20V920M1000 450H1460M1230 -20V450M-20 640H430M215 640V920" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="6"/></svg>
+<header class="top">
+<div class="wrap">
+<a class="brand" href="/" aria-label="Courtly home"><img src="/icon.png" alt="" width="40" height="40"><span>Courtly</span></a>
+</div>
+</header>
+<main id="main">
+<section class="hero-main">
+<div class="wrap">
+<div class="hero-art loop" data-tilt><svg viewBox="0 0 340 420" role="img" aria-label="A phone showing the Courtly app icon">
+<g class="f2" style="transform-box:fill-box;transform-origin:center"><g class=""><circle cx="40" cy="300" r="16" fill="#E4F24A" stroke="#B7C42A" stroke-width="1.9"/><path d="M30.1 287.5C39.2 294.4 39.2 305.6 30.1 312.5M49.9 287.5C40.8 294.4 40.8 305.6 49.9 312.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g></g>
+<g class="f3" style="transform-box:fill-box;transform-origin:center"><g class=""><circle cx="300" cy="70" r="12" fill="#E4F24A" stroke="#B7C42A" stroke-width="1.4"/><path d="M292.6 60.6C299.4 65.8 299.4 74.2 292.6 79.4M307.4 60.6C300.6 65.8 300.6 74.2 307.4 79.4" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/></g></g>
+<defs><clipPath id="iconclip"><rect x="132" y="146" width="104" height="104" rx="26"/></clipPath></defs>
+<g class="bob"><g transform="rotate(-12 184 206)">
+<rect x="72" y="46" width="196" height="340" rx="38" fill="#B7C42A"/>
+<rect x="86" y="36" width="196" height="340" rx="38" fill="#E4F24A"/>
+<rect x="100" y="54" width="168" height="304" rx="28" fill="#fff"/>
+<rect x="160" y="68" width="48" height="8" rx="4" fill="#E2E7F2"/>
+<rect x="132" y="152" width="104" height="104" rx="26" fill="#173F9E"/>
+<g class="beat-soft"><image href="/icon.png" x="132" y="146" width="104" height="104" clip-path="url(#iconclip)"/></g>
+</g></g>
+</svg></div>
+<div class="hero-copy">
+<h1><span class="w">Find</span> <span class="w">someone</span> <span class="w">to</span> <span class="w">hit</span> <span class="w">with</span> <span class="w">at</span> <span class="w">a</span> <em><span class="w">public</span> <span class="w">court</span> <span class="w">near</span> <span class="w">you.</span></em></h1>
+<a class="btn btn-lime rise r2" href="#how">See how it works</a>
+<p class="hero-note rise r3"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9s-2-.9-3.4-.9c-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.8 1.3 10.3.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.4.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.2zM13.9 4.9c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3-1.5z"/></svg>Courtly is an iOS app. Find it on the App Store soon.</p>
+</div>
+</div>
+</section>
+</div>
+<div class="how" id="how">
+<svg class="rally-svg" aria-hidden="true"><path class="rally-path" d=""/><g class="rally-fx"></g><g class="rally-ghosts"><circle class="ghost" r="19"/><circle class="ghost" r="17"/><circle class="ghost" r="15"/></g><g class="rally-ball"><ellipse class="rally-shadow" cx="0" cy="0" rx="22" ry="6"/><g class="rally-body"><g class=""><circle cx="0" cy="0" r="21" fill="#E4F24A" stroke="#B7C42A" stroke-width="2.5"/><path d="M-13.0 -16.4C-1.1 -7.3 -1.1 7.3 -13.0 16.4M13.0 -16.4C1.1 -7.3 1.1 7.3 13.0 16.4" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></g></g></g></svg>
+<section class="feature">
+<div class="wrap">
+<div class="copy reveal"><h2>Post a hit</h2><p>Pick a public court and a time. Players near you can see it and ask to join.</p></div>
+<div class="art reveal d1 loop" data-land><div class="lift" data-hit="165 30 440" data-tilt-deg="-3"><svg viewBox="0 0 440 360" role="img" aria-label="A new hit being posted, and a pin dropping on the map">
+<rect x="262" y="128" width="160" height="176" rx="26" fill="#C5D3F2"/>
+<rect x="262" y="120" width="160" height="176" rx="26" fill="#E3EBFC"/>
+<g stroke="#fff" stroke-width="10" stroke-linecap="round"><path d="M262 180H422M318 120V296M262 252L422 214"/></g>
+<rect x="372" y="138" width="34" height="30" rx="8" fill="#CFE6B8"/>
+<ellipse class="ripple" cx="352" cy="232" rx="16" ry="7" fill="none" stroke="#1F5BD8" stroke-width="3"/>
+<g class="pin"><path d="M352 232c-14-18-22-29-22-40a22 22 0 0 1 44 0c0 11-8 22-22 40z" fill="#1F5BD8" stroke="#fff" stroke-width="3"/><g class=""><circle cx="352" cy="191" r="9" fill="#E4F24A" stroke="#B7C42A" stroke-width="1.1"/><path d="M346.4 184.0C351.6 187.8 351.6 194.2 346.4 198.0M357.6 184.0C352.4 187.8 352.4 194.2 357.6 198.0" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></g></g>
+<rect x="40" y="38" width="250" height="300" rx="26" fill="#D7DFEF"/>
+<rect x="40" y="30" width="250" height="300" rx="26" fill="#fff" stroke="#E2E7F2" stroke-width="3"/>
+<text x="64" y="72" font-family="Nunito, -apple-system, Helvetica, Arial, sans-serif" font-weight="800" font-size="24" fill="#0E1726">New hit</text>
+<rect x="64" y="88" width="202" height="46" rx="12" fill="#EEF2FB"/><text x="78" y="107" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#5B6577" letter-spacing=".5">COURT</text><text x="78" y="124" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#0E1726">Public courts · Court 2</text><rect x="64" y="142" width="202" height="46" rx="12" fill="#EEF2FB"/><text x="78" y="161" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#5B6577" letter-spacing=".5">WHEN</text><text x="78" y="178" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#0E1726">Today, 6:00 PM</text><rect x="64" y="196" width="202" height="46" rx="12" fill="#EEF2FB"/><text x="78" y="215" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" fill="#5B6577" letter-spacing=".5">LEVEL</text><text x="78" y="232" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#0E1726">3.5</text>
+<rect class="tap-shadow" x="64" y="264" width="202" height="48" rx="14" fill="#B7C42A"/>
+<g class="tap"><rect x="64" y="258" width="202" height="48" rx="14" fill="#E4F24A"/>
+<text x="165" y="288" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" fill="#0E1726" text-anchor="middle" letter-spacing="1">POST HIT</text></g>
+</svg></div></div>
+</div>
+</section>
+
+<section class="feature flip">
+<div class="wrap">
+<div class="copy reveal"><h2>Ask to join one</h2><p>See the hits posted near you and ask to join the one that fits your day.</p></div>
+<div class="art reveal d1 loop" data-land><div class="lift" data-hit="220 30 440" data-tilt-deg="3"><svg viewBox="0 0 440 340" role="img" aria-label="A list of nearby hits; tapping Join sends a request">
+<rect x="30" y="38" width="380" height="280" rx="26" fill="#D7DFEF"/>
+<rect x="30" y="30" width="380" height="280" rx="26" fill="#fff" stroke="#E2E7F2" stroke-width="3"/>
+<text x="56" y="74" font-family="Nunito, -apple-system, Helvetica, Arial, sans-serif" font-weight="800" font-size="24" fill="#0E1726">Today</text>
+<rect x="56" y="94" width="56" height="46" rx="14" fill="#E3EBFC"/><text x="84" y="116" font-family="Nunito, -apple-system, Helvetica, Arial, sans-serif" font-weight="800" font-size="17" fill="#173F9E" text-anchor="middle">0.8</text><text x="84" y="131" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#173F9E" text-anchor="middle">mi</text><text x="128" y="114" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#0E1726">6:00 PM</text><text x="128" y="133" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#5B6577">Public courts · Court 1</text><rect x="300" y="104" width="84" height="32" rx="12" fill="#B7C42A"/><rect x="300" y="100" width="84" height="32" rx="12" fill="#E4F24A"/><text x="342" y="121" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#0E1726" text-anchor="middle" letter-spacing=".8">JOIN</text>
+<path d="M56 154H384" stroke="#E2E7F2" stroke-width="2"/>
+<rect x="56" y="166" width="56" height="46" rx="14" fill="#E3EBFC"/><text x="84" y="188" font-family="Nunito, -apple-system, Helvetica, Arial, sans-serif" font-weight="800" font-size="17" fill="#173F9E" text-anchor="middle">2.4</text><text x="84" y="203" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#173F9E" text-anchor="middle">mi</text><text x="128" y="186" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#0E1726">7:30 PM</text><text x="128" y="205" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#5B6577">Public courts · Court 4</text><g class="join-on"><rect x="300" y="176" width="84" height="32" rx="12" fill="#B7C42A"/><rect x="300" y="172" width="84" height="32" rx="12" fill="#E4F24A"/><text x="342" y="193" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#0E1726" text-anchor="middle" letter-spacing=".8">JOIN</text></g><g class="join-off"><rect x="300" y="174" width="84" height="32" rx="12" fill="#E3EBFC"/><path d="M314 190l5 5 9-10" stroke="#173F9E" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="352" y="195" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#173F9E" text-anchor="middle" letter-spacing=".5">SENT</text></g>
+<path d="M56 226H384" stroke="#E2E7F2" stroke-width="2"/>
+<rect x="56" y="238" width="56" height="46" rx="14" fill="#E3EBFC"/><text x="84" y="260" font-family="Nunito, -apple-system, Helvetica, Arial, sans-serif" font-weight="800" font-size="17" fill="#173F9E" text-anchor="middle">3.1</text><text x="84" y="275" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" fill="#173F9E" text-anchor="middle">mi</text><text x="128" y="258" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" fill="#0E1726">8:00 PM</text><text x="128" y="277" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#5B6577">Public courts · Court 6</text><rect x="300" y="248" width="84" height="32" rx="12" fill="#B7C42A"/><rect x="300" y="244" width="84" height="32" rx="12" fill="#E4F24A"/><text x="342" y="265" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" fill="#0E1726" text-anchor="middle" letter-spacing=".8">JOIN</text>
+</svg></div></div>
+</div>
+</section>
+
+<section class="feature">
+<div class="wrap">
+<div class="copy reveal"><h2>A chat opens</h2><p>When it’s confirmed, a chat opens with everyone playing, so you can sort out the rest.</p></div>
+<div class="art reveal d1 loop" data-land><div class="lift" data-hit="220 20 440" data-tilt-deg="-3"><svg viewBox="0 0 440 350" role="img" aria-label="A group chat opening with the players in a confirmed hit">
+<rect x="40" y="28" width="360" height="300" rx="26" fill="#D7DFEF"/>
+<rect x="40" y="20" width="360" height="300" rx="26" fill="#fff" stroke="#E2E7F2" stroke-width="3"/>
+<circle cx="78" cy="58" r="16" fill="#0E1726"/><circle cx="100" cy="58" r="16" fill="#E4F24A" stroke="#fff" stroke-width="3"/>
+<text x="126" y="54" font-family="Nunito, -apple-system, Helvetica, Arial, sans-serif" font-weight="800" font-size="17" fill="#0E1726">Saturday hit</text>
+<text x="126" y="72" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#5B6577">Doubles · 8:00 AM</text>
+<path d="M40 94H400" stroke="#E2E7F2" stroke-width="2"/>
+<g class="b1"><rect x="62" y="112" width="178" height="44" rx="18" fill="#EEF2FB"/>
+<text x="80" y="140" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#0E1726">Court 3 or 4?</text></g>
+<g class="b2"><rect x="196" y="170" width="182" height="44" rx="18" fill="#1F5BD8"/>
+<text x="214" y="198" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#fff">4. See you at 8!</text></g>
+<g class="typing"><rect x="62" y="228" width="70" height="40" rx="18" fill="#EEF2FB"/>
+<circle class="dot" cx="84" cy="248" r="5" fill="#5B6577"/><circle class="dot" cx="97" cy="248" r="5" fill="#5B6577"/><circle class="dot" cx="110" cy="248" r="5" fill="#5B6577"/></g>
+<g class="b3"><rect x="62" y="228" width="226" height="44" rx="18" fill="#E4F24A"/>
+<text x="80" y="256" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#0E1726">Bringing a new can of balls</text></g>
+</svg></div></div>
+</div>
+</section>
+
+<section class="feature flip">
+<div class="wrap">
+<div class="copy reveal"><h2>Never miss a hit</h2><p>Turn on notifications for requests, acceptances, reminders, cancellations, messages, and the day-after check-in.</p></div>
+<div class="art reveal d1 loop" data-land><div class="lift" data-hit="210 20 420" data-tilt-deg="3"><svg viewBox="0 0 420 400" role="img" aria-label="Courtly notifications on a phone lock screen">
+<rect x="96" y="20" width="228" height="372" rx="40" fill="#0B1F55"/>
+<rect x="108" y="32" width="204" height="348" rx="30" fill="#1F5BD8"/>
+<g stroke="#fff" stroke-opacity=".13" stroke-width="5" fill="none"><path d="M180 32V380M180 210H312M246 32V210"/></g>
+<text x="210" y="98" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="44" font-weight="800" fill="#fff" text-anchor="middle">9:41</text>
+<text x="210" y="122" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#DCE6FB" text-anchor="middle">Saturday</text>
+<g class="n1"><rect x="62" y="150" width="296" height="62" rx="18" fill="#0B1F55" opacity=".25"/><rect x="62" y="146" width="296" height="62" rx="18" fill="#fff"/><rect x="76" y="159" width="36" height="36" rx="10" fill="#1F5BD8"/><path d="M98.9 171.2A9 9 0 1 0 98.9 182.8" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="102" cy="177" r="3.5" fill="#E4F24A"/><text x="124" y="173" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#0E1726">Request accepted</text><text x="124" y="192" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#5B6577">Doubles, Saturday at 8:00 AM</text></g>
+<g class="n2"><rect x="62" y="222" width="296" height="62" rx="18" fill="#0B1F55" opacity=".25"/><rect x="62" y="218" width="296" height="62" rx="18" fill="#fff"/><rect x="76" y="231" width="36" height="36" rx="10" fill="#1F5BD8"/><path d="M98.9 243.2A9 9 0 1 0 98.9 254.8" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="102" cy="249" r="3.5" fill="#E4F24A"/><text x="124" y="245" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#0E1726">Reminder</text><text x="124" y="264" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#5B6577">Your hit starts in 1 hour</text></g>
+<g class="n3"><rect x="62" y="294" width="296" height="62" rx="18" fill="#0B1F55" opacity=".25"/><rect x="62" y="290" width="296" height="62" rx="18" fill="#fff"/><rect x="76" y="303" width="36" height="36" rx="10" fill="#1F5BD8"/><path d="M98.9 315.2A9 9 0 1 0 98.9 326.8" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="102" cy="321" r="3.5" fill="#E4F24A"/><text x="124" y="317" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#0E1726">How was your hit?</text><text x="124" y="336" font-family="-apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#5B6577">Tap to check in</text></g>
+</svg></div></div>
+</div>
+</section>
+
+</div>
+<section class="final loop" data-scroll>
+<div class="wrap reveal">
+<h2>Hit more. Plan less.</h2>
 <p>Courtly is an iOS app. Find it on the App Store soon.</p>
-<div class="card"><strong>Questions?</strong> Email <a href="mailto:courtly.support@gmail.com">courtly.support@gmail.com</a>.</div>
-</article>
+</div>
+<div class="final-scene"><svg viewBox="0 0 1600 460" aria-hidden="true">
+<g data-x="-60" data-y="70"><g class="f1" style="transform-box:fill-box;transform-origin:center"><g class=""><circle cx="560" cy="170" r="26" fill="#E4F24A" stroke="#B7C42A" stroke-width="3.1"/><path d="M543.9 149.7C558.7 160.9 558.7 179.1 543.9 190.3M576.1 149.7C561.3 160.9 561.3 179.1 576.1 190.3" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round"/></g></g></g>
+<g data-x="70" data-y="90" data-r="20"><g class="f2" style="transform-box:fill-box;transform-origin:center"><g transform="translate(1010 90) rotate(-25) scale(.9)"><rect x="35" y="78" width="10" height="56" rx="5" fill="#0E1726"/><ellipse cx="40" cy="44" rx="32" ry="40" fill="#fff" stroke="#0E1726" stroke-width="7"/><path d="M24 14V74M40 6V82M56 14V74M12 30H68M9 44H71M12 58H68" stroke="#AFC0E8" stroke-width="2.5"/></g></g></g>
+<g data-x="-90" data-y="50"><g class="f3" style="transform-box:fill-box;transform-origin:center"><g transform="translate(390 230)"><path d="M14 4h92a12 12 0 0 1 12 12v34a12 12 0 0 1-12 12H40l-18 14v-14h-8A12 12 0 0 1 2 50V16A12 12 0 0 1 14 4z" fill="#fff" stroke="#E2E7F2" stroke-width="3"/><circle cx="42" cy="34" r="6" fill="#1F5BD8"/><circle cx="60" cy="34" r="6" fill="#1F5BD8"/><circle cx="78" cy="34" r="6" fill="#1F5BD8"/></g></g></g>
+<g data-x="80" data-y="60"><g class="f1" style="transform-box:fill-box;transform-origin:center"><g transform="translate(1140 250)"><rect x="0" y="6" width="70" height="70" rx="35" fill="#B7C42A"/><circle cx="35" cy="35" r="35" fill="#E4F24A"/><path d="M20 35l10 10 20-20" stroke="#0E1726" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g></g></g>
+<g data-x="110" data-y="110"><g class="f2" style="transform-box:fill-box;transform-origin:center"><g class=""><circle cx="1270" cy="170" r="18" fill="#E4F24A" stroke="#B7C42A" stroke-width="2.2"/><path d="M1258.8 156.0C1269.1 163.7 1269.1 176.3 1258.8 184.0M1281.2 156.0C1270.9 163.7 1270.9 176.3 1281.2 184.0" fill="none" stroke="#fff" stroke-width="2.9" stroke-linecap="round"/></g></g></g>
+<g data-x="-120" data-y="100"><g class="f3" style="transform-box:fill-box;transform-origin:center"><g class=""><circle cx="320" cy="150" r="14" fill="#E4F24A" stroke="#B7C42A" stroke-width="1.7"/><path d="M311.3 139.1C319.3 145.1 319.3 154.9 311.3 160.9M328.7 139.1C320.7 145.1 320.7 154.9 328.7 160.9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></g></g></g>
+<g data-y="-110">
+<rect x="694" y="126" width="220" height="330" rx="40" fill="#B7C42A"/>
+<rect x="690" y="116" width="220" height="330" rx="40" fill="#E4F24A"/>
+<rect x="706" y="132" width="188" height="300" rx="28" fill="#fff"/>
+<g class="hop"><g class=""><circle cx="800" cy="260" r="34" fill="#E4F24A" stroke="#B7C42A" stroke-width="4.1"/><path d="M778.9 233.5C798.3 248.1 798.3 271.9 778.9 286.5M821.1 233.5C801.7 248.1 801.7 271.9 821.1 286.5" fill="none" stroke="#fff" stroke-width="5.4" stroke-linecap="round"/></g></g>
+<ellipse cx="800" cy="312" rx="30" ry="7" fill="#0B1F55" opacity=".15"/>
+</g>
+<g data-x="-80"><path d="M-200 300C-70 270 30 340 180 322S440 250 600 305 860 352 1000 315 1250 250 1420 300 1600 315 1800 292V460H-200Z" fill="#173F9E"/></g>
+<g data-x="80"><path d="M-200 330C-60 312 50 372 220 350S480 292 640 340 900 380 1060 344 1290 290 1440 330 1650 352 1800 330V460H-200Z" fill="#1F5BD8"/></g>
+</svg></div>
+</section>
 </main>
-<footer>© 2026 Courtly · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></footer>
+<footer class="on-blue">
+<div class="wrap">
+<div class="foot-top">
+<a class="brand" href="/" aria-label="Courtly home"><img src="/icon.png" alt="" width="36" height="36"><span>Courtly</span></a>
+<a class="btn btn-lime" href="/support">Visit support</a>
+</div>
+<div class="cols">
+<div><h2>Courtly</h2><ul><li><a href="/#how">How it works</a></li></ul></div>
+<div><h2>Help</h2><ul><li><a href="/support">Support</a></li><li><a href="mailto:courtly.support@gmail.com">courtly.support@gmail.com</a></li></ul></div>
+<div><h2>Legal</h2><ul><li><a href="/privacy">Privacy Policy</a></li><li><a href="/terms">Terms of Service</a></li></ul></div>
+</div>
+<div class="copy">© 2026 Courtly</div>
+</div>
+</footer>
 </body>
 </html>

@@ -63,33 +63,38 @@ struct NeedsReplyCard: View {
     }
 
     private var accepted: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             PlayerAvatar(card: item.person, size: 44)
             VStack(alignment: .leading, spacing: 1) {
                 Text("\(item.person.firstName) accepted you")
                     .font(CourtlyFont.bodySemibold)
                     .foregroundStyle(CourtlyColor.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Text("\(item.hit.shortTimeLabel) · \(item.hit.court.shortName)")
                     .font(CourtlyFont.caption)
                     .foregroundStyle(CourtlyColor.secondary)
+                    .lineLimit(1)
             }
-            Spacer(minLength: 8)
+            .layoutPriority(1)
+            Spacer(minLength: 4)
             Button(action: openChat) {
                 Text("Chat")
                     .font(CourtlyFont.secondarySemibold)
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
                     .background(Capsule().fill(CourtlyColor.blue))
+                    .fixedSize()
             }
             .buttonStyle(PressableButtonStyle())
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) { hits.dismissAccepted(item) }
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(CourtlyColor.secondary)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 24, height: 32)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

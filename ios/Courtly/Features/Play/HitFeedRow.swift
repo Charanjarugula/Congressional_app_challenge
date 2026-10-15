@@ -8,6 +8,7 @@ struct HitFeedRow: View {
     let onTap: () -> Void
 
     @Environment(HitsStore.self) private var hits
+    @Environment(AppSession.self) private var session
     @Environment(\.navigate) private var navigate
     @State private var isJoining = false
     @State private var showsPlayers = false
@@ -73,7 +74,16 @@ struct HitFeedRow: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Open in Maps")
                     }
-                    if hit.hasPendingRequest {
+                    if let clash = clashingHit {
+                        VStack(spacing: 8) {
+                            Text("You’re already playing \(clash.shortTimeLabel)\(clash.counterpart(for: session.profile?.id).map { " with \($0.firstName)" } ?? "").")
+                                .font(CourtlyFont.caption)
+                                .foregroundStyle(CourtlyColor.secondary)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity)
+                            ActionButton(title: "See that hit", style: .grouped) { navigate(.hit(clash.id)) }
+                        }
+                    } else if hit.hasPendingRequest {
                         ActionButton(title: "Requested", style: .grouped, isLoading: isJoining) { cancel() }
                     } else {
                         ActionButton(title: "Request to join", isLoading: isJoining) { join() }
@@ -91,6 +101,14 @@ struct HitFeedRow: View {
             }
         }
         .errorAlert($errorMessage, title: "Couldn’t ask to join")
+    }
+
+    /// An upcoming hit of yours that overlaps this one, if any. The backend refuses the ask anyway;
+    /// showing it here saves the tap.
+    private var clashingHit: Hit? {
+        (hits.myHits?.upcoming ?? []).first { mine in
+            mine.id != hit.id && mine.isMember && mine.isLive && mine.startsAt < hit.endsAt && mine.endsAt > hit.startsAt
+        }
     }
 
     /// "Ana and Luis · 1 spot open"

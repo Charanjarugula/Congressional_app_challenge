@@ -93,7 +93,7 @@
       tmp.setAttribute('d', parts.slice(0, k + 1).join(' Q'));
       landLens.push(tmp.getTotalLength());
     }
-    path.style.strokeDasharray = total; 
+    path.style.strokeDasharray = total;
   }
   function rally() {
     if (!total) return;

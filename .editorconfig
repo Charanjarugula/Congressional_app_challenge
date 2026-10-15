@@ -20,3 +20,6 @@ trim_trailing_whitespace = false
 
 [*.{pbxproj,plist,entitlements,xcprivacy}]
 indent_style = tab
+
+[*.xcscheme]
+indent_size = 3

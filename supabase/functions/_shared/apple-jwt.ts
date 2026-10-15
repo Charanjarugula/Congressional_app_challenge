@@ -6,7 +6,7 @@ function base64url(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function pemToDer(pem: string): Uint8Array {
+function pemToDer(pem: string): Uint8Array<ArrayBuffer> {
   const body = pem.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, "");
   const binary = atob(body);
   const bytes = new Uint8Array(binary.length);

@@ -71,27 +71,26 @@ struct GlassTabBar: View {
 }
 
 /// "Plan a hit", floating above the tab bar on Play.
-struct PlanHitPill: View {
+/// The one big plus, bottom right on Play and People: lime, navy glyph.
+struct PlusButton: View {
+    let label: String
     let action: () -> Void
 
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(CourtlyColor.lime)
-                Text("Plan a hit")
-                    .font(CourtlyFont.bodySemibold)
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 20)
-            .frame(height: 52)
+    static var face: some View {
+        Image(systemName: "plus")
+            .font(.system(size: 26, weight: .bold))
+            .foregroundStyle(CourtlyColor.ink)
+            .frame(width: 56, height: 56)
             .background(
-                Capsule()
-                    .fill(CourtlyColor.ink)
-                    .shadow(color: CourtlyColor.ink.opacity(0.3), radius: 12, y: 8)
+                Circle()
+                    .fill(CourtlyColor.lime)
+                    .shadow(color: CourtlyColor.ink.opacity(0.2), radius: 12, y: 8)
             )
-        }
-        .buttonStyle(PressableButtonStyle())
+    }
+
+    var body: some View {
+        Button(action: action) { Self.face }
+            .buttonStyle(PressableButtonStyle())
+            .accessibilityLabel(label)
     }
 }

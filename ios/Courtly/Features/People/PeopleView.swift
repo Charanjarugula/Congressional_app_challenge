@@ -37,52 +37,11 @@ struct PeopleView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            Text("People")
-                .font(CourtlyFont.largeTitle)
-                .tracking(-0.8)
-                .foregroundStyle(CourtlyColor.ink)
-            Spacer()
-            Button {
-                navigate(.friendRequests)
-            } label: {
-                Image(systemName: "person.badge.clock")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(inbox.requestCount > 0 ? CourtlyColor.ink : CourtlyColor.secondary)
-                    .frame(width: 40, height: 40)
-                    .background(
-                        Circle()
-                            .fill(Color.white)
-                            .shadow(color: CourtlyColor.ink.opacity(0.08), radius: 4, y: 2)
-                    )
-                    .overlay(alignment: .topTrailing) {
-                        CountBadge(count: inbox.requestCount)
-                            .offset(x: 5, y: -4)
-                    }
-            }
-            .buttonStyle(PressableButtonStyle())
-            .accessibilityLabel(inbox.requestCount > 0 ? "\(inbox.requestCount) friend requests" : "Friend requests")
-            Menu {
-                Button("Add friends", systemImage: "person.badge.plus") { navigate(.addFriends) }
-                Button("New group chat", systemImage: "person.3") { navigate(.newGroup) }
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(CourtlyColor.blue)
-                    .frame(width: 40, height: 40)
-                    .background(
-                        Circle()
-                            .fill(Color.white)
-                            .shadow(color: CourtlyColor.ink.opacity(0.08), radius: 4, y: 2)
-                    )
-            }
-            .accessibilityLabel("Add friends or start a group")
-            if let card = session.profile?.card {
-                PlayerAvatar(card: card, size: 40)
-                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
-            }
-        }
-        .frame(height: 52)
+        Text("People")
+            .font(CourtlyFont.largeTitle)
+            .tracking(-0.8)
+            .foregroundStyle(CourtlyColor.ink)
+            .frame(height: 52)
     }
 
     private var searchField: some View {
@@ -227,12 +186,10 @@ struct PeopleView: View {
     }
 }
 
-/// Avatar, name and time, last message, unread dot.
+/// Avatar, name and time, the newest message, unread dot.
 struct ChatRow: View {
     let chat: Chat
     let me: UUID?
-
-    private static let hitPrefix = "Hit request: "
 
     var body: some View {
         HStack(spacing: 14) {
@@ -250,20 +207,10 @@ struct ChatRow: View {
                             .foregroundStyle(CourtlyColor.secondary)
                     }
                 }
-                HStack(spacing: 6) {
-                    if isHitRequest {
-                        Text("HIT")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(CourtlyColor.blue)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(CourtlyColor.blueTint))
-                    }
-                    Text(previewText)
-                        .font(isCallToAction ? CourtlyFont.secondarySemibold : CourtlyFont.secondary)
-                        .foregroundStyle(isCallToAction ? CourtlyColor.blue : CourtlyColor.secondary)
-                        .lineLimit(1)
-                }
+                Text(chat.preview?.isEmpty == false ? chat.preview! : "Say hi")
+                    .font(chat.unreadCount > 0 ? CourtlyFont.secondarySemibold : CourtlyFont.secondary)
+                    .foregroundStyle(chat.unreadCount > 0 ? CourtlyColor.ink : CourtlyColor.secondary)
+                    .lineLimit(1)
             }
             if chat.unreadCount > 0 {
                 Circle()
@@ -273,21 +220,6 @@ struct ChatRow: View {
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
-    }
-
-    private var isHitRequest: Bool {
-        chat.lastMessageType == .hitInvite || chat.preview?.hasPrefix(Self.hitPrefix) == true
-    }
-
-    /// Someone added you and is waiting for the add-back.
-    private var isCallToAction: Bool {
-        chat.friendship == "requested_me"
-    }
-
-    private var previewText: String {
-        guard let preview = chat.preview, !preview.isEmpty else { return "Say hi" }
-        if isHitRequest { return String(preview.dropFirst(Self.hitPrefix.count)) }
-        return preview
     }
 }
 

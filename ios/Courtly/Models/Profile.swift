@@ -16,6 +16,7 @@ struct Profile: Codable, Equatable {
     var homeLng: Double?
     var radiusMi: Int
     var availabilityMask: Int32
+    var busyMask: Int32?
     var busyMaskWeek: Int32?
     var calendarProvider: CalendarProvider
     var phoneE164: String?
@@ -39,6 +40,7 @@ struct Profile: Codable, Equatable {
 
     var availability: AvailabilityMask { AvailabilityMask(rawValue: availabilityMask) }
     var busyThisWeek: AvailabilityMask { AvailabilityMask(rawValue: busyMaskWeek ?? 0) }
+    var busy: AvailabilityMask { AvailabilityMask(rawValue: busyMask ?? 0) }
     var radius: TravelRadius { TravelRadius(rawValue: radiusMi) ?? .ten }
 
     /// How other players see this profile.

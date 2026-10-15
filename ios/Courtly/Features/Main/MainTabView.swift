@@ -44,6 +44,25 @@ struct MainTabView: View {
         }
         // Placed before the inset so the pill floats above the tab bar instead of over it.
         .overlay(alignment: .bottomTrailing) {
+            if isAtRoot && selected == .people {
+                Menu {
+                    Button("Add friends", systemImage: "person.badge.plus") { paths[.people, default: []].append(.addFriends) }
+                    Button("New group", systemImage: "person.3") { paths[.people, default: []].append(.newGroup) }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 56, height: 56)
+                        .background(
+                            Circle()
+                                .fill(CourtlyColor.blue)
+                                .shadow(color: CourtlyColor.blue.opacity(0.3), radius: 12, y: 8)
+                        )
+                }
+                .accessibilityLabel("Add friends or start a group")
+                .padding(.trailing, 20)
+                .padding(.bottom, 16)
+            }
             if isAtRoot && selected == .play && (showsPlanPill || coachStep == 3) {
                 PlanHitPill { isPlanning = true }
                     .overlay(

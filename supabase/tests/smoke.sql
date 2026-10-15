@@ -38,6 +38,20 @@ begin
     if sqlerrm not in ('already_requested') then raise; end if;
   end;
 
+  -- A block marked busy keeps its hits out of the feed; clearing it brings them back.
+  if public.availability_bit(now() + interval '2 days') is not null then
+    perform public.update_profile(jsonb_build_object('busy_mask', 1 << public.availability_bit(now() + interval '2 days')));
+    if exists (select 1 from jsonb_array_elements(public.get_play_feed()->'near_you') e where (e->>'id')::uuid = v_hit_id) then
+      raise exception 'a hit in a busy block reached the feed';
+    end if;
+    perform public.update_profile(jsonb_build_object('busy_mask', 0));
+    if not exists (select 1 from jsonb_array_elements(public.get_play_feed()->'near_you') e where (e->>'id')::uuid = v_hit_id) then
+      raise exception 'clearing the busy block did not bring the hit back';
+    end if;
+  else
+    perform public.busy_at(b, now());   -- a hit outside the blocks is never busy; still exercised
+  end if;
+
   -- Maya accepts: hit confirmed, chat exists, both are members, Jordan is notified.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   v_hit := public.respond_to_request(v_req_id, true);

@@ -83,6 +83,17 @@ struct NeedsReplyCard: View {
                     .background(Capsule().fill(CourtlyColor.blue))
             }
             .buttonStyle(PressableButtonStyle())
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { hits.dismissAccepted(item) }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(CourtlyColor.secondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss")
         }
     }
 

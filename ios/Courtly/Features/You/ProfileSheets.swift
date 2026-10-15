@@ -583,7 +583,7 @@ struct ProfilePhotoButton: View {
             if let data = try? await item.loadTransferable(type: Data.self),
                let image = await Task.detached(priority: .userInitiated, operation: { UIImage(data: data)?.downscaled(to: 1800) }).value {
                 // Let the photo library finish sliding away before the cropper comes up.
-                while showsPicker { try? await Task.sleep(for: .milliseconds(50)) }
+                for _ in 0..<40 where showsPicker { try? await Task.sleep(for: .milliseconds(50)) }
                 try? await Task.sleep(for: .milliseconds(350))
                 photoToCrop = CropTarget(image: image)
             } else {

@@ -19,7 +19,7 @@ One or two sentences.
 ## Where
 
 - Device and iOS version (or browser, for the site):
-- App build (You → Account → the version line at the bottom), or the page URL:
+- App build (the version line at the bottom of You), or the page URL:
 
 ## Screenshots
 

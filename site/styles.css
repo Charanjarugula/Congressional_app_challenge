@@ -99,7 +99,9 @@ a, button, summary { touch-action: manipulation; }
 @media (prefers-color-scheme: dark) { .final h2 { color: #fff; } }
 .final p { color: var(--text-2); margin: 0; }
 .final-scene { position: relative; height: 460px; margin-top: 24px; }
-.final-scene svg { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 1600px; max-width: none; height: auto; }
+.final-scene svg { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: 1600px; max-width: none; height: auto; overflow: visible; }
+/* a solid strip under the waves so the blue always reaches both edges, at any width */
+.final-scene::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--blue); }
 footer { background: var(--blue); color: var(--on-blue); padding: 24px 0 36px; margin-top: -2px; }
 .foot-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 28px; border-bottom: 2px solid rgba(255,255,255,.18); }
 footer .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; padding-top: 28px; }

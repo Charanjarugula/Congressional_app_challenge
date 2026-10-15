@@ -115,6 +115,9 @@ struct YouView: View {
             }
             .padding(.horizontal, 16)
             .frame(height: 50)
+            .contentShape(Rectangle())
+            .onTapGesture { setNotifications(!notificationsOn) }   // the whole row flips it, not only the switch
+            .accessibilityElement(children: .combine)
             HairlineSeparator()
             Menu {
                 Button("Anyone") { setVisibility("anyone") }
@@ -198,13 +201,13 @@ struct YouView: View {
         notificationsOn = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
     }
 
-    /// First time: the system prompt. After that the switch lives in Settings, so open it.
+    /// First time: the system prompt. After that the switch lives in Settings, so open Courtly’s page there.
     private func setNotifications(_ on: Bool) {
         Task { @MainActor in
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             if on && settings.authorizationStatus == .notDetermined {
                 notificationsOn = await NotificationPermission.request()
-            } else if let url = URL(string: UIApplication.openSettingsURLString) {
+            } else if let url = URL(string: UIApplication.openNotificationSettingsURLString) {   // straight to Courtly’s notification settings
                 _ = await UIApplication.shared.open(url)
             }
         }

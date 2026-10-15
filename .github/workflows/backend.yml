@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 15
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ (inputs.target == 'prod') && 'jrlocgfyskutnusscenf' || 'letuvtazmtjkvivattfy' }}
+      SUPABASE_PROJECT_REF: ${{ (inputs.target == 'prod') && 'pokwfigwgpsxrphbfgru' || 'letuvtazmtjkvivattfy' }}
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
       APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}

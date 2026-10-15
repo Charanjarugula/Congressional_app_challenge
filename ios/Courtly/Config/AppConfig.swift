@@ -10,8 +10,8 @@ enum AppConfig {
     static let supabaseAnonKey = "sb_publishable_2om3uiw5HBgQxNaBFEUZYA_g8Wfkxp6"
     static let apnsEnvironment = "sandbox"
     #else
-    static let supabaseURL = URL(string: "https://jrlocgfyskutnusscenf.supabase.co")!
-    static let supabaseAnonKey = "sb_publishable_gt6oatTEPQt7rP3xHjHpKw_vPL2jtI3"
+    static let supabaseURL = URL(string: "https://pokwfigwgpsxrphbfgru.supabase.co")!
+    static let supabaseAnonKey = "sb_publishable_s5ibTnXQLB0yxhDSFGyq2w_I3R9j4cE"
     static let apnsEnvironment = "production"
     #endif
 

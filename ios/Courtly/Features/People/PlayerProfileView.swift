@@ -126,16 +126,11 @@ struct PlayerProfileView: View {
                 .padding(.top, 6)
                 Spacer(minLength: 0)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                if let area = profile.card.areaLabel?.components(separatedBy: ",").first {
-                    Text(area)
-                }
-                if !profile.card.formats.isEmpty {
-                    Text(profile.card.formats.map(\.shortTitle).joined(separator: ", "))
-                }
+            if let area = profile.card.areaLabel?.components(separatedBy: ",").first {
+                Text(area)
+                    .font(CourtlyFont.secondary)
+                    .foregroundStyle(CourtlyColor.ink)
             }
-            .font(CourtlyFont.secondary)
-            .foregroundStyle(CourtlyColor.ink)
             if !profile.mutualCards.isEmpty {
                 Button {
                     showsMutuals = true

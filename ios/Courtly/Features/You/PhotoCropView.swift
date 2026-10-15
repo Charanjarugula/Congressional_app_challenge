@@ -7,6 +7,8 @@ struct PhotoCropView: View {
     let onCancel: () -> Void
     let onChoose: (UIImage) -> Void
 
+    @Environment(\.dismiss) private var dismiss
+
     static let maxZoom: CGFloat = 4
     static let outputSide: CGFloat = 600
 
@@ -18,24 +20,50 @@ struct PhotoCropView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let diameter = min(proxy.size.width - 32, proxy.size.height - 220)
+            // Opened straight after the photo library closes, the cover can be laid out with no safe
+            // area at all, which put Cancel and Choose under the status bar where taps never land.
+            // The window's insets are the floor.
+            let window = Self.windowInsets
+            let top = max(0, window.top - proxy.safeAreaInsets.top)
+            let bottom = max(0, window.bottom - proxy.safeAreaInsets.bottom)
+            let diameter = min(proxy.size.width - 32, proxy.size.height - top - bottom - 220)
             let shown = displayedSize(diameter: diameter)
             VStack(spacing: 0) {
                 HStack {
-                    Button("Cancel", action: onCancel)
-                        .foregroundStyle(.white)
+                    // Each button closes the screen itself as well as telling the owner, so the cover
+                    // can never be left up if the owner's presentation state goes out of step.
+                    Button {
+                        dismiss()
+                        onCancel()
+                    } label: {
+                        Text("Cancel")
+                            .frame(minWidth: 64, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .foregroundStyle(.white)
                     Spacer()
                     Text("Move and scale")
                         .font(CourtlyFont.bodySemibold)
                         .foregroundStyle(.white)
                     Spacer()
-                    Button("Choose") { onChoose(crop(diameter: diameter)) }
-                        .font(CourtlyFont.bodySemibold)
-                        .foregroundStyle(CourtlyColor.lime)
+                    Button {
+                        let cropped = crop(diameter: diameter)
+                        dismiss()
+                        onChoose(cropped)
+                    } label: {
+                        Text("Choose")
+                            .frame(minWidth: 64, minHeight: 44, alignment: .trailing)
+                            .contentShape(Rectangle())
+                    }
+                    .font(CourtlyFont.bodySemibold)
+                    .foregroundStyle(CourtlyColor.lime)
                 }
                 .font(CourtlyFont.body)
+                .buttonStyle(.plain)
                 .padding(.horizontal, 20)
                 .frame(height: 52)
+                .background(Color.black)
+                .zIndex(1)   // above the photo, which can spill past its frame when zoomed
 
                 // The photo sits in an overlay so a wide or zoomed photo never widens the screen.
                 Color.clear
@@ -44,6 +72,7 @@ struct PhotoCropView: View {
                             .resizable()
                             .frame(width: shown.width, height: shown.height)
                             .offset(offset)
+                            .allowsHitTesting(false)   // a zoomed photo must never cover Cancel or Choose
                     }
                     .overlay {
                         CropMask(diameter: diameter)
@@ -98,10 +127,19 @@ struct PhotoCropView: View {
                 .foregroundStyle(.white.opacity(0.8))
                 .padding(.horizontal, 28)
                 .padding(.vertical, 24)
+                .background(Color.black)
+                .zIndex(1)
             }
+            .padding(.top, top)
+            .padding(.bottom, bottom)
         }
         .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)
+    }
+
+    private static var windowInsets: UIEdgeInsets {
+        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows)
+        return (windows.first(where: \.isKeyWindow) ?? windows.first)?.safeAreaInsets ?? .zero
     }
 
     /// At zoom 1 the photo's short side just fills the circle.

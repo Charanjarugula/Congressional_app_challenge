@@ -56,14 +56,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Runner images carry several iOS runtimes and not every iPhone model exists on the newest one, so
+      # the device is chosen by identifier: an iPhone on the highest iOS runtime available.
       - name: Pick an available iPhone simulator
         id: simulator
         run: |
-          name=$(xcrun simctl list devices available -j | python3 -c 'import json, sys
-          devices = [d["name"] for runtime in json.load(sys.stdin)["devices"].values() for d in runtime if d["isAvailable"] and d["name"].startswith("iPhone")]
-          print(devices[-1])')
-          echo "name=$name" >> "$GITHUB_OUTPUT"
-          echo "Testing on $name"
+          xcrun simctl list devices available -j | python3 -c 'import json, os, sys
+          runtimes = json.load(sys.stdin)["devices"]
+          def version(runtime): return tuple(int(n) for n in runtime.rsplit(".", 1)[-1].split("-")[1:])
+          phones = [(version(r), d) for r, devices in runtimes.items() if ".iOS-" in r for d in devices if d["isAvailable"] and d["name"].startswith("iPhone")]
+          best = max(phones)[1]
+          print("Testing on", best["name"], "udid", best["udid"])
+          open(os.environ["GITHUB_OUTPUT"], "a").write("udid=" + best["udid"] + "\n")'
 
       - name: Test
         run: |
@@ -71,7 +75,7 @@ jobs:
           xcodebuild test \
             -project ios/Courtly.xcodeproj \
             -scheme Courtly \
-            -destination "platform=iOS Simulator,name=${{ steps.simulator.outputs.name }}" \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
             CODE_SIGNING_ALLOWED=NO \
             | tee test.log | grep -E "^(Test Suite|Test Case .* (passed|failed)|Executed|\*\*|error:|.*: error:)" || true
           grep -q "TEST SUCCEEDED" test.log

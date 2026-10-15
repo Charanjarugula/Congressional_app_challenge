@@ -18,6 +18,8 @@ struct Chat: Codable, Identifiable {
     var unreadCount: Int
     let muted: Bool?
     let friendship: String?
+    /// Set once the player has left: the thread is theirs to read up to then, not to write.
+    let leftAt: Date?
     var hit: Hit?
 
     var title: String { name ?? "Chat" }

@@ -67,7 +67,18 @@ struct ChatThreadView: View {
                     withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
             }
-            composer
+            if chat?.leftAt != nil {
+                VStack(spacing: 0) {
+                    HairlineSeparator()
+                    Text("You left this chat")
+                        .font(CourtlyFont.secondary)
+                        .foregroundStyle(CourtlyColor.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                }
+            } else {
+                composer
+            }
         }
         .background(Color.white.ignoresSafeArea())
         .plainBackButton()

@@ -715,6 +715,23 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   perform public.leave_hit(v_hit_id);
   if public.is_chat_member(v_chat, b) then raise exception 'leaver kept in the hit chat'; end if;
+  -- The leaver keeps the thread as it was: old lines up to their own leaving, nothing after, no writing.
+  v_page := public.get_chat_page(v_chat);
+  if (v_page->'chat'->>'left_at') is null then raise exception 'left chat does not say so: %', v_page->'chat'; end if;
+  if not exists (select 1 from jsonb_array_elements(v_page->'messages') m where m->'payload'->>'event' = 'player_left') then raise exception 'leaver cannot see their own leaving line'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.send_message(v_chat, gen_random_uuid(), 'after you left');
+  update public.messages set created_at = created_at + interval '1 minute' where chat_id = v_chat and body = 'after you left';   -- one transaction clock: move it past the leaving
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  if exists (select 1 from jsonb_array_elements(public.get_chat_page(v_chat)->'messages') m where m->>'body' = 'after you left') then raise exception 'leaver sees a later message'; end if;
+  if public.get_chat(v_chat)->>'preview' like '%after you left%' then raise exception 'leaver previews a later message'; end if;
+  if not exists (select 1 from jsonb_array_elements(public.get_inbox()) x where (x->>'id')::uuid = v_chat) then raise exception 'left hit chat gone from the inbox'; end if;
+  begin
+    perform public.send_message(v_chat, gen_random_uuid(), 'still here?');
+    raise exception 'wrote after leaving';
+  exception when others then
+    if sqlerrm <> 'not_a_member' then raise; end if;
+  end;
   -- Blocking: Maya blocks Alex, who is in her hit; he is out and the spot is open.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   perform public.block_user(c);

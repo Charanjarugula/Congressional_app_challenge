@@ -17,6 +17,8 @@ struct PlayerAvatar: View {
             }
             .frame(width: size, height: size)
             .clipShape(Circle())
+            // A new photo is a new URL; without this the image keeps showing the old one.
+            .id(url)
         } else {
             InitialsAvatar(initials: card.initials, size: size, style: style)
         }

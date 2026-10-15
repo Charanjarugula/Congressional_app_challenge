@@ -34,7 +34,7 @@ struct PlayView: View {
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "Play", art: .play) }
-        .refreshable { await hits.loadFeed() }
+        .refreshable { await hits.loadFeed(userInitiated: true) }
     }
 
     @ViewBuilder

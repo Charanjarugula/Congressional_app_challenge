@@ -17,8 +17,8 @@ final class OnboardingDraft {
     var calendar: CalendarConnection?
     var contactsGranted = false
 
-    /// Players must be 13 or older: US law (COPPA) requires parental consent below that.
-    static let minimumAge = 13
+    /// Courtly is for adults: players arrange to meet in person, so the app is rated 18+.
+    static let minimumAge = 18
 
     var meetsMinimumAge: Bool {
         let years = Calendar.current.dateComponents([.year], from: birthday, to: .now).year ?? 0

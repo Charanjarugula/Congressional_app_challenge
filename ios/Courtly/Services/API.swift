@@ -82,13 +82,14 @@ enum API {
             try await client.rpc("unblock_user", params: ["p_user": userID.uuidString])
         }
 
-        static func report(_ userID: UUID, reason: ReportReason, details: String?, alsoBlock: Bool, hitID: UUID?) async throws {
+        static func report(_ userID: UUID, reason: ReportReason, details: String?, alsoBlock: Bool, hitID: UUID?, messageID: UUID? = nil) async throws {
             try await client.rpc("report_user", params: [
                 "p_user": userID.uuidString,
                 "p_reason": reason.rawValue,
                 "p_details": nullable(details),
                 "p_also_block": alsoBlock,
                 "p_hit": nullable(hitID?.uuidString),
+                "p_message": nullable(messageID?.uuidString),
             ])
         }
 

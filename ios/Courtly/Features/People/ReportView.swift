@@ -4,6 +4,8 @@ import SwiftUI
 struct ReportView: View {
     let player: PlayerCard
     var hitID: UUID? = nil
+    /// A single message being reported, shown at the top of the sheet.
+    var message: Message? = nil
     let onDone: (_ alsoBlocked: Bool) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -15,7 +17,7 @@ struct ReportView: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                Text("Report \(player.firstName)")
+                Text(message == nil ? "Report \(player.firstName)" : "Report message")
                     .font(CourtlyFont.bodySemibold)
                     .foregroundStyle(CourtlyColor.ink)
                 HStack {
@@ -30,6 +32,16 @@ struct ReportView: View {
 
             ScrollView {
                 VStack(spacing: 8) {
+                    if let message {
+                        Text("“\(message.body)”")
+                            .font(CourtlyFont.secondary)
+                            .foregroundStyle(CourtlyColor.secondary)
+                            .lineLimit(4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(14)
+                            .background(RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous).fill(CourtlyColor.card))
+                            .padding(.bottom, 8)
+                    }
                     ForEach(ReportReason.allCases) { option in
                         Button {
                             reason = option
@@ -86,7 +98,7 @@ struct ReportView: View {
         isSending = true
         Task { @MainActor in
             do {
-                try await API.People.report(player.id, reason: reason, details: nil, alsoBlock: alsoBlock, hitID: hitID)
+                try await API.People.report(player.id, reason: reason, details: nil, alsoBlock: alsoBlock, hitID: hitID, messageID: message?.id)
                 isSending = false
                 onDone(alsoBlock)
             } catch {

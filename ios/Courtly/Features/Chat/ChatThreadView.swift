@@ -18,6 +18,7 @@ struct ChatThreadView: View {
     @State private var hasEarlier = false
     @State private var isLoadingEarlier = false
     @State private var errorMessage: String?
+    @State private var reporting: Message?
     @FocusState private var composerFocused: Bool
 
     private var me: UUID? { session.profile?.id }
@@ -51,7 +52,7 @@ struct ChatThreadView: View {
                                     .foregroundStyle(CourtlyColor.secondary)
                                     .padding(.top, index == 0 ? 0 : 6)
                             }
-                            MessageRow(message: message, isMine: message.sender?.id == me, showsAvatar: chat?.type != .dm)
+                            MessageRow(message: message, isMine: message.sender?.id == me, showsAvatar: chat?.type != .dm) { reporting = message }
                         }
                         Color.clear
                             .frame(height: 1)
@@ -113,6 +114,14 @@ struct ChatThreadView: View {
         .sheet(isPresented: $showsRequestHit) {
             if let chat {
                 PlanHitView(inviteTo: chat) { _ in
+                    Task { await refresh() }
+                }
+            }
+        }
+        .sheet(item: $reporting) { message in
+            if let sender = message.sender {
+                ReportView(player: sender, message: message) { _ in
+                    reporting = nil
                     Task { await refresh() }
                 }
             }
@@ -350,6 +359,7 @@ private struct MessageRow: View {
     let message: Message
     let isMine: Bool
     let showsAvatar: Bool
+    var onReport: () -> Void = {}
 
     var body: some View {
         switch message.type {
@@ -383,6 +393,15 @@ private struct MessageRow: View {
     }
 
     private var bubble: some View {
+        textBubble
+            .contextMenu {
+                if !isMine && message.type == .text && message.sender != nil {
+                    Button("Report", systemImage: "exclamationmark.bubble") { onReport() }
+                }
+            }
+    }
+
+    private var textBubble: some View {
         Text(message.body)
             .font(CourtlyFont.body)
             .foregroundStyle(isMine ? .white : CourtlyColor.ink)

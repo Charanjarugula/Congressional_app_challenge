@@ -37,6 +37,21 @@ Select an iPhone simulator and press Run. Debug builds talk to the `courtly-dev`
 
 To run on a device, choose your team under Signing & Capabilities. The bundle id is `com.charanjarugula.courtly`.
 
+### Building and testing
+
+CI builds the app for the simulator in Debug and Release without signing:
+
+```sh
+xcodebuild build -project ios/Courtly.xcodeproj -target Courtly -sdk iphonesimulator \
+  -destination "generic/platform=iOS Simulator" -configuration Debug CODE_SIGNING_ALLOWED=NO
+```
+
+The backend's migrations, seed and smoke test run against a local Postgres 16. The harness drops and recreates a database named `courtly_test`, so point it at a server you can scratch:
+
+```sh
+PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres supabase/tests/local/run.sh
+```
+
 ## How the app talks to the backend
 
 Every read and write is one database function (`get_play_feed`, `create_hit`, `send_message`, ...) called through `API.swift`. Row-level security guards direct table access; the functions run as security definer and check the caller themselves. Only those entry points are callable over the API: helpers such as `hit_json` or `chat_json` have no grant, so a new function the app should call needs `grant execute ... to authenticated` in its migration (see `0009_function_grants.sql`). The row policies take the caller from the session through the `viewer_*` wrappers (`0011_review_fixes.sql`); the two-player helpers such as `is_blocked_either` and `is_chat_member` are not callable by the app role, and neither is the `chats` table, which the app only ever reads through `chat_json`. Errors raised as short codes (`hit_full`, `already_requested`) are turned into plain sentences in `BackendMessages.swift`.

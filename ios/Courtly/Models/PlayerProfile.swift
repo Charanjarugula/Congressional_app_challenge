@@ -42,7 +42,7 @@ struct SearchedPlayer: Codable, Identifiable {
         card = try PlayerCard(from: decoder)
         let container = try decoder.container(keyedBy: CodingKeys.self)
         mutualFriends = try container.decodeIfPresent([String].self, forKey: .mutualFriends) ?? []
-        relationship = try container.decodeIfPresent(Relationship.self, forKey: .relationship) ?? .none
+        relationship = try container.decodeIfPresent(Relationship.self, forKey: .relationship) ?? Relationship.none
     }
 
     func encode(to encoder: Encoder) throws {
@@ -73,7 +73,7 @@ struct PlayerProfile: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         mutualFriends = try container.decodeIfPresent([String].self, forKey: .mutualFriends) ?? []
         mutualCards = try container.decodeIfPresent([PlayerCard].self, forKey: .mutualCards) ?? []
-        relationship = try container.decodeIfPresent(Relationship.self, forKey: .relationship) ?? .none
+        relationship = try container.decodeIfPresent(Relationship.self, forKey: .relationship) ?? Relationship.none
         dmChatId = try container.decodeIfPresent(UUID.self, forKey: .dmChatId)
         hitsTogether = try container.decodeIfPresent(Int.self, forKey: .hitsTogether) ?? 0
         friendCount = try container.decodeIfPresent(Int.self, forKey: .friendCount) ?? 0

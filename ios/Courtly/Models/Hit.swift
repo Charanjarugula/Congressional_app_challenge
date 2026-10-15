@@ -144,7 +144,7 @@ struct Hit: Codable, Identifiable, Equatable {
 
     /// Where the viewer stands with this person, from the server; `.none` when unknown.
     func relationship(with id: UUID) -> Relationship {
-        viewer.relationships?.first { $0.userId == id }?.relationship ?? .none
+        viewer.relationships?.first { $0.userId == id }?.relationship ?? Relationship.none
     }
 
     var openInvite: Viewer.Invite? {

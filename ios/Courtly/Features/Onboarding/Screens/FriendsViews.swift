@@ -157,7 +157,7 @@ struct PeopleToPlayWithView: View {
                     card: person.card,
                     name: person.displayName,
                     detail: person.detail,
-                    standing: standings[person.id] ?? .none
+                    standing: standings[person.id] ?? Relationship.none
                 ) {
                     toggle(person.card.id)
                 }
@@ -216,7 +216,7 @@ struct PeopleToPlayWithView: View {
     private func toggle(_ id: UUID) {
         guard !busy.contains(id) else { return }
         busy.insert(id)
-        let before = standings[id] ?? .none
+        let before = standings[id] ?? Relationship.none
         guard before != .friend && before != .blocked else { busy.remove(id); return }
         // Requested → take it back; anything else → add (adding someone who asked you accepts them).
         standings[id] = before == .requested ? Relationship.none : .requested

@@ -177,7 +177,7 @@ struct AddFriendsView: View {
     /// What the server said about a contact match, with friends known from the friend list.
     private func contactRelationship(_ id: UUID) -> Relationship {
         if friendIDs.contains(id) { return .friend }
-        return contactMatches.first { $0.player.id == id }?.relationship ?? .none
+        return contactMatches.first { $0.player.id == id }?.relationship ?? Relationship.none
     }
 
     private func relationship(for id: UUID, fallback: Relationship) -> Relationship {
@@ -259,7 +259,7 @@ struct AddFriendsView: View {
         Task { @MainActor in
             do {
                 let result = try await API.People.respondFriendRequest(card.id, accept: accept)
-                relationships[card.id] = Relationship(rawValue: result.relationship) ?? .none
+                relationships[card.id] = Relationship(rawValue: result.relationship) ?? Relationship.none
                 inbox.removeRequest(from: card.id)
                 await inbox.load()
             } catch {
@@ -275,7 +275,7 @@ struct AddFriendsView: View {
         Task { @MainActor in
             do {
                 _ = try await API.People.cancelFriendRequest(card.id)
-                relationships[card.id] = .none
+                relationships[card.id] = Relationship.none   // explicit: a bare .none would delete the entry
                 await inbox.load()
             } catch {
                 errorMessage = error.localizedDescription

@@ -81,7 +81,11 @@ struct HitDetailView: View {
             }
             Button("Stay", role: .cancel) {}
         } message: {
-            Text("Your spot opens back up and the host is told.")
+            if let hit, hit.viewer.isHost, let next = hit.players.first {
+                Text("\(next.card.firstName) takes over as host. The hit goes on without you.")
+            } else {
+                Text("Your spot opens back up and the host is told.")
+            }
         }
         .sheet(isPresented: $showsCalendar) {
             if let hit {
@@ -225,6 +229,10 @@ struct HitDetailView: View {
                     .padding(.top, 20)
             }
             if hit.viewer.isHost {
+                if !hit.players.isEmpty {
+                    DestructiveTextButton(title: "Leave hit") { showsLeaveAlert = true }
+                        .padding(.top, 8)
+                }
                 DestructiveTextButton(title: "Cancel hit") { showsCancelAlert = true }
                     .padding(.top, 8)
             } else if hit.viewer.isPlayer {

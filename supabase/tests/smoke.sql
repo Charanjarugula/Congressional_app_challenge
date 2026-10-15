@@ -811,6 +811,33 @@ begin
     if sqlerrm <> 'request_not_found' then raise; end if;
   end;
 
+  -- A host who leaves hands the hit to whoever joined first; alone, the host can only cancel.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_hit := public.create_hit(v_court, now() + interval '12 days', 60, 'casual', 2, 'anyone');
+  v_hit_id := (v_hit->>'id')::uuid;
+  begin
+    perform public.leave_hit(v_hit_id);
+    raise exception 'a host alone left instead of cancelling';
+  exception when others then
+    if sqlerrm <> 'host_cannot_leave' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+  v_hit := public.leave_hit(v_hit_id);
+  if (select host_id from public.hits where id = v_hit_id) <> b then raise exception 'hosting did not pass to the first joiner'; end if;
+  if (v_hit->>'spots_open')::int <> 1 or (v_hit->>'status') <> 'confirmed' then raise exception 'handover state: %', v_hit; end if;
+  if not (public.hit_json(v_hit_id, b)->'viewer'->>'is_host')::boolean then raise exception 'new host is not host in their view'; end if;
+  if (select count(*) from public.hit_players where hit_id = v_hit_id and left_at is null and role = 'host') <> 1 then raise exception 'host rows after handover'; end if;
+  if not exists (select 1 from public.notifications where user_id = b and kind = 'player_left' and body like '%hosting now%') then raise exception 'new host was not told'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.cancel_hit(v_hit_id);
+
   -- Underage deletion removes a half-onboarded account outright, with the friend request and DM it opened.
   insert into public.profiles (id, first_name, last_name) values (d, 'Sam', 'Lee');
   perform set_config('request.jwt.claims', json_build_object('sub', d, 'role', 'authenticated')::text, true);

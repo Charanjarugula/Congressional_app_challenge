@@ -90,6 +90,7 @@ begin
     'mutual_cards', public.mutual_friend_cards(v_user, p_user),
     'relationship', public.relationship_to(v_user, p_user),
     'dm_chat_id', case when f.status = 'accepted' then f.dm_chat_id end,
+    'friend_count', (select count(*) from public.friendships x where p_user in (x.user_a, x.user_b) and x.status = 'accepted'),
     'hits_together', (select count(*) from public.hit_players a join public.hit_players b on a.hit_id = b.hit_id
                       join public.hits h on h.id = a.hit_id
                       where a.user_id = v_user and b.user_id = p_user and h.status = 'played'),

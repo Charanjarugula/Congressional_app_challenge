@@ -188,8 +188,16 @@ struct StatusPill: View {
 struct ActionButton: View {
     enum Style {
         case blue, grouped
+        /// White, for a button that sits on the grouped background itself rather than in a card.
+        case card
 
-        var background: Color { self == .blue ? CourtlyColor.blue : CourtlyColor.groupedBackground }
+        var background: Color {
+            switch self {
+            case .blue: CourtlyColor.blue
+            case .grouped: CourtlyColor.groupedBackground
+            case .card: CourtlyColor.card
+            }
+        }
         var foreground: Color { self == .blue ? .white : CourtlyColor.ink }
     }
 

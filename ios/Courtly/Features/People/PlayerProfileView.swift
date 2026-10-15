@@ -24,16 +24,6 @@ struct PlayerProfileView: View {
             if let profile {
                 VStack(alignment: .leading, spacing: 0) {
                     heading(profile)
-                    actions(profile)
-                        .padding(.top, 18)
-                    SectionHeader(title: "Plays", top: 24)
-                    Card {
-                        VStack(spacing: 0) {
-                            InfoRow(title: "What", value: profile.card.formats.isEmpty ? "Not set" : profile.card.formats.map(\.shortTitle).joined(separator: ", "))
-                            HairlineSeparator()
-                            InfoRow(title: "Usually free", value: AvailabilityMask(rawValue: profile.card.availabilityMask ?? 0).shortDescription)
-                        }
-                    }
                     if !profile.mutualCards.isEmpty {
                         SectionHeader(title: profile.mutualCards.count == 1 ? "1 mutual friend" : "\(profile.mutualCards.count) mutual friends", top: 24)
                         CardRows(items: profile.mutualCards) { friend in
@@ -132,36 +122,83 @@ struct PlayerProfileView: View {
 
     // MARK: - Sections
 
+    /// Avatar beside the numbers, then name, level and area, what they play, who you both know, and the buttons.
     private func heading(_ profile: PlayerProfile) -> some View {
-        VStack(spacing: 6) {
-            PlayerAvatar(card: profile.card, size: 96)
-                .padding(.bottom, 6)
-            Text(profile.card.displayName)
-                .font(.system(size: 28, weight: .bold))
-                .tracking(-0.6)
-                .foregroundStyle(CourtlyColor.ink)
-            Text(summary(profile))
-                .font(CourtlyFont.secondary)
-                .foregroundStyle(CourtlyColor.secondary)
-                .multilineTextAlignment(.center)
-            if let mutual = profile.mutualLine {
-                Text(mutual)
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 0) {
+                PlayerAvatar(card: profile.card, size: 86)
+                Spacer(minLength: 16)
+                stat(profile.card.hitsPlayed, "hits")
+                Spacer()
+                stat(profile.friendCount, "friends")
+                Spacer()
+                stat(profile.hitsTogether, "together")
             }
+            .padding(.trailing, 12)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(profile.card.displayName)
+                    .font(.system(size: 20, weight: .bold))
+                    .tracking(-0.3)
+                    .foregroundStyle(CourtlyColor.ink)
+                if !profile.card.levelAndArea.isEmpty {
+                    Text(profile.card.levelAndArea)
+                        .font(CourtlyFont.secondary)
+                        .foregroundStyle(CourtlyColor.ink)
+                }
+                if !profile.card.formats.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(profile.card.formats, id: \.self) { format in
+                            Text(format.shortTitle)
+                                .font(CourtlyFont.captionSemibold)
+                                .foregroundStyle(CourtlyColor.blue)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(CourtlyColor.blueTint))
+                        }
+                    }
+                    .padding(.top, 3)
+                }
+            }
+            if !profile.mutualCards.isEmpty {
+                HStack(spacing: 8) {
+                    HStack(spacing: -8) {
+                        ForEach(profile.mutualCards.prefix(3)) { friend in
+                            PlayerAvatar(card: friend, size: 24)
+                                .overlay(Circle().stroke(CourtlyColor.groupedBackground, lineWidth: 2))
+                        }
+                    }
+                    Text(mutualLine(profile))
+                        .font(CourtlyFont.caption)
+                        .foregroundStyle(CourtlyColor.secondary)
+                        .lineLimit(2)
+                }
+            }
+            actions(profile)
+                .padding(.top, 4)
         }
-        .frame(maxWidth: .infinity)
         .padding(.top, 8)
     }
 
-    private func summary(_ profile: PlayerProfile) -> String {
-        let card = profile.card
-        let played = card.hitsPlayed == 1 ? "1 hit played" : "\(card.hitsPlayed) hits played"
-        var parts = [card.level?.title, card.areaLabel?.components(separatedBy: ",").first, played].compactMap { $0 }
-        if profile.hitsTogether > 0 {
-            parts.append(profile.hitsTogether == 1 ? "1 hit together" : "\(profile.hitsTogether) hits together")
+    private func stat(_ value: Int, _ label: String) -> some View {
+        VStack(spacing: 1) {
+            Text("\(value)")
+                .font(.system(size: 19, weight: .bold))
+                .foregroundStyle(CourtlyColor.ink)
+            Text(label)
+                .font(CourtlyFont.caption)
+                .foregroundStyle(CourtlyColor.secondary)
         }
-        return parts.joined(separator: " · ")
+    }
+
+    /// "Friends with Ana, Luis and 2 others"
+    private func mutualLine(_ profile: PlayerProfile) -> String {
+        let names = profile.mutualCards.prefix(2).map(\.firstName)
+        let rest = profile.mutualCards.count - names.count
+        switch (names.count, rest) {
+        case (1, 0): return "Friends with \(names[0])"
+        case (2, 0): return "Friends with \(names[0]) and \(names[1])"
+        default: return "Friends with \(names.joined(separator: ", ")) and \(rest) other\(rest == 1 ? "" : "s")"
+        }
     }
 
     @ViewBuilder
@@ -170,18 +207,18 @@ struct PlayerProfileView: View {
             switch profile.relationship {
             case .friend:
                 ActionButton(title: "Invite to hit") { showsInviteToHit = true }
-                ActionButton(title: "Message", style: .grouped, isEnabled: profile.dmChatId != nil) {
+                ActionButton(title: "Message", style: .card, isEnabled: profile.dmChatId != nil) {
                     if let chatID = profile.dmChatId { navigate(.chat(chatID)) }
                 }
             case .requested:
-                ActionButton(title: "Requested", style: .grouped, isLoading: isWorking) { showsCancelRequest = true }
-                ActionButton(title: "Message", style: .grouped, isEnabled: false) {}
+                ActionButton(title: "Requested", style: .card, isLoading: isWorking) { showsCancelRequest = true }
+                ActionButton(title: "Message", style: .card, isEnabled: false) {}
             case .requestedMe:
                 ActionButton(title: "Confirm", isLoading: isWorking) { respond(accept: true) }
-                ActionButton(title: "Delete", style: .grouped, isLoading: isWorking) { respond(accept: false) }
+                ActionButton(title: "Delete", style: .card, isLoading: isWorking) { respond(accept: false) }
             case .none, .blocked:
                 ActionButton(title: "Add friend", isLoading: isWorking) { addFriend() }
-                ActionButton(title: "Message", style: .grouped, isEnabled: false) {}
+                ActionButton(title: "Message", style: .card, isEnabled: false) {}
             }
         }
     }
@@ -270,28 +307,6 @@ struct PlayerProfileView: View {
         await inbox.load()
         await hits.refreshAll()
         navigate.pop()
-    }
-}
-
-/// "What — Casual, Singles" style row, 50pt tall.
-private struct InfoRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Text(title)
-                .font(CourtlyFont.body)
-                .foregroundStyle(CourtlyColor.ink)
-            Spacer(minLength: 12)
-            Text(value)
-                .font(CourtlyFont.secondary)
-                .foregroundStyle(CourtlyColor.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 50)
     }
 }
 

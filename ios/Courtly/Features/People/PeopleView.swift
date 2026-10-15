@@ -22,7 +22,7 @@ struct PeopleView: View {
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "People") }
+        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "People", art: .people) }
         .refreshable { await inbox.load() }
         .task(id: isActive) {
             guard isActive else { return }

@@ -23,7 +23,7 @@ struct MyHitsView: View {
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "My Hits") }
+        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "My Hits", art: .myHits) }
         .refreshable { await hits.loadMyHits() }
     }
 
@@ -108,8 +108,8 @@ struct MyHitsView: View {
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                 }
                 .foregroundStyle(CourtlyColor.ink)
-                .frame(width: 64, height: 52)
-                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.lime))
+                .frame(width: 62, height: 46)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(CourtlyColor.lime))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(hit.counterpart(for: me)?.displayName ?? "Your hit") · \(hit.format.shortTitle)")
@@ -133,7 +133,7 @@ struct MyHitsView: View {
                     ChevronMark()
                 }
             }
-            .padding(.vertical, 14)
+            .padding(.vertical, 10)
             .padding(.horizontal, 16)
             .contentShape(Rectangle())
         }

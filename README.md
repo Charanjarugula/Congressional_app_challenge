@@ -39,21 +39,30 @@ Not yet: Android. Phone numbers are never collected.
 
 Maya posts a casual hit for Thursday at 6:30 PM at Wellington Tennis Center with one open spot. Luis, two miles away, sees it on Play and asks to join. Maya accepts; the hit turns confirmed and a chat opens with the two of them. Both get a reminder the day before and an hour before. The morning after, My Hits asks each of them whether the other showed up.
 
-## Stack
+## Tech stack
 
-SwiftUI (iOS 17+) talking to Supabase (Postgres with PostGIS, Auth, Storage, Edge Functions) over plain `URLSession`. Apple Push Notifications, EventKit, MapKit, Contacts. The policy site is static HTML on Vercel.
+| Area | Technology | What it does here |
+|---|---|---|
+| App | Swift, SwiftUI, iOS 17+ | The four tabs, onboarding, the sheets; talks to the backend over plain `URLSession`. |
+| Data and sign-in | Supabase: Postgres with PostGIS, Auth, Storage, Realtime | Profiles, courts, hits, chats; Apple, Google and email sign-in; avatar photos; live refresh of open screens. |
+| Backend logic | SQL functions behind row-level security, pg_cron, pg_net | Every read and write the app makes; reminders, expiry and day-after checks on a schedule; the push webhook. |
+| Edge Functions | Deno (TypeScript) | Push delivery over APNs, account deletion, Sign in with Apple token exchange, report emails. |
+| Device frameworks | APNs, EventKit, MapKit, Contacts, Core Location | Notifications, calendar busy times, court search and directions, contact matching, the player's area. |
+| Website | Static HTML, CSS and JavaScript on Vercel | Landing page, privacy policy, terms, support. |
+| CI | GitHub Actions | Simulator builds and the unit tests on every app change; migrations and the smoke test on Postgres 16 for backend changes; the dev deploy on merge. |
 
-## Repository
+## Project structure
 
 | Path | What |
 |---|---|
-| `ios/Courtly.xcodeproj` | Open this in Xcode 16 or newer. |
+| `ios/Courtly.xcodeproj` | Open this in Xcode 26 or newer. |
 | `ios/Courtly/App` | App entry, root view, session state, notification delegate. |
 | `ios/Courtly/Config` | Supabase URLs and keys per environment, policy links. |
 | `ios/Courtly/DesignSystem` | Color and type tokens, shared components (cards, pills, buttons, avatars). |
 | `ios/Courtly/Features` | One folder per screen group: Onboarding, Main (tab shell, stores), Play, Hits, Chat, People, You. |
 | `ios/Courtly/Models` | Plain data types matching the backend's JSON shapes. |
 | `ios/Courtly/Services` | Supabase client, typed `API` wrappers, device services (location, calendar, contacts, notifications), snapshot cache. |
+| `ios/CourtlyTests` | Unit tests (XCTest): deep links, error messages, date decoding, the availability grid, model decoding. |
 | `supabase/migrations` | The schema, row-level security, and every database function the app calls, in order. |
 | `supabase/functions` | Edge Functions: `send-push`, `delete-account`, `apple-token-exchange`, `report-email` (emails each report to the support inbox). |
 | `supabase/seed` | Public courts and the blocked-words list. |
@@ -62,11 +71,17 @@ SwiftUI (iOS 17+) talking to Supabase (Postgres with PostGIS, Auth, Storage, Edg
 | `supabase/tests` | The smoke test that runs after each deploy, the reviewer-side check of the demo world, and a local Postgres harness. |
 | `scripts/supabase-deploy.mjs` | Deploys migrations, seeds, settings, secrets and functions through the Supabase management API. |
 | `scripts/testflight.sh` | Archives the Release app and uploads it to TestFlight with an App Store Connect API key. |
-| `site/` | Privacy policy, terms and support pages. Vercel root directory is `site`. |
+| `site/` | Landing page, privacy policy, terms and support pages. Vercel root directory is `site`. |
+| `docs/moderation.md` | How reports are handled day to day. |
+| `.github/workflows` | iOS build and tests, backend test, backend deploy. |
 
-## Running the app
+## Getting started
+
+You need a Mac with Xcode 26 or newer (the app uses the iOS 26 SDK's age-range check). Nothing else has to be installed to run the app in the simulator: Debug builds talk to the shared `courtly-dev` project with the public key in `AppConfig.swift`, and that key only works under the database's row-level security. Running on a phone needs your own Apple developer team. The backend harness needs Postgres 16 and `psql`.
 
 ```sh
+git clone https://github.com/Charanjarugula/Congressional_app_challenge.git
+cd Congressional_app_challenge
 open ios/Courtly.xcodeproj
 ```
 
@@ -104,6 +119,16 @@ A push to `main` that touches `supabase/`, the deploy script or the workflow dep
 Email sign-in sends a six-digit code, so the Supabase project needs: OTP length 6 and expiry 600 s; the Magic Link and Confirm signup templates containing `{{ .Token }}`; and an SMTP server (the built-in mailer allows two emails an hour). Sign in with Apple needs the Apple provider enabled with the bundle id as client id; Google needs the iOS client id. The deploy's `auth` step sets all of this from the secrets above when the access token has the auth-config scope, and prints the values to set by hand in Authentication → Email and Providers when it doesn't.
 
 Pull requests that touch `supabase/` run the migrations and the smoke test against a throwaway Postgres in CI; the run fails if any function in the schema went unexecuted, so a new function needs a check in `supabase/tests/smoke.sql`. Migrations are append-only once a project has recorded them in `private.app_migrations`: a change to a function is a new numbered file that re-creates it (`0010_…`, `0011_…`), never an edit to a file already applied, so `migrate` can tell what is new. The deploy enforces it: `migrate` records a hash of each file it applies and refuses to run when a recorded file's contents have changed. A project whose ledger predates hash tracking is refused too, because nothing proves it received the files as they read today: reset it once with the dev-only `reset` step, which asks the catalogs for everything the migrations created and takes it all out (tables, functions, types, cron jobs, the private schema, the avatars policies, and the accounts, since a sign-in without its profile row could never get one back), so `migrate` runs every file again from nothing. Only when the applied files are known to match the project, `migrate --adopt-hashes` records the current hashes instead. `reset` refuses any project but dev.
+
+## Roadmap and known limitations
+
+Planned, with no dates attached: the App Store release, after the current TestFlight testing.
+
+Limitations today: courts are the 25 seeded Palm Beach County public courts plus the ones players add; iOS 17 and later only, no Android; phone numbers are not collected, so friends are found by email or by adding each other; English only.
+
+## Credits
+
+Built by Charan Jarugula. Thanks to [Supabase](https://supabase.com) for the backend platform, Apple for SwiftUI and the device frameworks, and the Nunito typeface, used on the website under the SIL Open Font License (`site/fonts/OFL.txt`).
 
 ## Working in this repo
 

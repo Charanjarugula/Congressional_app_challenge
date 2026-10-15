@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// One open hit. Tap to open it up: where, how long, who's in, and the button to ask.
 struct HitFeedRow: View {
@@ -39,25 +40,39 @@ struct HitFeedRow: View {
             .buttonStyle(.plain)
 
             if isExpanded {
-                VStack(alignment: .leading, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        detail("calendar", "\(HitFormatting.dayAndDate.string(from: hit.startsAt)) · \(HitFormatting.clock.string(from: hit.startsAt)) · \(hit.durationMin) min")
-                        detail("mappin.and.ellipse", [hit.court.name, hit.court.address].compactMap { $0 }.joined(separator: ", "))
-                        detail("person.2", playersLine)
-                        detail("figure.tennis", hostLine)
-                    }
-                    if hit.players.count > 0 {
-                        AvatarStack(cards: hit.everyone, size: 28)
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("\(HitFormatting.dayAndDate.string(from: hit.startsAt)) · \(HitFormatting.clock.string(from: hit.startsAt)) · \(hit.durationMin) min")
+                            .font(CourtlyFont.secondary)
+                            .foregroundStyle(CourtlyColor.ink)
+                        Button(action: openInMaps) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(hit.court.name)
+                                    .font(CourtlyFont.secondary)
+                                    .foregroundStyle(CourtlyColor.ink)
+                                if let address = hit.court.address {
+                                    Text(address)
+                                        .font(CourtlyFont.secondary)
+                                        .foregroundStyle(CourtlyColor.blue)
+                                }
+                            }
+                            .multilineTextAlignment(.leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open \(hit.court.name) in Maps")
+                        HStack(spacing: 10) {
+                            AvatarStack(cards: hit.everyone, size: 26)
+                            Text(playersLine)
+                                .font(CourtlyFont.secondary)
+                                .foregroundStyle(CourtlyColor.secondary)
+                        }
                     }
                     if hit.hasPendingRequest {
                         ActionButton(title: "Requested", style: .grouped, isEnabled: false) {}
                     } else {
                         ActionButton(title: "Request to join", isLoading: isJoining) { join() }
                     }
-                    Button("See hit") { navigate(.hit(hit.id)) }
-                        .font(CourtlyFont.secondarySemibold)
-                        .foregroundStyle(CourtlyColor.blue)
-                        .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
@@ -67,28 +82,18 @@ struct HitFeedRow: View {
         .errorAlert($errorMessage, title: "Couldn’t ask to join")
     }
 
-    /// "Hosted by Luis · Advanced · 12 hits played"
-    private var hostLine: String {
-        let played = hit.host.hitsPlayed == 1 ? "1 hit played" : "\(hit.host.hitsPlayed) hits played"
-        return ["Hosted by \(hit.host.firstName)", hit.host.level?.title, played].compactMap { $0 }.joined(separator: " · ")
-    }
-
+    /// "2 in · 1 spot open · Advanced host"
     private var playersLine: String {
         let inCount = 1 + hit.players.count
-        let who = inCount == 1 ? "Just \(hit.host.firstName) so far" : "\(inCount) in"
-        return "\(who) · \(hit.spotsLabel) open"
+        return [inCount == 1 ? "\(hit.host.firstName) so far" : "\(inCount) in", "\(hit.spotsLabel) open", hit.host.level.map { "\($0.title) host" }]
+            .compactMap { $0 }
+            .joined(separator: " · ")
     }
 
-    private func detail(_ icon: String, _ text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(CourtlyColor.secondary)
-                .frame(width: 18)
-            Text(text)
-                .font(CourtlyFont.secondary)
-                .foregroundStyle(CourtlyColor.ink)
-        }
+    private func openInMaps() {
+        let name = hit.court.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        guard let url = URL(string: "https://maps.apple.com/?ll=\(hit.court.lat),\(hit.court.lng)&q=\(name)") else { return }
+        UIApplication.shared.open(url)
     }
 
     private func join() {

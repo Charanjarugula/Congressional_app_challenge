@@ -238,11 +238,6 @@ struct AreaSheet: View {
                     .buttonStyle(PressableButtonStyle())
                 }
             }
-            Text("Other players only ever see your city, never your address.")
-                .font(CourtlyFont.caption)
-                .foregroundStyle(CourtlyColor.secondary)
-                .padding(.top, 12)
-                .padding(.horizontal, 4)
         }
         .onAppear {
             guard !seeded, let profile = session.profile else { return }

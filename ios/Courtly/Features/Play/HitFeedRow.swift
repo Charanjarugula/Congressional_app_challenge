@@ -25,12 +25,6 @@ struct HitFeedRow: View {
                             .font(CourtlyFont.secondary)
                             .foregroundStyle(CourtlyColor.secondary)
                             .lineLimit(1)
-                        if let reason = hit.reason {
-                            Text(reason)
-                                .font(CourtlyFont.caption)
-                                .foregroundStyle(CourtlyColor.blue)
-                                .lineLimit(1)
-                        }
                     }
                     Spacer(minLength: 0)
                 }

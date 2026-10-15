@@ -10,8 +10,8 @@ struct PlayView: View {
 
     @State private var tab = 0
     @State private var expanded: UUID?
-    @State private var format: PlayFormat?
-    @State private var myLevelOnly = false
+    @State private var filters = ExploreFilters()
+    @State private var showsFilters = false
 
     var body: some View {
         ScrollView {
@@ -94,48 +94,38 @@ struct PlayView: View {
 
     @ViewBuilder
     private func explore(_ nearby: [Hit]) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Menu {
-                    Button("Any format") { format = nil }
-                    ForEach(PlayFormat.allCases) { option in
-                        Button(option.shortTitle) { format = option }
-                    }
-                } label: {
-                    chip(format?.shortTitle ?? "Any format", on: format != nil, menu: true)
+        HStack(spacing: 10) {
+            Button { showsFilters = true } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal.decrease")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(filters.activeCount == 0 ? "Filters" : "Filters · \(filters.activeCount)")
+                        .font(CourtlyFont.captionSemibold)
                 }
-                Button { myLevelOnly.toggle() } label: {
-                    chip("My level", on: myLevelOnly)
-                }
-                .buttonStyle(.plain)
+                .foregroundStyle(filters.activeCount == 0 ? CourtlyColor.ink : .white)
+                .padding(.horizontal, 14)
+                .frame(height: 34)
+                .background(Capsule().fill(filters.activeCount == 0 ? CourtlyColor.card : CourtlyColor.ink))
             }
-            .padding(.vertical, 12)
+            .buttonStyle(.plain)
+            Text("Within \(session.profile?.radius.title ?? "") of \(session.profile?.areaLabel?.components(separatedBy: ",").first ?? "you")")
+                .font(CourtlyFont.caption)
+                .foregroundStyle(CourtlyColor.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
         }
-        let shown = nearby.filter { hit in
-            (format == nil || hit.format == format) && (!myLevelOnly || hit.host.level == session.profile?.level)
+        .padding(.vertical, 12)
+        .sheet(isPresented: $showsFilters) {
+            ExploreFiltersSheet(filters: $filters, radius: session.profile?.radius ?? .ten)
         }
+        let shown = filters.apply(to: nearby)
         if nearby.isEmpty {
-            QuietCard(title: "No open hits near you", detail: "Within \(session.profile?.radius.title ?? "your radius") of \(session.profile?.areaLabel?.components(separatedBy: ",").first ?? "you"). Plan one and players nearby can ask to join.")
+            QuietCard(title: "No open hits near you", detail: "Widen the distance in Filters, or plan one and players nearby can ask to join.")
         } else if shown.isEmpty {
-            QuietCard(title: "Nothing matches", detail: "Try another format or turn off the level filter.")
+            QuietCard(title: "Nothing matches", detail: "Loosen a filter to see more.")
         } else {
             rows(shown)
         }
-    }
-
-    private func chip(_ title: String, on: Bool, menu: Bool = false) -> some View {
-        HStack(spacing: 4) {
-            Text(title)
-            if menu {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
-            }
-        }
-        .font(CourtlyFont.captionSemibold)
-        .foregroundStyle(on ? .white : CourtlyColor.ink)
-        .padding(.horizontal, 12)
-        .frame(height: 32)
-        .background(Capsule().fill(on ? CourtlyColor.ink : CourtlyColor.card))
     }
 
     private func rows(_ list: [Hit]) -> some View {

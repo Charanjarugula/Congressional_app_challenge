@@ -24,24 +24,24 @@ enum AgeAssurance {
     static func check() async -> Result {
         #if canImport(DeclaredAgeRange)
         guard #available(iOS 26.2, *) else { return .useBirthdayGate }
-        var required = (try? await AgeRangeService.shared.isEligibleForAgeFeatures) ?? false
-        if #available(iOS 26.4, *), let features = try? await AgeRangeService.shared.requiredRegulatoryFeatures {
-            required = required || features.contains(.declaredAgeRangeRequired)
-        }
-        guard required else { return .useBirthdayGate }
-        guard let presenter = topViewController() else { return .mustConfirm }
+        // Apple's own answer to "does age assurance apply to this person" decides. (The regulatory
+        // feature list alone isn't enough: the simulator lists it while saying the person isn't eligible.)
+        guard (try? await AgeRangeService.shared.isEligibleForAgeFeatures) == true else { return .useBirthdayGate }
+        guard let presenter = topViewController() else { return .useBirthdayGate }
         do {
             switch try await AgeRangeService.shared.requestAgeRange(ageGates: OnboardingDraft.minimumAge, in: presenter) {
             case .sharing(let range):
                 if let lower = range.lowerBound, lower >= OnboardingDraft.minimumAge { return .adult }
                 return .minor   // no lower bound means below the gate
             case .declinedSharing:
-                return .mustConfirm
+                return .mustConfirm   // where the law applies, a declined check doesn't let anyone through
             @unknown default:
                 return .mustConfirm
             }
         } catch {
-            return .mustConfirm   // where the law applies, an unanswered check doesn't let anyone through
+            // Apple couldn't answer (service unavailable, no Apple Account): the birthday gate, which the
+            // server enforces too, still keeps out anyone under 18. Never lock everyone out on an outage.
+            return .useBirthdayGate
         }
         #else
         return .useBirthdayGate
@@ -58,3 +58,4 @@ enum AgeAssurance {
         return controller
     }
 }
+

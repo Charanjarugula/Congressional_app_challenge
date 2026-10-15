@@ -19,6 +19,10 @@ build/
 .env
 .env.*
 
+# Supabase CLI local state (supabase init writes these next to the project)
+supabase/.temp/
+supabase/.branches/
+
 # Node
 node_modules/
 

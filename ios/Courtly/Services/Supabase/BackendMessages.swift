@@ -31,7 +31,7 @@ enum BackendMessages {
         case "filtered": "That message can’t be sent."
         case "rate_limited": "Slow down a little and try again."
         case "onboarding_incomplete", "missing_birthday", "missing_level", "missing_formats", "missing_location": "Finish setting up your profile first."
-        case "underage": "Courtly is for players 13 and older."
+        case "underage": "Courtly is for players 18 and older."
         case "missing_members": "Pick at least one friend."
         case "not_a_group": "That isn’t a group chat."
         case "cannot_add_self", "cannot_block_self", "cannot_report_self": "That’s you."

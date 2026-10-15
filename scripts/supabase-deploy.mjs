@@ -41,6 +41,7 @@ const FUNCTIONS = {
   "send-push": { verifyJwt: false }, // called by the database webhook, authenticated by a shared secret
   "delete-account": { verifyJwt: true },
   "apple-token-exchange": { verifyJwt: true },
+  "report-email": { verifyJwt: false }, // called by the database on each report, authenticated by a shared secret
 };
 
 const OTP_TEMPLATE = (verb) =>
@@ -221,6 +222,14 @@ const steps = {
 
   async secrets() {
     const present = SECRET_NAMES.filter((name) => process.env[name]).map((name) => ({ name, value: process.env[name] }));
+    // Report emails go out through the mailbox that sends sign-in codes. The project only ever hands
+    // back a hash of its SMTP password, so the real one has to come from SMTP_USER and SMTP_PASS.
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      present.push({ name: "REPORT_SMTP_USER", value: process.env.SMTP_USER }, { name: "REPORT_SMTP_PASS", value: process.env.SMTP_PASS });
+      if (process.env.SMTP_HOST) present.push({ name: "REPORT_SMTP_HOST", value: process.env.SMTP_HOST });
+    } else {
+      console.log("secrets SMTP_USER and SMTP_PASS not given; report emails stay off until they are");
+    }
     if (present.length === 0) { console.log("secrets none provided"); return; }
     await api("POST", `/projects/${REF}/secrets`, present);
     console.log(`secrets set ${present.map((s) => s.name).join(", ")}`);

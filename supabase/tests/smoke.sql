@@ -838,6 +838,31 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   perform public.cancel_hit(v_hit_id);
 
+  -- A single message can be reported; its text stays with the report. Only the sender's own message, seen by the reporter.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_msg := public.send_message(public.find_dm_chat(a, b), gen_random_uuid(), 'a message worth reporting');
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.report_user(a, 'rude_or_unsafe', null, false, null, (v_msg->>'id')::uuid);
+  if not exists (select 1 from public.reports where message_id = (v_msg->>'id')::uuid and message_body = 'a message worth reporting') then raise exception 'message report not kept'; end if;
+  begin
+    perform public.report_user(v_pat2, 'other', null, false, null, (v_msg->>'id')::uuid);
+    raise exception 'reported a message under the wrong player';
+  exception when others then
+    if sqlerrm <> 'not_a_member' then raise; end if;
+  end;
+  perform public.post_report_email(gen_random_uuid());   -- no functions url in tests: a quiet no-op
+  -- 17 can't finish onboarding; 18 can.
+  update public.profiles set birthday = current_date - interval '17 years' where id = v_pat2;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  begin
+    perform public.complete_onboarding();
+    raise exception 'a 17-year-old finished onboarding';
+  exception when others then
+    if sqlerrm <> 'underage' then raise; end if;
+  end;
+  update public.profiles set birthday = current_date - interval '18 years' where id = v_pat2;
+  perform public.complete_onboarding();
+
   -- Underage deletion removes a half-onboarded account outright, with the friend request and DM it opened.
   insert into public.profiles (id, first_name, last_name) values (d, 'Sam', 'Lee');
   perform set_config('request.jwt.claims', json_build_object('sub', d, 'role', 'authenticated')::text, true);

@@ -55,7 +55,7 @@ struct MainTabView: View {
                 .padding(.trailing, 20)
                 .padding(.bottom, 16)
             }
-            if isAtRoot && selected == .play {
+            if isAtRoot && (selected == .play || selected == .myHits) {
                 PlusButton(label: "Plan a hit") { isPlanning = true }
                     .overlay(
                         Circle()

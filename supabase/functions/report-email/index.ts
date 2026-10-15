@@ -4,9 +4,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.16";
 import { webhookSecretMatches } from "../_shared/webhook.ts";
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+import { json } from "../_shared/http.ts";
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method" }, 405);

@@ -51,6 +51,7 @@ struct JoinRequestView: View {
                         ActionButton(title: "Decline", style: .grouped, isLoading: working == false) { respond(accept: false) }
                         ActionButton(title: "Accept", isLoading: working == true) { respond(accept: true) }
                     }
+                    .disabled(working != nil)   // one answer at a time
                     .padding(.top, 16)
                 } else if hits.isLoadingFeed || !didLoad {
                     ProgressView()

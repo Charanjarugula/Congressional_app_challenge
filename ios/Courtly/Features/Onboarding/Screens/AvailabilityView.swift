@@ -262,7 +262,7 @@ struct ConnectCalendarSheet: View {
                 .padding(.top, 12)
             }
 
-            TextActionButton(title: draft.calendar == nil ? "Not now" : "Done") { dismiss() }
+            TextActionButton(title: draft.calendar == nil ? "Close" : "Done") { dismiss() }
                 .padding(.top, 4)
             Spacer(minLength: 0)
         }

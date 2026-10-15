@@ -10,18 +10,16 @@ enum OnboardingRoute: Hashable {
     case emailCode(String)
     case name
     case birthday
-    case gender
     case level
     case formats
     case location
     case availability
-    case friends
     case people
     case notifications
     case done
 }
 
-/// Welcome → account → profile questions → location → availability → friends → notifications → done.
+/// Welcome → account → profile questions → location → availability → players near you → notifications → done.
 /// A player who signed in but never finished starts again at the name step.
 struct OnboardingFlow: View {
     @Environment(AppSession.self) private var session
@@ -111,9 +109,7 @@ struct OnboardingFlow: View {
         case .name:
             NameView(draft: draft) { save(then: .birthday) }
         case .birthday:
-            BirthdayView(draft: draft) { save(then: .gender) }
-        case .gender:
-            GenderView(draft: draft) { save(then: .level) }
+            BirthdayView(draft: draft) { save(then: .level) }
         case .level:
             LevelView(draft: draft) { save(then: .formats) }
         case .formats:
@@ -121,19 +117,7 @@ struct OnboardingFlow: View {
         case .location:
             LocationView(draft: draft) { save(then: .availability) }
         case .availability:
-            AvailabilityView(draft: draft) { save(then: .friends) }
-        case .friends:
-            FriendsIntroView(
-                onFindFriends: { granted in
-                    draft.contactsGranted = granted
-                    push(.people)
-                },
-                // Players near you don't need contacts, so skipping still shows them.
-                onSkip: {
-                    draft.contactsGranted = false
-                    push(.people)
-                }
-            )
+            AvailabilityView(draft: draft) { save(then: .people) }
         case .people:
             PeopleToPlayWithView(draft: draft) { push(.notifications) }
         case .notifications:

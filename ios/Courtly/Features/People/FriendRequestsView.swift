@@ -4,7 +4,8 @@ import SwiftUI
 struct FriendRequestsView: View {
     @Environment(InboxStore.self) private var inbox
     @Environment(\.navigate) private var navigate
-    @State private var working: Set<UUID> = []
+    /// What's running per request: true = confirming, false = deleting or taking back.
+    @State private var working: [UUID: Bool] = [:]
     @State private var errorMessage: String?
 
     private var requests: FriendRequests { inbox.requests ?? .empty }
@@ -13,10 +14,18 @@ struct FriendRequestsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if requests.incoming.isEmpty && requests.outgoing.isEmpty {
-                    if inbox.requests == nil {
+                    if inbox.requests == nil && inbox.isLoading {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding(.top, 80)
+                    } else if inbox.requests == nil {
+                        VStack(spacing: 12) {
+                            QuietCard(title: "Couldn’t load requests", detail: "Check your connection and try again.")
+                            Button("Try again") { Task { await inbox.load() } }
+                                .font(CourtlyFont.secondarySemibold)
+                                .foregroundStyle(CourtlyColor.blue)
+                        }
+                        .padding(.top, 24)
                     } else {
                         emptyState
                     }
@@ -27,9 +36,10 @@ struct FriendRequestsView: View {
                             VStack(spacing: 12) {
                                 row(request) { EmptyView() }
                                 HStack(spacing: 8) {
-                                    ActionButton(title: "Confirm", isLoading: working.contains(request.id)) { respond(request, accept: true) }
-                                    ActionButton(title: "Delete", style: .grouped, isEnabled: !working.contains(request.id)) { respond(request, accept: false) }
+                                    ActionButton(title: "Confirm", isLoading: working[request.id] == true) { respond(request, accept: true) }
+                                    ActionButton(title: "Delete", style: .grouped, isLoading: working[request.id] == false) { respond(request, accept: false) }
                                 }
+                                .disabled(working[request.id] != nil)
                                 .padding(.horizontal, 16)
                                 .padding(.bottom, 14)
                             }
@@ -39,12 +49,12 @@ struct FriendRequestsView: View {
                         SectionHeader(title: "Sent", top: 24)
                         CardRows(items: requests.outgoing) { request in
                             row(request) {
-                                PillButton(title: "Cancel", style: .tint) { cancel(request) }
+                                PillButton(title: working[request.id] != nil ? "Cancelling…" : "Cancel", style: .tint) { cancel(request) }
                                     .fixedSize()
-                                    .disabled(working.contains(request.id))
+                                    .disabled(working[request.id] != nil)
                             }
                         }
-                        Text("They see your request until you take it back.")
+                        Text("Waiting for them to confirm. Cancel takes the request back.")
                             .font(CourtlyFont.caption)
                             .foregroundStyle(CourtlyColor.secondary)
                             .padding(.top, 8)
@@ -129,9 +139,9 @@ struct FriendRequestsView: View {
     }
 
     private func respond(_ request: FriendRequest, accept: Bool) {
-        working.insert(request.id)
+        working[request.id] = accept
         Task { @MainActor in
-            defer { working.remove(request.id) }
+            defer { working[request.id] = nil }
             do {
                 _ = try await API.People.respondFriendRequest(request.id, accept: accept)
                 inbox.removeRequest(from: request.id)
@@ -143,9 +153,9 @@ struct FriendRequestsView: View {
     }
 
     private func cancel(_ request: FriendRequest) {
-        working.insert(request.id)
+        working[request.id] = false
         Task { @MainActor in
-            defer { working.remove(request.id) }
+            defer { working[request.id] = nil }
             do {
                 _ = try await API.People.cancelFriendRequest(request.id)
                 inbox.removeRequest(from: request.id)

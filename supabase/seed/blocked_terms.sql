@@ -1,4 +1,5 @@
--- Minimal objectionable-content list. Edit in the dashboard; the app embeds the same list for instant feedback.
+-- Objectionable-content list (slurs, sexual content, threats), matched server-side as whole words in
+-- messages, names, group names and court names. Edit here and redeploy the seed step.
 insert into public.blocked_terms (term) values
   ('nigger'), ('nigga'), ('faggot'), ('fag'), ('kike'), ('spic'), ('chink'), ('tranny'), ('retard'),
   ('kys'), ('rape')

@@ -20,6 +20,9 @@ final class OnboardingDraft {
     /// Courtly is for adults: players arrange to meet in person, so the app is rated 18+.
     static let minimumAge = 18
 
+    /// Set once the player moves the picker or a saved birthday loads: the starting date is never taken as theirs.
+    var birthdayChosen = false
+
     var meetsMinimumAge: Bool {
         let years = Calendar.current.dateComponents([.year], from: birthday, to: .now).year ?? 0
         return years >= Self.minimumAge
@@ -37,7 +40,12 @@ final class OnboardingDraft {
     func load(from profile: Profile) {
         firstName = profile.firstName
         lastName = profile.lastName
-        if let birthday = profile.birthday, let date = Self.dateFormatter.date(from: birthday) { self.birthday = date }
+        if let birthday = profile.birthday, let date = Self.dateFormatter.date(from: birthday) {
+            self.birthday = date
+            birthdayChosen = true
+        } else {
+            birthdayChosen = false   // never carry a date over from another account
+        }
         gender = profile.gender
         level = profile.level
         formats = Set(profile.formats)

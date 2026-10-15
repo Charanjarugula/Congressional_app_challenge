@@ -573,10 +573,14 @@ struct ProfilePhotoButton: View {
         isWorking = true
         Task { @MainActor in
             defer { isWorking = false }
-            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
             // Decoding a camera photo is slow; off the main thread, kept large enough to zoom in sharply.
-            let image = await Task.detached(priority: .userInitiated) { UIImage(data: data)?.downscaled(to: 1800) }.value
-            if let image { photoToCrop = CropTarget(image: image) }
+            if let data = try? await item.loadTransferable(type: Data.self),
+               let image = await Task.detached(priority: .userInitiated, operation: { UIImage(data: data)?.downscaled(to: 1800) }).value {
+                photoToCrop = CropTarget(image: image)
+            } else {
+                pickerItem = nil   // so picking the same photo again tries again
+                errorMessage = "That photo couldn’t be opened. If it’s in iCloud, wait for it to download and try again."
+            }
         }
     }
 

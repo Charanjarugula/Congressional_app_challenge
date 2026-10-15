@@ -8,8 +8,10 @@ struct PlayerProfileView: View {
 
     @Environment(HitsStore.self) private var hits
     @Environment(InboxStore.self) private var inbox
+    @Environment(AppSession.self) private var session
     @Environment(\.navigate) private var navigate
     @State private var profile: PlayerProfile?
+    @State private var showsRemoveFriend = false
     @State private var loadFailed = false
     @State private var isWorking = false
     @State private var showsActions = false
@@ -62,10 +64,14 @@ struct PlayerProfileView: View {
         }
         .confirmationDialog("", isPresented: $showsActions) {
             if profile?.relationship.isFriend == true {
-                Button("Remove friend") { removeFriend() }
+                Button("Remove friend") { showsRemoveFriend = true }
             }
             Button("Block", role: .destructive) { showsBlockAlert = true }
             Button("Report", role: .destructive) { showsReport = true }
+        }
+        .confirmationDialog("Remove \(profile?.card.firstName ?? "this player") as a friend?", isPresented: $showsRemoveFriend, titleVisibility: .visible) {
+            Button("Remove friend", role: .destructive) { removeFriend() }
+            Button("Keep", role: .cancel) {}
         }
         .confirmationDialog("Cancel your friend request?", isPresented: $showsCancelRequest, titleVisibility: .visible) {
             Button("Cancel request", role: .destructive) { cancelRequest() }
@@ -286,6 +292,7 @@ struct PlayerProfileView: View {
     private func afterBlock() async {
         await inbox.load()
         await hits.refreshAll()
+        await session.refreshProfile()   // the Blocked players count on You
         navigate.pop()
     }
 }
@@ -297,8 +304,13 @@ private struct OpenHitRow: View {
     @Environment(HitsStore.self) private var hits
     @Environment(\.navigate) private var navigate
     @State private var isJoining = false
-    @State private var asked = false
+    @State private var requestID: UUID?   // set once asked here
+    @State private var cancelledHere = false   // taken back here: the hit's own copy is now stale
     @State private var errorMessage: String?
+
+    private var pendingRequestID: UUID? {
+        requestID ?? (!cancelledHere && hit.hasPendingRequest ? hit.viewer.request?.id : nil)
+    }
 
     var body: some View {
         HStack(spacing: 14) {
@@ -328,15 +340,19 @@ private struct OpenHitRow: View {
             }
             .buttonStyle(.plain)
 
-            if asked || hit.hasPendingRequest {
-                Text("Asked")
+            // Same words and behavior as the feed: Ask to join, then Requested (tap to take it back).
+            if let pending = pendingRequestID {
+                PillButton(title: isJoining ? "…" : "Requested", style: .tint) { cancel(pending) }
+                    .disabled(isJoining)
+            } else if hit.wasDeclined {
+                Text("Passed")
                     .font(CourtlyFont.secondarySemibold)
                     .foregroundStyle(CourtlyColor.secondary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Capsule().fill(CourtlyColor.groupedBackground))
             } else {
-                PillButton(title: isJoining ? "Asking…" : "Join", style: .tint) { join() }
+                PillButton(title: isJoining ? "Asking…" : "Ask to join", style: .filled) { join() }
                     .disabled(isJoining)
             }
         }
@@ -349,8 +365,23 @@ private struct OpenHitRow: View {
         isJoining = true
         Task { @MainActor in
             do {
-                _ = try await hits.requestToJoin(hit.id)
-                asked = true
+                let updated = try await hits.requestToJoin(hit.id)
+                requestID = updated.viewer.request?.id
+                cancelledHere = false
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isJoining = false
+        }
+    }
+
+    private func cancel(_ requestID: UUID) {
+        isJoining = true
+        Task { @MainActor in
+            do {
+                try await hits.cancelRequest(requestID, hitID: hit.id)
+                self.requestID = nil
+                cancelledHere = true
             } catch {
                 errorMessage = error.localizedDescription
             }

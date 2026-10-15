@@ -15,10 +15,45 @@ enum SupabaseError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .notSignedIn: "You’re signed out."
-        case let .http(status, message): "Request failed (\(status)): \(message)"
+        case let .http(status, message): Self.plainText(status: status, message: message)
         case let .backend(code): BackendMessages.text(for: code)
-        case let .decoding(detail): "Unexpected response: \(detail)"
+        case let .decoding(detail):
+            #if DEBUG
+            "Unexpected response: \(detail)"
+            #else
+            "Something didn’t load right. Pull down to try again."
+            #endif
         }
+    }
+
+    /// Never a status code or a server's raw wording on screen: a sentence a player can act on.
+    /// Edge Functions that answer with their own plain sentence (e.g. "Apple couldn't be reached…")
+    /// keep it; anything that looks technical gets a general line.
+    static func plainText(status: Int, message: String) -> String {
+        let lower = message.lowercased()
+        if lower.contains("sending") && lower.contains("email") {
+            return "We couldn’t send the email just now. Try again in a minute."
+        }
+        switch status {
+        case 429:
+            return "Too many tries. Wait a minute and try again."
+        case 401, 403:
+            return "You’re signed out. Sign in again."
+        case 0, 500...599:
+            if isPlainSentence(message) { return message }
+            return "Something went wrong on our end. Try again in a moment."
+        default:
+            if isPlainSentence(message) { return message }
+            return "That didn’t work. Try again."
+        }
+    }
+
+    /// A short sentence written for people: no braces, codes or stack-trace shapes.
+    private static func isPlainSentence(_ message: String) -> Bool {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 8, trimmed.count <= 160, trimmed.first?.isUppercase == true else { return false }
+        let technical = ["{", "}", "_", "PGRST", "error code", "exception", "violates", "null value", "JWT", "http"]
+        return !technical.contains { trimmed.localizedCaseInsensitiveContains($0) }
     }
 
     var code: String? {

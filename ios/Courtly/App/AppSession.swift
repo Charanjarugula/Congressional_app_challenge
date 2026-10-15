@@ -1,3 +1,4 @@
+import EventKit
 import Foundation
 import Observation
 import UserNotifications
@@ -18,6 +19,8 @@ final class AppSession {
     }
 
     private(set) var stage: Stage = .loading
+    /// Counts sign-outs, so a fresh onboarding flow replaces one left mid-way.
+    private(set) var signOutCount = 0
     private(set) var profile: Profile?
     var alert: AppAlert?
 
@@ -121,8 +124,8 @@ final class AppSession {
 
     /// The server removes hits, chats, photos and the sign-in; then the device forgets everything.
     @MainActor
-    func deleteAccount() async throws {
-        try await API.Account.delete()
+    func deleteAccount(unfinished: Bool = false) async throws {
+        try await API.Account.delete(mode: unfinished ? "underage" : "full")
         await signOut()
     }
 
@@ -141,8 +144,19 @@ final class AppSession {
     }
 
     /// Server first (device token, sign-out), then everything the device remembers about the player.
+    /// With Apple Calendar connected and access still on, re-reads the coming week's busy blocks
+    /// and saves them, so stale ones never hide hits. Quiet on any failure: it only refines the feed.
+    @MainActor
+    func refreshCalendarBusy() async {
+        guard let profile, profile.calendarProvider == .apple,
+              EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return }
+        let mask = await Task.detached(priority: .utility) { CalendarService().busyMaskForComingWeek() }.value
+        try? await API.Profile.saveBusyWeek(Int(mask.rawValue))
+    }
+
     @MainActor
     func signOut() async {
+        signOutCount += 1   // onboarding starts over from Welcome, with nothing from the last account
         RealtimeHub.shared.reset()
         await API.Devices.unregisterStored()
         await client.signOut()

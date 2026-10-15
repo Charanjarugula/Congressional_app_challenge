@@ -85,8 +85,13 @@ struct HitFeedRow: View {
                         }
                     } else if hit.hasPendingRequest {
                         ActionButton(title: "Requested", style: .grouped, isLoading: isJoining) { cancel() }
+                    } else if hit.wasDeclined {
+                        Text("\(hit.host.firstName) passed on this one.")
+                            .font(CourtlyFont.caption)
+                            .foregroundStyle(CourtlyColor.secondary)
+                            .frame(maxWidth: .infinity)
                     } else {
-                        ActionButton(title: "Request to join", isLoading: isJoining) { join() }
+                        ActionButton(title: "Ask to join", isLoading: isJoining) { join() }
                     }
                 }
                 .padding(.horizontal, 16)

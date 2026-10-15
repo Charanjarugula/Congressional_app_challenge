@@ -114,6 +114,10 @@ struct InviteSheet: View {
             Spacer(minLength: 8)
             if let chatID = friend.dmChatId {
                 sendButton(chatID: chatID, targetUserID: friend.card.id)
+            } else {
+                Text("Message them first")
+                    .font(CourtlyFont.caption)
+                    .foregroundStyle(CourtlyColor.secondary)
             }
         }
         .padding(.vertical, 12)
@@ -150,7 +154,9 @@ struct InviteSheet: View {
         async let friendList = API.People.friends()
         async let inbox = API.Chats.inbox()
         do {
-            friends = try await friendList
+            // Friends already in the hit can't be invited to it.
+            let inHit = Set(hit.everyone.map(\.id))
+            friends = try await friendList.filter { !inHit.contains($0.id) }
             groups = try await inbox.filter { $0.type == .group }
             loadFailed = false
         } catch {

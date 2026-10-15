@@ -261,7 +261,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_CFBundleDisplayName = Courtly;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "We only read free/busy times to skip blocks you can't make. Event details stay private.";
-				INFOPLIST_KEY_NSContactsUsageDescription = "Courtly uses your contacts to find friends who already play. Only hashed numbers are sent, never stored.";
+				INFOPLIST_KEY_NSContactsUsageDescription = "Courtly checks which of your contacts already play. Phone numbers and emails are hashed on your iPhone and only the hashes are compared; your address book is never uploaded.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Used to find players and public courts near you. Other players only see your general area.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -295,7 +295,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_CFBundleDisplayName = Courtly;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "We only read free/busy times to skip blocks you can't make. Event details stay private.";
-				INFOPLIST_KEY_NSContactsUsageDescription = "Courtly uses your contacts to find friends who already play. Only hashed numbers are sent, never stored.";
+				INFOPLIST_KEY_NSContactsUsageDescription = "Courtly checks which of your contacts already play. Phone numbers and emails are hashed on your iPhone and only the hashes are compared; your address book is never uploaded.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Used to find players and public courts near you. Other players only see your general area.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

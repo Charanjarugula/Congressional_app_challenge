@@ -15,6 +15,7 @@ struct YouView: View {
     @State private var isDeleting = false
     @State private var isSigningOut = false
     @State private var errorMessage: String?
+    @State private var supportCopied = false
     @State private var visibilitySave: Task<Void, Never>?   // saves run in the order chosen
 
     var body: some View {
@@ -71,6 +72,11 @@ struct YouView: View {
             }
         }
         .errorAlert($errorMessage)
+        .alert("Email us", isPresented: $supportCopied) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Mail isn’t set up on this iPhone. We copied \(AppConfig.supportEmail) so you can paste it into any email app.")
+        }
     }
 
     @ViewBuilder
@@ -143,9 +149,7 @@ struct YouView: View {
         }
 
         group(label: "Help") {
-            SettingsRow(title: "Contact support") {
-                if let url = URL(string: "mailto:\(AppConfig.supportEmail)") { UIApplication.shared.open(url) }
-            }
+            SettingsRow(title: "Contact support") { contactSupport() }
             HairlineSeparator()
             SettingsRow(title: "Privacy Policy") { UIApplication.shared.open(AppConfig.privacyURL) }
             HairlineSeparator()
@@ -228,6 +232,17 @@ struct YouView: View {
                 try await session.updateProfile(["hit_visibility": value])
             } catch {
                 errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    /// Opens Mail; with no mail account set up, shows the address and copies it instead of doing nothing.
+    private func contactSupport() {
+        guard let url = URL(string: "mailto:\(AppConfig.supportEmail)") else { return }
+        UIApplication.shared.open(url) { opened in
+            if !opened {
+                UIPasteboard.general.string = AppConfig.supportEmail
+                supportCopied = true
             }
         }
     }

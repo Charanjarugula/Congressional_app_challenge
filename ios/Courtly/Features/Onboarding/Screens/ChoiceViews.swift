@@ -1,30 +1,5 @@
 import SwiftUI
 
-/// 05 · Gender. Single choice.
-struct GenderView: View {
-    @Bindable var draft: OnboardingDraft
-    let onContinue: () -> Void
-
-    var body: some View {
-        OnboardingStepView(
-            progress: 0.4,
-            title: "What’s your gender?",
-            subtitle: "Some players prefer to hit with men or women. We’ll use this to match you."
-        ) {
-            VStack(spacing: 8) {
-                ForEach(Gender.allCases) { option in
-                    ChoiceRow(title: option.title, isSelected: draft.gender == option) {
-                        draft.gender = option
-                    }
-                }
-            }
-            .padding(.top, 28)
-        } footer: {
-            PrimaryButton(title: "Continue", isEnabled: draft.gender != nil, action: onContinue)
-        }
-    }
-}
-
 /// 06 · Tennis journey. Single choice with a description per level.
 struct LevelView: View {
     @Bindable var draft: OnboardingDraft

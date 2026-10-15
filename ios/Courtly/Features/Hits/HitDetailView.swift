@@ -17,7 +17,7 @@ struct HitDetailView: View {
     @State private var showsCalendar = false
     @State private var showsInvite = false
     @State private var attendance: [UUID: Bool] = [:]
-    @State private var friendsAdded: Set<UUID> = []
+    @State private var standings: [UUID: Relationship] = [:]   // friend adds made on this screen
     @State private var errorMessage: String?
 
     private var me: UUID? { session.profile?.id }
@@ -129,7 +129,7 @@ struct HitDetailView: View {
                         ActionButton(title: hit.unreadMessages > 0 ? "Chat · \(hit.unreadMessages)" : "Chat") {
                             navigate(.chat(chatID))
                         }
-                    } else if hit.isLive {
+                    } else if hit.isLive && hit.viewer.isHost {
                         ActionButton(title: "Invite") { showsInvite = true }
                     }
                     if hit.isLive {
@@ -212,9 +212,22 @@ struct HitDetailView: View {
                         answer(player, showedUp: true, hit: hit)
                     }
                 }
-                if attendance[player.id] == true && !friendsAdded.contains(player.id) {
-                    ActionButton(title: "Add \(player.firstName) as a friend", style: .grouped) {
-                        addFriend(player)
+                if attendance[player.id] == true {
+                    switch standings[player.id] ?? hit.relationship(with: player.id) {
+                    case .none:
+                        ActionButton(title: "Add \(player.firstName) as a friend", style: .grouped) {
+                            addFriend(player)
+                        }
+                    case .requested:
+                        Text("Friend request sent")
+                            .font(CourtlyFont.caption)
+                            .foregroundStyle(CourtlyColor.secondary)
+                    case .requestedMe:
+                        ActionButton(title: "Confirm \(player.firstName)’s friend request", style: .grouped) {
+                            addFriend(player)   // adding someone who asked you is accepting
+                        }
+                    case .friend, .blocked:
+                        EmptyView()
                     }
                 }
             }
@@ -224,7 +237,7 @@ struct HitDetailView: View {
     @ViewBuilder
     private func footer(_ hit: Hit) -> some View {
         if hit.isLive {
-            if hit.isMember && hit.spotsOpen > 0 {
+            if hit.viewer.isHost && hit.spotsOpen > 0 {   // only the host can send invites
                 ActionButton(title: "Invite friends", style: .grouped) { showsInvite = true }
                     .padding(.top, 20)
             }
@@ -240,7 +253,7 @@ struct HitDetailView: View {
                     .padding(.top, 8)
             } else if hit.hasPendingRequest, let request = hit.viewer.request {
                 VStack(spacing: 4) {
-                    Text("You asked to join. \(hit.host.firstName) will get back to you.")
+                    Text("Requested. \(hit.host.firstName) can say yes until the hit starts.")
                         .font(CourtlyFont.secondary)
                         .foregroundStyle(CourtlyColor.secondary)
                         .multilineTextAlignment(.center)
@@ -256,15 +269,25 @@ struct HitDetailView: View {
 
     @ViewBuilder
     private func bottomAction(_ hit: Hit) -> some View {
-        if hit.isLive && !hit.isMember && !hit.hasPendingRequest {
+        if hit.isLive && !hit.isMember && hit.wasDeclined && hit.openInvite == nil {
+            Text("\(hit.host.firstName) passed on this one.")
+                .font(CourtlyFont.secondary)
+                .foregroundStyle(CourtlyColor.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(CourtlyColor.groupedBackground)
+        } else if hit.isLive && !hit.isMember && !hit.hasPendingRequest {
             Group {
                 if let invite = hit.openInvite {
                     PrimaryButton(title: "I’m in", isLoading: isWorking) {
                         Task { await perform { try await hits.claimInvite(invite.id) } }
                     }
                 } else {
-                    PrimaryButton(title: hit.isFull ? "Full" : "Ask to join", isEnabled: !hit.isFull, isLoading: isWorking) {
-                        Task { await perform { try await hits.requestToJoin(hit.id) } }
+                    VStack(spacing: 8) {
+                        SafetyNote()
+                        PrimaryButton(title: hit.isFull ? "Full" : "Ask to join", isEnabled: !hit.isFull, isLoading: isWorking) {
+                            Task { await perform { try await hits.requestToJoin(hit.id) } }
+                        }
                     }
                 }
             }
@@ -287,6 +310,10 @@ struct HitDetailView: View {
             let known = hit ?? hits.cachedHit(hitID)
             fresh.needsAttendance = fresh.needsAttendance ?? known?.needsAttendance
             hit = fresh
+            // Answers already given come back from the server, so leaving and returning keeps them.
+            for answer in fresh.viewer.attendance ?? [] where attendance[answer.userId] == nil {
+                attendance[answer.userId] = answer.showedUp
+            }
             loadFailed = false
         } catch {
             if hit == nil { loadFailed = true }
@@ -335,12 +362,14 @@ struct HitDetailView: View {
     }
 
     private func addFriend(_ player: PlayerCard) {
-        friendsAdded.insert(player.id)
+        let before = standings[player.id]
+        standings[player.id] = .requested
         Task { @MainActor in
             do {
-                _ = try await API.People.addFriend(player.id)
+                let result = try await API.People.addFriend(player.id)
+                standings[player.id] = Relationship(rawValue: result.relationship) ?? .requested
             } catch {
-                friendsAdded.remove(player.id)
+                standings[player.id] = before
                 errorMessage = error.localizedDescription
             }
         }
@@ -353,7 +382,8 @@ private struct DetailRow: View {
     let value: String
 
     var body: some View {
-        HStack(spacing: 10) {
+        // Long addresses and court names wrap instead of being cut, so they can always be read.
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(title)
                 .font(CourtlyFont.body)
                 .foregroundStyle(CourtlyColor.ink)
@@ -361,10 +391,12 @@ private struct DetailRow: View {
             Text(value)
                 .font(CourtlyFont.secondary)
                 .foregroundStyle(CourtlyColor.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
+                .multilineTextAlignment(.trailing)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 16)
-        .frame(height: 50)
+        .padding(.vertical, 14)
+        .frame(minHeight: 50)
     }
 }

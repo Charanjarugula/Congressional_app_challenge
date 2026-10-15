@@ -247,14 +247,16 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   v_feed := public.match_contacts(array[public.contact_hash('+15615550142'), 'nothing']);
   if jsonb_array_length(v_feed) <> 1 or (v_feed->0->'player'->>'id')::uuid <> a then raise exception 'match_contacts: %', v_feed; end if;
-  update public.profiles set birthday = current_date - interval '12 years' where id = b;
+  if v_feed->0->>'relationship' is null then raise exception 'match_contacts lost the relationship: %', v_feed; end if;
+  -- Back to mid-onboarding for this check: an onboarded profile can't take an under-18 birthday (0023).
+  update public.profiles set birthday = current_date - interval '12 years', onboarding_completed_at = null where id = b;
   begin
     perform public.complete_onboarding();
     raise exception 'underage accepted';
   exception when others then
     if sqlerrm <> 'underage' then raise; end if;
   end;
-  update public.profiles set birthday = '1994-05-02' where id = b;
+  update public.profiles set birthday = '1994-05-02', onboarding_completed_at = now() where id = b;
 
   -- Row-level security as the app's role: Alex sees only hits visible to him, never Maya's profile row.
   execute 'set local role authenticated';
@@ -866,6 +868,27 @@ begin
     if exists (select 1 from jsonb_array_elements(v_feed->'near_you') e where (e->>'id')::uuid = (v_demo_hit->>'id')::uuid) then
       raise exception 'a demo hit reached a real player''s feed';
     end if;
+    if jsonb_array_length(public.search_players('Zed')) <> 0 then raise exception 'a demo account came up in name search'; end if;
+    -- Search never reveals more than the last initial.
+    if jsonb_array_length(public.search_players('Nia P')) <> 0 then raise exception 'search by own name should not list self'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+    if jsonb_array_length(public.search_players('Nia P')) <> 1 then raise exception 'first name and last initial should match'; end if;
+    if jsonb_array_length(public.search_players('Nia Pa')) <> 0 then raise exception 'search revealed more than the last initial'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);
+    -- A photo has to be in the player's own folder; a later birthday change can't make them under 18.
+    begin
+      perform public.update_profile(jsonb_build_object('photo_path', a::text || '/avatar-1.jpg'));
+      raise exception 'pointed a profile at someone else''s photo';
+    exception when others then
+      if sqlerrm <> 'invalid_photo' then raise; end if;
+    end;
+    perform public.update_profile(jsonb_build_object('photo_path', v_new::text || '/avatar-1.jpg'));
+    begin
+      perform public.update_profile(jsonb_build_object('birthday', (current_date - interval '17 years')::date));
+      raise exception 'changed birthday to under 18 after onboarding';
+    exception when others then
+      if sqlerrm <> 'underage' then raise; end if;
+    end;
     v_pulse := public.get_area_pulse();
     if (v_pulse->>'players')::int < 1 or (v_pulse->>'courts')::int < 1 or (v_pulse->>'radius_mi')::int < 25 then
       raise exception 'area pulse: %', v_pulse;
@@ -873,6 +896,19 @@ begin
     -- The demo account itself still sees the other demo players' world, and real players nearby.
     perform set_config('request.jwt.claims', json_build_object('sub', v_demo, 'role', 'authenticated')::text, true);
     if (public.get_area_pulse()->>'players')::int < 1 then raise exception 'demo pulse empty'; end if;
+    if jsonb_array_length(public.search_players('Nia')) <> 1 then raise exception 'demo account cannot find a real player by name'; end if;
+    -- A fresh calendar snapshot counts; one older than 7 days hides nothing.
+    perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);
+    perform public.save_busy_week(2097151);
+    if not public.busy_at(v_new, ((date_trunc('day', now() at time zone 'America/New_York') + interval '1 day 18 hours') at time zone 'America/New_York')) then raise exception 'fresh busy week ignored'; end if;
+    update public.profiles set busy_mask_week_at = now() - interval '8 days' where id = v_new;
+    if public.busy_at(v_new, ((date_trunc('day', now() at time zone 'America/New_York') + interval '1 day 18 hours') at time zone 'America/New_York')) then raise exception 'stale busy week still hiding hits'; end if;
+    perform public.save_busy_week(0);
+    -- The hit carries where the viewer stands with each person and their day-after answers.
+    if (public.hit_json((v_demo_hit->>'id')::uuid, v_new)->'viewer'->'relationships'->0->>'relationship') <> 'none' then
+      raise exception 'hit_json relationships: %', public.hit_json((v_demo_hit->>'id')::uuid, v_new)->'viewer';
+    end if;
+    if jsonb_typeof(public.hit_json((v_demo_hit->>'id')::uuid, v_new)->'viewer'->'attendance') <> 'array' then raise exception 'hit_json attendance missing'; end if;
     -- No home area yet: nothing to count, no error.
     update public.profiles set home_point = null where id = v_new;
     perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);
@@ -893,7 +929,7 @@ begin
   end;
   perform public.post_report_email(gen_random_uuid());   -- no functions url in tests: a quiet no-op
   -- 17 can't finish onboarding; 18 can.
-  update public.profiles set birthday = current_date - interval '17 years' where id = v_pat2;
+  update public.profiles set birthday = current_date - interval '17 years', onboarding_completed_at = null where id = v_pat2;
   perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
   begin
     perform public.complete_onboarding();

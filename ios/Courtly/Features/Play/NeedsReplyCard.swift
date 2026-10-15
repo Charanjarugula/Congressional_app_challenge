@@ -64,7 +64,9 @@ struct NeedsReplyCard: View {
 
     private var accepted: some View {
         HStack(spacing: 12) {
-            PlayerAvatar(card: item.person, size: 44)
+            Button { navigate(.player(item.person.id)) } label: { PlayerAvatar(card: item.person, size: 44) }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(item.person.displayName), open profile")
             VStack(alignment: .leading, spacing: 1) {
                 Text("\(item.person.firstName) accepted you")
                     .font(CourtlyFont.bodySemibold)
@@ -106,14 +108,17 @@ struct NeedsReplyCard: View {
         HStack(spacing: 14) {
             PlayerAvatar(card: item.person, size: 44)
             VStack(alignment: .leading, spacing: 1) {
+                // Two lines each, so "Christopher M. asked to join" keeps its verb on a small iPhone.
                 Text(title)
                     .font(CourtlyFont.bodySemibold)
                     .foregroundStyle(CourtlyColor.ink)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(CourtlyFont.secondary)
                     .foregroundStyle(CourtlyColor.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             ChevronMark()

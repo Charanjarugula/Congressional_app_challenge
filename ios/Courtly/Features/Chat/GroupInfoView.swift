@@ -37,11 +37,22 @@ struct GroupInfoView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
 
-                    SectionHeader(title: "Members", actionTitle: "Add", action: { showsAddMembers = true }, top: 24)
+                    if chat.leftAt == nil {
+                        SectionHeader(title: "Members", actionTitle: "Add", action: { showsAddMembers = true }, top: 24)
+                    } else {
+                        SectionHeader(title: "Members", top: 24)
+                    }
                     CardRows(items: chat.members ?? []) { member in
                         memberRow(member)
                     }
 
+                    if chat.leftAt != nil {
+                        Text("You left this group. You can still read it, but not add people or change settings.")
+                            .font(CourtlyFont.caption)
+                            .foregroundStyle(CourtlyColor.secondary)
+                            .padding(.top, 16)
+                            .padding(.horizontal, 4)
+                    } else {
                     SectionHeader(title: "Settings", top: 24)
                     Card {
                         VStack(spacing: 0) {
@@ -61,6 +72,7 @@ struct GroupInfoView: View {
                                 showsLeaveAlert = true
                             }
                         }
+                    }
                     }
                 } else if loadFailed {
                     QuietCard(title: "This group isn’t available", detail: "You may have left it.")

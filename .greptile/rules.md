@@ -5,7 +5,7 @@ Courtly helps recreational tennis players in Palm Beach County find a hit: one t
 ## What matters most
 
 1. **Security of the API surface.** Only the functions granted in `supabase/migrations/0009_function_grants.sql` are callable. A helper that takes an arbitrary user, hit or chat id and ends up callable over PostgREST is a data leak.
-2. **Privacy promises.** Other players see first name, last initial, level, area label and availability only. No precise coordinates, no phone numbers, no birthdays, no email. The site pages must describe the real behavior.
+2. **Privacy promises.** Other players see first name, last initial, photo, level, area label, hits played, formats and availability only. No precise coordinates, no phone numbers, no birthdays, no email. The site pages must describe the real behavior.
 3. **App and backend agreeing.** Every RPC the app calls has a typed wrapper in `ios/Courtly/Services/API.swift`; models in `ios/Courtly/Models` mirror the `*_json` builders in SQL. Renamed parameters, new nullable fields or new error codes must be updated on both sides.
 4. **State that outlives a screen.** Stores (`HitsStore`, `InboxStore`, `AppSession`), the Realtime hub, caches and the badge are shared; sign-out must reset all of them, and overlapping refreshes must not overwrite newer state with older responses.
 

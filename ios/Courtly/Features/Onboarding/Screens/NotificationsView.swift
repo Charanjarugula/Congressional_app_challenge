@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 15 · Notifications pre-prompt. Only "Turn on notifications" triggers the system prompt (16).
+/// 15 · Notifications. Continue always leads to the system prompt (App Review 5.1.1(iv): no exit before it).
 struct NotificationsView: View {
     @Bindable var draft: OnboardingDraft
     let onContinue: () -> Void
@@ -15,9 +15,9 @@ struct NotificationsView: View {
         ) {
             VStack(spacing: 10) {
                 NotificationPreviewCard(
-                    title: "Jordan accepted",
+                    title: "Jordan R. accepted you",
                     time: "now",
-                    message: "Thu 6:30 PM at Wellington Tennis Center. Tap to confirm.",
+                    message: "Thu 6:30 PM at Wellington Tennis Center. You’re in.",
                     isPrimary: true
                 )
                 NotificationPreviewCard(
@@ -30,10 +30,8 @@ struct NotificationsView: View {
             .padding(.top, 40)
             .accessibilityHidden(true)
         } footer: {
-            VStack(spacing: 4) {
-                PrimaryButton(title: "Turn on notifications", isLoading: isRequesting, action: turnOn)
-                TextActionButton(title: "Not now", action: onContinue)
-            }
+            // One way forward: the system prompt, where the player can still choose Don't Allow.
+            PrimaryButton(title: "Continue", isLoading: isRequesting, action: turnOn)
         }
     }
 

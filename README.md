@@ -16,6 +16,29 @@ Palm Beach County has many free public courts and plenty of people who would pla
 
 You post a **hit**: one time, one public court, the kind of tennis you want (casual rally, singles, doubles or drills) and how many spots are open. Friends and nearby players see it and ask to join; when you accept, the hit is confirmed and a chat opens for it. You can invite a friend or a whole group straight to a hit, mark the hours you are usually free so the right hits reach you, and after you play, say who showed up. The app is where hits get found and organized; the website is a landing page with the policies and the support address.
 
+## What works today
+
+- **Post a hit** with a time, court, format and open spots; edit or cancel it later (`PlanHitView`, `HitDetailView`; `create_hit`, `update_hit`, `cancel_hit`).
+- **Ask to join**; the host accepts or declines; a confirmed hit gets its own chat (`JoinRequestView`; `request_to_join`, `respond_to_request`).
+- **Invite a friend or a group** to a hit; the first tap takes the spot (`InviteSheet`, `HitInviteCard`; `send_hit_invite`, `claim_invite`).
+- **Leave a hit**; a host who leaves hands it to the first player who joined (`leave_hit`).
+- **Chats**: one per hit, direct messages with friends, and groups you create (`ChatThreadView`, `NewGroupView`; `send_message`, `create_group`).
+- **Friends**: send and accept requests, see mutual friends, find people from your contacts without uploading them (only hashes are compared) (`AddFriendsView`, `FriendRequestsView`; `match_contacts`, `get_friend_suggestions`).
+- **Nearby**: a new player sees how many players, open hits and courts are around them (`SuggestedPlayersRow`; `get_area_pulse`).
+- **Availability**: a weekly grid of free and busy blocks, with Apple Calendar events marked busy if you connect it; hits in busy blocks stay out of your feed (`AvailabilitySheet`, `CalendarService`).
+- **Courts**: 25 public courts in the county to start with; add another from a Maps search (`CourtPickerView`; `add_court`).
+- **Day-after check**: say whether each player showed up; repeated no-shows are counted (`MyHitsView`; `submit_attendance`).
+- **Safety**: block players, report them, and every report reaches the support inbox by email (`ReportView`, `BlockedPlayersView`; `report_user`, the `report-email` function).
+- **Live updates**: open chats and the hit lists refresh when another phone changes them (`RealtimeHub`).
+- **Sign in** with Apple, Google or an email code; **delete your account** from the app (`AuthService`; the `delete-account` function).
+- **Reminders and pushes** the day before and the hour before a confirmed hit, and for requests, invites and messages (`send-push`, the scheduler in `0008_scheduler.sql`).
+
+Not yet: Android. Phone numbers are never collected.
+
+## How it works
+
+Maya posts a casual hit for Thursday at 6:30 PM at Wellington Tennis Center with one open spot. Luis, two miles away, sees it on Play and asks to join. Maya accepts; the hit turns confirmed and a chat opens with the two of them. Both get a reminder the day before and an hour before. The morning after, My Hits asks each of them whether the other showed up.
+
 ## Stack
 
 SwiftUI (iOS 17+) talking to Supabase (Postgres with PostGIS, Auth, Storage, Edge Functions) over plain `URLSession`. Apple Push Notifications, EventKit, MapKit, Contacts. The policy site is static HTML on Vercel.

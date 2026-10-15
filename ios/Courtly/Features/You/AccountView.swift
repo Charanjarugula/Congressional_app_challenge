@@ -87,6 +87,7 @@ struct AccountView: View {
             .padding(.bottom, 24)
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .plainBackButton()
         .navigationTitle("Account")
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)

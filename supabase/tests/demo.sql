@@ -7,8 +7,10 @@ begin
   if rv is null then raise exception 'DEMO_CHECK no reviewer account'; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', rv, 'role', 'authenticated')::text, true);
   f := public.get_play_feed(); m := public.get_my_hits(); i := public.get_inbox();
-  select count(*) into v_friends from public.friendships x where rv in (x.user_a, x.user_b);
+  select count(*) into v_friends from public.friendships x where rv in (x.user_a, x.user_b) and x.status = 'accepted';
   if v_friends <> 2 then raise exception 'DEMO_CHECK friends: % (wanted 2)', v_friends; end if;
+  -- Marcus's friend request waits.
+  if jsonb_array_length(public.get_friend_requests()->'incoming') <> 1 then raise exception 'DEMO_CHECK friend requests: %', public.get_friend_requests(); end if;
   -- Priya's request to the reviewer's hit waits for an answer.
   if not exists (select 1 from jsonb_array_elements(f->'needs_reply') e where e->>'kind' = 'join_request') then
     raise exception 'DEMO_CHECK nothing needs a reply: %', f->'needs_reply';
@@ -28,6 +30,10 @@ begin
   if not exists (select 1 from public.messages m where m.sender_id = rv and m.body like 'Thanks! Saturday mornings%') then
     raise exception 'DEMO_CHECK the reviewer''s group message is missing';
   end if;
-  -- The conversation with Ana, the group, and the two hit chats.
-  if jsonb_array_length(i) < 4 then raise exception 'DEMO_CHECK inbox has % chats (wanted 4)', jsonb_array_length(i); end if;
+  -- The conversation with Ana (carrying their hit tomorrow), the group, and the thread with Luis for the reviewer's own hit.
+  if jsonb_array_length(i) < 3 then raise exception 'DEMO_CHECK inbox has % chats (wanted 3)', jsonb_array_length(i); end if;
+  if (select count(*) from jsonb_array_elements(i) e where e->>'type' = 'dm' and e->'hit' is not null and e->'hit' <> 'null'::jsonb) < 2 then
+    raise exception 'DEMO_CHECK the direct messages should each carry a hit: %', i;
+  end if;
+  if exists (select 1 from jsonb_array_elements(i) e where e->>'type' = 'hit') then raise exception 'DEMO_CHECK a two-player hit opened a chat of its own: %', i; end if;
 end $$;

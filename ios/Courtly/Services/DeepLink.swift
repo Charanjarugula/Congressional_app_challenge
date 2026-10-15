@@ -10,12 +10,14 @@ enum DeepLink: Equatable {
     case request(UUID)
     case chat(UUID)
     case check(hitID: UUID, playerID: UUID)
+    case friendRequests
 
     init?(string: String) {
         guard let url = URL(string: string), url.scheme == "courtly", let host = url.host else { return nil }
         let parts = url.pathComponents.filter { $0 != "/" }
         switch (host, parts.count) {
         case ("play", _): self = .play
+        case ("people", 1) where parts[0] == "requests": self = .friendRequests
         case ("hit", 1):
             guard let id = UUID(uuidString: parts[0]) else { return nil }
             self = .hit(id)

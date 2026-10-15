@@ -74,6 +74,7 @@ struct GroupInfoView: View {
             .padding(.bottom, 24)
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .plainBackButton()
         .navigationTitle("Group")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

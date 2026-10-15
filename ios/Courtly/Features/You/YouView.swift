@@ -60,9 +60,6 @@ struct YouView: View {
                     .foregroundStyle(CourtlyColor.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                Text(subtitle(profile))
-                    .font(CourtlyFont.secondary)
-                    .foregroundStyle(CourtlyColor.secondary)
             }
         }
         .padding(.top, 8)
@@ -80,24 +77,22 @@ struct YouView: View {
         .buttonStyle(PressableButtonStyle())
         .padding(.top, 16)
 
-        SectionHeader(title: "How you play", top: 24)
+        SectionHeader(title: "Playing", top: 24)
         Card {
             VStack(spacing: 0) {
-                SettingsRow(title: "Availability", value: profile.availability.shortDescription) { sheet = .availability }
-                HairlineSeparator()
                 SettingsRow(title: "Level", value: profile.level?.title ?? "Not set") { sheet = .level }
                 HairlineSeparator()
-                SettingsRow(title: "What you play", value: profile.formats.isEmpty ? "Not set" : profile.formats.map(\.shortTitle).joined(separator: ", ")) { sheet = .formats }
+                SettingsRow(title: "Plays", value: profile.formats.isEmpty ? "Not set" : profile.formats.map(\.shortTitle).joined(separator: ", ")) { sheet = .formats }
                 HairlineSeparator()
                 SettingsRow(title: "Area", value: areaValue(profile)) { sheet = .area }
+                HairlineSeparator()
+                SettingsRow(title: "Availability", value: profile.availability.isEmpty ? "Not set" : nil) { sheet = .availability }
             }
         }
 
-        SectionHeader(title: "Connected", top: 24)
+        SectionHeader(title: "Settings", top: 24)
         Card {
             VStack(spacing: 0) {
-                SettingsRow(title: "Calendar", value: profile.calendarProvider == .none ? "Not connected" : "Apple") { sheet = .availability }
-                HairlineSeparator()
                 HStack {
                     Text("Notifications")
                         .font(CourtlyFont.body)
@@ -113,10 +108,6 @@ struct YouView: View {
                 SettingsRow(title: "Account") { navigate(.account) }
             }
         }
-    }
-
-    private func subtitle(_ profile: Profile) -> String {
-        [profile.level?.title, profile.areaLabel?.components(separatedBy: ",").first].compactMap { $0 }.joined(separator: " · ")
     }
 
     private func areaValue(_ profile: Profile) -> String {

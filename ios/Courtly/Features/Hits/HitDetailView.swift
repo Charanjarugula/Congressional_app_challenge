@@ -48,6 +48,7 @@ struct HitDetailView: View {
             }
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .plainBackButton()
         .navigationTitle(hit?.format.shortTitle ?? "Hit")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

@@ -1,11 +1,17 @@
 import SwiftUI
 
-/// Hits you can join: requests waiting on you, then friends' hits, then the closest open ones.
+/// Hits you can join. Whatever waits on your answer comes first; under it, two lists: hits your friends
+/// are hosting, and everything open near you with a couple of filters.
 struct PlayView: View {
     @Environment(HitsStore.self) private var hits
+    @Environment(AppSession.self) private var session
+    @Environment(\.navigate) private var navigate
     let onPlan: () -> Void
 
-    @State private var showsAllNearby = false
+    @State private var tab = 0
+    @State private var expanded: UUID?
+    @State private var filters = ExploreFilters()
+    @State private var showsFilters = false
 
     var body: some View {
         ScrollView {
@@ -28,7 +34,7 @@ struct PlayView: View {
                 }
             }
             .padding(.horizontal, CourtlyMetrics.screenPadding)
-            .padding(.bottom, 24)
+            .padding(.bottom, 96)
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
@@ -46,111 +52,89 @@ struct PlayView: View {
             }
         }
 
-        if feed.myUpcomingCount == 0 {
-            NoHitsCard(onPlan: onPlan)
-                .padding(.top, feed.needsReply.isEmpty ? 4 : 22)
-        }
+        SegmentedControl(options: ["Friends", "Explore"], selectedIndex: $tab)
+            .padding(.top, feed.needsReply.isEmpty ? 4 : 22)
 
-        if !feed.freeThisWeek.isEmpty {
-            FreeThisWeekCard(players: feed.freeThisWeek, onPlan: onPlan)
-                .padding(.top, 22)
-        }
-
-        if !feed.fromFriends.isEmpty {
-            SectionHeader(title: "From friends")
-            CardRows(items: feed.fromFriends) { hit in
-                HitFeedRow(hit: hit)
-            }
-        }
-
-        if !feed.nearYou.isEmpty {
-            SectionHeader(
-                title: "Near you",
-                actionTitle: feed.nearYou.count > 5 ? (showsAllNearby ? "Show less" : "See all") : nil,
-                action: { withAnimation { showsAllNearby.toggle() } }
-            )
-            CardRows(items: showsAllNearby ? feed.nearYou : Array(feed.nearYou.prefix(5))) { hit in
-                HitFeedRow(hit: hit)
-            }
-        }
-
-        if !feed.hasHits {
-            QuietCard(
-                title: "No open hits near you yet",
-                detail: "Post one and players within your radius can ask to join."
-            )
-            .padding(.top, 22)
+        if tab == 0 {
+            friends(feed.fromFriends)
+        } else {
+            explore(feed.nearYou)
         }
     }
-}
 
-/// Blue card shown while you have nothing planned.
-private struct NoHitsCard: View {
-    let onPlan: () -> Void
+    // MARK: - Friends
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("No hits planned")
-                    .font(.system(size: 22, weight: .bold))
-                    .tracking(-0.4)
-                Text("Pick a time and a court. Players nearby can ask to join.")
+    @ViewBuilder
+    private func friends(_ hitsFromFriends: [Hit]) -> some View {
+        if hitsFromFriends.isEmpty {
+            VStack(spacing: 8) {
+                Text("Nothing from friends yet")
+                    .font(.system(size: 20, weight: .bold))
+                    .tracking(-0.3)
+                    .foregroundStyle(CourtlyColor.ink)
+                Text("When a friend posts a hit, it shows up here first.")
                     .font(CourtlyFont.secondary)
-                    .lineSpacing(3)
-                    .opacity(0.92)
-                    .frame(maxWidth: 260, alignment: .leading)
-            }
-            Button(action: onPlan) {
-                Text("Plan a hit")
-                    .font(CourtlyFont.bodySemibold)
+                    .foregroundStyle(CourtlyColor.secondary)
+                    .multilineTextAlignment(.center)
+                Button("Add friends") { navigate(.addFriends) }
+                    .font(CourtlyFont.secondarySemibold)
                     .foregroundStyle(CourtlyColor.blue)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.white))
+                    .padding(.top, 4)
             }
-            .buttonStyle(PressableButtonStyle())
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 24)
+            .padding(.top, 56)
+        } else {
+            rows(hitsFromFriends)
+                .padding(.top, 12)
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 22)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(CourtlyColor.blue))
     }
-}
 
-/// Friends whose availability still has open blocks this week.
-private struct FreeThisWeekCard: View {
-    let players: [PlayerCard]
-    let onPlan: () -> Void
+    // MARK: - Explore
 
-    var body: some View {
-        Button(action: onPlan) {
-            HStack(spacing: 14) {
-                AvatarStack(cards: players, size: 32)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(names)
-                        .font(CourtlyFont.bodySemibold)
-                        .foregroundStyle(CourtlyColor.ink)
-                        .lineLimit(1)
-                    Text("Free this week · plan something")
-                        .font(CourtlyFont.caption)
-                        .foregroundStyle(CourtlyColor.secondary)
+    @ViewBuilder
+    private func explore(_ nearby: [Hit]) -> some View {
+        HStack(spacing: 10) {
+            Button { showsFilters = true } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal.decrease")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(filters.activeCount == 0 ? "Filters" : "Filters · \(filters.activeCount)")
+                        .font(CourtlyFont.captionSemibold)
                 }
-                Spacer(minLength: 8)
-                ChevronMark()
+                .foregroundStyle(filters.activeCount == 0 ? CourtlyColor.ink : .white)
+                .padding(.horizontal, 14)
+                .frame(height: 34)
+                .background(Capsule().fill(filters.activeCount == 0 ? CourtlyColor.card : CourtlyColor.ink))
             }
-            .padding(16)
-            .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(CourtlyColor.card))
+            .buttonStyle(.plain)
+            Text("Within \(session.profile?.radius.title ?? "") of \(session.profile?.areaLabel?.components(separatedBy: ",").first ?? "you")")
+                .font(CourtlyFont.caption)
+                .foregroundStyle(CourtlyColor.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
         }
-        .buttonStyle(PressableButtonStyle())
+        .padding(.vertical, 12)
+        .sheet(isPresented: $showsFilters) {
+            ExploreFiltersSheet(filters: $filters, radius: session.profile?.radius ?? .ten)
+        }
+        let shown = filters.apply(to: nearby)
+        if nearby.isEmpty {
+            QuietCard(title: "No open hits near you", detail: "Widen the distance in Filters, or plan one and players nearby can ask to join.")
+        } else if shown.isEmpty {
+            QuietCard(title: "Nothing matches", detail: "Loosen a filter to see more.")
+        } else {
+            rows(shown)
+        }
     }
 
-    private var names: String {
-        let first = players.prefix(2).map(\.firstName)
-        let rest = players.count - first.count
-        switch (first.count, rest) {
-        case (1, _): return first[0]
-        case (2, 0): return "\(first[0]) and \(first[1])"
-        default: return "\(first.joined(separator: ", ")) and \(rest) more"
+    private func rows(_ list: [Hit]) -> some View {
+        CardRows(items: list) { hit in
+            HitFeedRow(hit: hit, isExpanded: expanded == hit.id) {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    expanded = expanded == hit.id ? nil : hit.id
+                }
+            }
         }
     }
 }

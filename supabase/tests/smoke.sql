@@ -2,7 +2,7 @@
 -- Everything happens inside one DO block that ends by raising SMOKE_OK, which rolls the whole thing back.
 do $$
 declare
-  a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid(); d uuid := gen_random_uuid(); v_pat uuid := gen_random_uuid();
+  a uuid := gen_random_uuid(); b uuid := gen_random_uuid(); c uuid := gen_random_uuid(); d uuid := gen_random_uuid(); v_pat uuid := gen_random_uuid(); v_pat2 uuid := gen_random_uuid();
   v_court uuid; v_hit jsonb; v_hit_id uuid; v_req jsonb; v_req_id uuid; v_chat uuid; v_msg jsonb;
   v_feed jsonb; v_inbox jsonb; v_friend jsonb; v_invite jsonb; v_group jsonb; v_n integer; v_dm uuid; v_page jsonb;
 begin
@@ -38,6 +38,20 @@ begin
     if sqlerrm not in ('already_requested') then raise; end if;
   end;
 
+  -- A block marked busy keeps its hits out of the feed; clearing it brings them back.
+  if public.availability_bit(now() + interval '2 days') is not null then
+    perform public.update_profile(jsonb_build_object('busy_mask', 1 << public.availability_bit(now() + interval '2 days')));
+    if exists (select 1 from jsonb_array_elements(public.get_play_feed()->'near_you') e where (e->>'id')::uuid = v_hit_id) then
+      raise exception 'a hit in a busy block reached the feed';
+    end if;
+    perform public.update_profile(jsonb_build_object('busy_mask', 0));
+    if not exists (select 1 from jsonb_array_elements(public.get_play_feed()->'near_you') e where (e->>'id')::uuid = v_hit_id) then
+      raise exception 'clearing the busy block did not bring the hit back';
+    end if;
+  else
+    perform public.busy_at(b, now());   -- a hit outside the blocks is never busy; still exercised
+  end if;
+
   -- Maya accepts: hit confirmed, chat exists, both are members, Jordan is notified.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   v_hit := public.respond_to_request(v_req_id, true);
@@ -67,35 +81,38 @@ begin
   select count(*) into v_n from public.notifications where user_id = a and kind = 'message';
   if v_n <> 1 then raise exception 'host should get 1 message push, got %', v_n; end if;
 
-  -- Friends: Alex adds Jordan (pending, DM created), Jordan adds back (accepted).
+  -- Friends: Alex asks Jordan. Nothing opens until Jordan confirms; Jordan sees the request and the badge counts it.
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
   v_friend := public.add_friend(b);
-  if (v_friend->>'relationship') <> 'requested' then raise exception 'add_friend: %', v_friend; end if;
-  begin
-    perform public.send_message((v_friend->>'dm_chat_id')::uuid, gen_random_uuid(), 'hi');
-    raise exception 'dm allowed before add-back';
-  exception when others then
-    if sqlerrm <> 'not_friends' then raise; end if;
-  end;
-  -- Same for a hit request card.
-  v_hit := public.create_hit(v_court, now() + interval '6 days', 60, 'singles', 1, 'anyone');
-  begin
-    perform public.send_hit_invite((v_hit->>'id')::uuid, (v_friend->>'dm_chat_id')::uuid, b);
-    raise exception 'hit request allowed before add-back';
-  exception when others then
-    if sqlerrm <> 'not_friends' then raise; end if;
-  end;
+  if (v_friend->>'relationship') <> 'requested' or (v_friend->>'dm_chat_id') is not null then raise exception 'add_friend: %', v_friend; end if;
+  if public.find_dm_chat(b, c) is not null then raise exception 'a request opened a dm'; end if;
+  if public.friend_request_count(b) <> 1 then raise exception 'jordan should have one request waiting'; end if;
+  select count(*) into v_n from public.notifications where user_id = b and kind = 'friend_added';
+  if v_n <> 1 then raise exception 'jordan should be told once, got %', v_n; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
-  v_friend := public.add_friend(c);
-  if (v_friend->>'relationship') <> 'friend' then raise exception 'add back: %', v_friend; end if;
+  v_feed := public.get_friend_requests();
+  if jsonb_array_length(v_feed->'incoming') <> 1 or (v_feed->'incoming'->0->>'id')::uuid <> c then raise exception 'jordan''s requests: %', v_feed; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  v_feed := public.get_friend_requests();
+  if jsonb_array_length(v_feed->'outgoing') <> 1 or (v_feed->'outgoing'->0->>'id')::uuid <> b then raise exception 'alex''s sent requests: %', v_feed; end if;
+  -- Asking again is a quiet no-op: no second notice.
+  v_friend := public.add_friend(b);
+  if (v_friend->>'relationship') <> 'requested' then raise exception 'second add: %', v_friend; end if;
+  select count(*) into v_n from public.notifications where user_id = b and kind = 'friend_added';
+  if v_n <> 1 then raise exception 'a repeated add notified again (%)', v_n; end if;
+  v_hit := public.create_hit(v_court, now() + interval '6 days', 60, 'singles', 1, 'anyone');
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_friend := public.add_friend(c);   -- adding someone who asked you is confirming
+  if (v_friend->>'relationship') <> 'friend' or (v_friend->>'dm_chat_id') is null then raise exception 'add back: %', v_friend; end if;
+  if public.friend_request_count(b) <> 0 then raise exception 'confirmed request still counted'; end if;
   -- The system line reads from each side.
   v_inbox := public.get_inbox();
-  if not exists (select 1 from jsonb_array_elements(v_inbox) x where x->>'id' = v_friend->>'dm_chat_id' and x->>'preview' = 'You added Alex O. back. Say hi') then
+  if not exists (select 1 from jsonb_array_elements(v_inbox) x where x->>'id' = v_friend->>'dm_chat_id' and x->>'preview' = 'You and Alex O. are now friends. Say hi') then
     raise exception 'adder preview: %', v_inbox;
   end if;
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
   v_inbox := public.get_inbox();
-  if not exists (select 1 from jsonb_array_elements(v_inbox) x where x->>'id' = v_friend->>'dm_chat_id' and x->>'preview' = 'Jordan T. added you back. Say hi') then
+  if not exists (select 1 from jsonb_array_elements(v_inbox) x where x->>'id' = v_friend->>'dm_chat_id' and x->>'preview' = 'Jordan T. accepted your request. Say hi') then
     raise exception 'added preview: %', v_inbox;
   end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
@@ -456,9 +473,11 @@ begin
   if exists (select 1 from jsonb_array_elements(public.get_friends()) e where (e->>'id')::uuid = b) then raise exception 'remove_friend left jordan on maya''s list'; end if;
   v_friend := public.add_friend(b);
   if (v_friend->>'relationship') <> 'requested' then raise exception 'add after removal: %', v_friend; end if;
-  if (v_friend->>'dm_chat_id')::uuid is distinct from v_dm then raise exception 'add-back opened a second dm: %', v_friend; end if;
+  if (v_friend->>'dm_chat_id') is not null then raise exception 'a request after removal opened a dm: %', v_friend; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
-  if (public.add_friend(a)->>'relationship') <> 'friend' then raise exception 'add back after removal'; end if;
+  v_friend := public.respond_friend_request(a, true);
+  if (v_friend->>'relationship') <> 'friend' then raise exception 'confirm after removal: %', v_friend; end if;
+  if (v_friend->>'dm_chat_id')::uuid is distinct from v_dm then raise exception 'add-back opened a second dm: %', v_friend; end if;
 
   -- The blocked list is the blocker's own and empties on unblock.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
@@ -601,7 +620,7 @@ begin
   -- Suspension closes the player's future hits the way a host cancel does, cancels what they had pending,
   -- refuses them a spot, shows them nothing, and lifting it leaves the hits closed.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
-  v_hit := public.create_hit(v_court, now() + interval '6 days', 60, 'casual', 1, 'anyone');
+  v_hit := public.create_hit(v_court, now() + interval '7 days', 60, 'casual', 1, 'anyone');
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
   v_req := public.request_to_join((v_hit->>'id')::uuid);
   perform private.suspend_user(c, true);
@@ -641,6 +660,139 @@ begin
   if has_table_privilege('authenticated', 'public.chats', 'select') then raise exception 'chats rows are readable raw'; end if;
   if not has_table_privilege('authenticated', 'public.messages', 'select') then raise exception 'messages must stay readable for realtime'; end if;
   if not has_function_privilege('service_role', 'public.internal_delete_account(uuid, text)', 'execute') then raise exception 'service role lost internal_delete_account'; end if;
+
+  -- One chat per hit. Two players share their DM and may write there without being friends; a third player moves
+  -- the hit into a chat of its own, named after the hit; a hit born from a group lives in the group; leaving a DM-hosted
+  -- hit keeps the DM. A declined player can't ask again; a player can't hold two hits at once; cancelling tells whoever
+  -- was still waiting; blocking takes a player out of the blocker's hit; the day-after answer closes after three days.
+  insert into public.profiles (id, first_name, last_name, birthday, level, formats, zip, area_label, home_point, onboarding_completed_at)
+  values (v_pat2, 'Pat', 'Lee', '1992-07-07', 'intermediate', '{casual}', '33414', 'Wellington, FL',
+          extensions.st_setsrid(extensions.st_makepoint(-80.2414, 26.6618), 4326), now());
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_hit := public.create_hit(v_court, now() + interval '9 days', 60, 'casual', 2, 'anyone');
+  v_hit_id := (v_hit->>'id')::uuid;
+  if (v_hit->>'chat_id') is not null then raise exception 'a hit with nobody in it opened a chat: %', v_hit; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.remove_friend(b);
+  v_hit := public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+  v_chat := (v_hit->>'chat_id')::uuid;
+  if v_chat is distinct from public.find_dm_chat(a, b) then raise exception 'two-player hit did not use the dm: %', v_hit; end if;
+  if (public.get_chat(v_chat)->'hit'->>'id')::uuid is distinct from v_hit_id then raise exception 'dm does not pin the hit: %', public.get_chat(v_chat); end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  if public.relationship_to(b, a) = 'friend' then raise exception 'maya and jordan should not be friends here'; end if;
+  perform public.send_message(v_chat, gen_random_uuid(), 'see you at 9');   -- not friends, but a hit together
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  begin
+    perform public.create_hit(v_court, now() + interval '9 days 30 minutes', 60, 'singles', 1, 'anyone');
+    raise exception 'host booked two hits at once';
+  exception when others then
+    if sqlerrm <> 'overlaps_hit' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, false);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  begin
+    perform public.request_to_join(v_hit_id);
+    raise exception 'asked again after a no';
+  exception when others then
+    if sqlerrm <> 'already_declined' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
+  v_req := public.request_to_join(v_hit_id);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_hit := public.respond_to_request((v_req->'viewer'->'request'->>'id')::uuid, true);
+  if (v_hit->>'chat_id')::uuid = v_chat then raise exception 'third player left the hit in the dm: %', v_hit; end if;
+  v_chat := (v_hit->>'chat_id')::uuid;
+  if (select type from public.chats where id = v_chat) <> 'hit' then raise exception 'promoted chat is not a hit chat'; end if;
+  if public.chat_display_name(v_chat, b) not like 'Casual · %' then raise exception 'hit chat name: %', public.chat_display_name(v_chat, b); end if;
+  if not public.is_chat_member(v_chat, a) or not public.is_chat_member(v_chat, b) or not public.is_chat_member(v_chat, c) then raise exception 'promoted chat is missing a player'; end if;
+  if not exists (select 1 from public.messages where chat_id = public.find_dm_chat(a, b) and payload->>'event' = 'hit_moved') then raise exception 'the dm was not told the hit moved'; end if;
+  if (public.get_chat(public.find_dm_chat(a, b))->'hit'->>'id')::uuid is not distinct from v_hit_id then raise exception 'dm still pins a hit that moved'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.leave_hit(v_hit_id);
+  if public.is_chat_member(v_chat, b) then raise exception 'leaver kept in the hit chat'; end if;
+  -- Blocking: Maya blocks Alex, who is in her hit; he is out and the spot is open.
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.block_user(c);
+  if public.is_hit_member(v_hit_id, c) then raise exception 'blocked player still in the hit'; end if;
+  if (select spots_open from public.hits where id = v_hit_id) <> 2 then raise exception 'blocked player''s spot not reopened'; end if;
+  perform public.unblock_user(c);
+  -- Cancelling with a request still waiting: the requester hears about it.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.request_to_join(v_hit_id);
+  select count(*) into v_n from public.notifications where user_id = b and kind = 'request_declined';
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.cancel_hit(v_hit_id);
+  if (select count(*) from public.notifications where user_id = b and kind = 'request_declined') <> v_n + 1 then raise exception 'pending requester not told of the cancel'; end if;
+  -- A hit born from a group stays in the group when a member claims it.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  v_hit := public.create_hit(v_court, now() + interval '10 days', 60, 'drills', 2, 'invite_only', (v_group->>'id')::uuid, null);
+  v_invite := (select public.invite_json(i.id, b) from public.hit_invites i where i.hit_id = (v_hit->>'id')::uuid);
+  perform public.add_friend(a);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  perform public.add_friend(b);
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.add_chat_members((v_group->>'id')::uuid, array[a]);
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_hit := public.claim_invite((v_invite->>'id')::uuid);
+  if (v_hit->>'chat_id')::uuid is distinct from (v_group->>'id')::uuid then raise exception 'group-born hit left the group: %', v_hit; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  perform public.cancel_hit((v_hit->>'id')::uuid);
+  -- The day-after answer closes after three days.
+  update public.hits set starts_at = now() - interval '4 days' where id = (select h.id from public.hits h where h.status = 'played' order by h.starts_at desc limit 1) returning id into v_hit_id;
+  if public.needs_attendance(v_hit_id, a) then raise exception 'attendance still asked after three days'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  begin
+    perform public.submit_attendance(v_hit_id, b, true);
+    raise exception 'attendance accepted after three days';
+  exception when others then
+    if sqlerrm not in ('attendance_closed', 'not_a_player') then raise; end if;
+  end;
+
+
+  -- Friend requests: deleting one is silent, taking one back is clean, and the badge counts what waits.
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  v_n := public.badge_count(a);
+  perform public.add_friend(a);
+  if public.badge_count(a) <> v_n + 1 then raise exception 'badge did not count the request'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_friend := public.respond_friend_request(v_pat2, false);
+  if (v_friend->>'relationship') <> 'none' then raise exception 'delete request: %', v_friend; end if;
+  if public.relationship_to(v_pat2, a) <> 'requested' then raise exception 'the asker should still see requested, got %', public.relationship_to(v_pat2, a); end if;
+  if public.relationship_to(a, v_pat2) <> 'none' then raise exception 'deleted request still shows: %', public.relationship_to(a, v_pat2); end if;
+  if public.friend_request_count(a) <> 0 or jsonb_array_length(public.get_friend_requests()->'incoming') <> 0 then raise exception 'deleted request still listed'; end if;
+  if exists (select 1 from public.notifications where user_id = a and kind = 'friend_added' and collapse_id = 'friend-' || v_pat2::text) then raise exception 'deleted request kept its notice'; end if;
+  begin
+    perform public.respond_friend_request(v_pat2, true);
+    raise exception 'answered a deleted request';
+  exception when others then
+    if sqlerrm <> 'request_not_found' then raise; end if;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  select count(*) into v_n from public.notifications where user_id = a and kind = 'friend_added';
+  perform public.add_friend(a);   -- asking again after a quiet delete: nothing happens, nobody is told
+  if (select count(*) from public.notifications where user_id = a and kind = 'friend_added') <> v_n then raise exception 'a deleted request re-notified'; end if;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  v_friend := public.add_friend(v_pat2);   -- Maya changes her mind: that confirms it
+  if (v_friend->>'relationship') <> 'friend' or (v_friend->>'dm_chat_id') is null then raise exception 'add after delete: %', v_friend; end if;
+  v_feed := public.get_player(v_pat2);
+  if v_feed->>'relationship' <> 'friend' or (v_feed->>'dm_chat_id') is null or jsonb_typeof(v_feed->'mutual_cards') <> 'array' then raise exception 'get_player after confirm: %', v_feed; end if;
+  perform public.remove_friend(v_pat2);
+  perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
+  perform public.add_friend(a);
+  v_friend := public.cancel_friend_request(a);
+  if (v_friend->>'relationship') <> 'none' or public.relationship_to(a, v_pat2) <> 'none' then raise exception 'cancel request: %', v_friend; end if;
+  if exists (select 1 from public.notifications where user_id = a and kind = 'friend_added' and collapse_id = 'friend-' || v_pat2::text) then raise exception 'cancelled request kept its notice'; end if;
+  begin
+    perform public.cancel_friend_request(a);
+    raise exception 'cancelled twice';
+  exception when others then
+    if sqlerrm <> 'request_not_found' then raise; end if;
+  end;
 
   -- Underage deletion removes a half-onboarded account outright, with the friend request and DM it opened.
   insert into public.profiles (id, first_name, last_name) values (d, 'Sam', 'Lee');

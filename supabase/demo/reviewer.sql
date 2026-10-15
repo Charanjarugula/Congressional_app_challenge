@@ -22,9 +22,9 @@ begin
 
   -- Friends: Ana and Luis, with a short conversation with Ana.
   perform set_config('request.jwt.claims', json_build_object('sub', rv, 'role', 'authenticated')::text, true);
-  v_dm := public.add_friend(ana);
+  perform public.add_friend(ana);
   perform set_config('request.jwt.claims', json_build_object('sub', ana, 'role', 'authenticated')::text, true);
-  perform public.add_friend(rv);
+  v_dm := public.add_friend(rv);   -- Ana confirms; the conversation opens here
   perform public.send_message((v_dm->>'dm_chat_id')::uuid, gen_random_uuid(), 'Hey! Saw you’re in Wellington too. Up for a hit this week?');
   perform set_config('request.jwt.claims', json_build_object('sub', rv, 'role', 'authenticated')::text, true);
   perform public.send_message((v_dm->>'dm_chat_id')::uuid, gen_random_uuid(), 'Definitely. Tomorrow evening works for me');
@@ -32,6 +32,9 @@ begin
   perform public.add_friend(rv);
   perform set_config('request.jwt.claims', json_build_object('sub', rv, 'role', 'authenticated')::text, true);
   perform public.add_friend(luis);
+  -- Marcus has asked to be friends; the request waits on the People tab.
+  perform set_config('request.jwt.claims', json_build_object('sub', marcus, 'role', 'authenticated')::text, true);
+  perform public.add_friend(rv);
 
   -- The group: Luis adds the reviewer, Ana says hi, the reviewer answers.
   perform set_config('request.jwt.claims', json_build_object('sub', luis, 'role', 'authenticated')::text, true);

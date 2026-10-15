@@ -71,7 +71,10 @@ struct AvailabilityView: View {
 /// 7 columns × 3 blocks. Selected blocks are blue with a lime dot; busy blocks are hatched.
 struct AvailabilityGrid: View {
     @Binding var selected: AvailabilityMask
+    /// Blocks the calendar says are busy this week; shown striped, not editable here.
     var busy = AvailabilityMask()
+    /// Blocks the player marks busy by hand. When bound, a tap goes free → busy → clear.
+    var blocked: Binding<AvailabilityMask>? = nil
 
     private let labelWidth: CGFloat = 78
 
@@ -108,9 +111,21 @@ struct AvailabilityGrid: View {
 
     private func cell(day: Int, block: AvailabilityMask.Block) -> some View {
         let isOn = selected.contains(day: day, block: block)
-        let isBusy = busy.contains(day: day, block: block)
+        let isBlocked = blocked?.wrappedValue.contains(day: day, block: block) ?? false
+        let isBusy = isBlocked || busy.contains(day: day, block: block)
         return Button {
-            selected.toggle(day: day, block: block)
+            if let blocked {
+                if isOn {
+                    selected.toggle(day: day, block: block)
+                    blocked.wrappedValue.insert(day: day, block: block)
+                } else if isBlocked {
+                    blocked.wrappedValue.toggle(day: day, block: block)
+                } else {
+                    selected.toggle(day: day, block: block)
+                }
+            } else {
+                selected.toggle(day: day, block: block)
+            }
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)

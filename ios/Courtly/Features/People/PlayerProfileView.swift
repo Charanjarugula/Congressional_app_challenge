@@ -16,6 +16,8 @@ struct PlayerProfileView: View {
     @State private var showsBlockAlert = false
     @State private var showsReport = false
     @State private var showsInviteToHit = false
+    @State private var showsCancelRequest = false
+    @State private var showsMutuals = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -23,16 +25,6 @@ struct PlayerProfileView: View {
             if let profile {
                 VStack(alignment: .leading, spacing: 0) {
                     heading(profile)
-                    actions(profile)
-                        .padding(.top, 18)
-                    SectionHeader(title: "Plays", top: 24)
-                    Card {
-                        VStack(spacing: 0) {
-                            InfoRow(title: "What", value: profile.card.formats.isEmpty ? "Not set" : profile.card.formats.map(\.shortTitle).joined(separator: ", "))
-                            HairlineSeparator()
-                            InfoRow(title: "Usually free", value: AvailabilityMask(rawValue: profile.card.availabilityMask ?? 0).shortDescription)
-                        }
-                    }
                     if !profile.openHits.isEmpty {
                         SectionHeader(title: "Open hits", top: 24)
                         CardRows(items: profile.openHits) { hit in
@@ -51,12 +43,13 @@ struct PlayerProfileView: View {
             }
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .plainBackButton()
         .navigationTitle(profile?.card.firstName ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             if profile != nil {
-                ToolbarItem(placement: .topBarTrailing) {
+                PlainToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showsActions = true
                     } label: {
@@ -74,6 +67,10 @@ struct PlayerProfileView: View {
             Button("Block", role: .destructive) { showsBlockAlert = true }
             Button("Report", role: .destructive) { showsReport = true }
         }
+        .confirmationDialog("Cancel your friend request?", isPresented: $showsCancelRequest, titleVisibility: .visible) {
+            Button("Cancel request", role: .destructive) { cancelRequest() }
+            Button("Keep it", role: .cancel) {}
+        }
         .alert("Block \(profile?.card.firstName ?? "this player")?", isPresented: $showsBlockAlert) {
             Button("Block", role: .destructive) { block() }
             Button("Cancel", role: .cancel) {}
@@ -85,6 +82,14 @@ struct PlayerProfileView: View {
                 ReportView(player: card, hitID: hitID) { blocked in
                     showsReport = false
                     if blocked { Task { await afterBlock() } }
+                }
+            }
+        }
+        .sheet(isPresented: $showsMutuals) {
+            if let profile {
+                MutualFriendsSheet(name: profile.card.firstName, friends: profile.mutualCards) { id in
+                    showsMutuals = false
+                    navigate(.player(id))
                 }
             }
         }
@@ -100,35 +105,85 @@ struct PlayerProfileView: View {
     // MARK: - Sections
 
     private func heading(_ profile: PlayerProfile) -> some View {
-        VStack(spacing: 6) {
-            PlayerAvatar(card: profile.card, size: 96)
-                .padding(.bottom, 6)
-            Text(profile.card.displayName)
-                .font(.system(size: 28, weight: .bold))
-                .tracking(-0.6)
-                .foregroundStyle(CourtlyColor.ink)
-            Text(summary(profile))
-                .font(CourtlyFont.secondary)
-                .foregroundStyle(CourtlyColor.secondary)
-                .multilineTextAlignment(.center)
-            if let mutual = profile.mutualLine {
-                Text(mutual)
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.secondary)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 18) {
+                PlayerAvatar(card: profile.card, size: 92)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(profile.card.displayName)
+                        .font(.system(size: 22, weight: .bold))
+                        .tracking(-0.3)
+                        .foregroundStyle(CourtlyColor.ink)
+                    if let level = profile.card.level?.title {
+                        Text(level)
+                            .font(CourtlyFont.secondary)
+                            .foregroundStyle(CourtlyColor.secondary)
+                    }
+                    Text(stats(profile))
+                        .font(CourtlyFont.secondary)
+                        .foregroundStyle(CourtlyColor.ink)
+                        .padding(.top, 2)
+                }
+                .padding(.top, 6)
+                Spacer(minLength: 0)
             }
+            VStack(alignment: .leading, spacing: 2) {
+                if let area = profile.card.areaLabel?.components(separatedBy: ",").first {
+                    Text(area)
+                }
+                if !profile.card.formats.isEmpty {
+                    Text(profile.card.formats.map(\.shortTitle).joined(separator: ", "))
+                }
+            }
+            .font(CourtlyFont.secondary)
+            .foregroundStyle(CourtlyColor.ink)
+            if !profile.mutualCards.isEmpty {
+                Button {
+                    showsMutuals = true
+                } label: {
+                    HStack(spacing: 10) {
+                        HStack(spacing: -9) {
+                            ForEach(profile.mutualCards.prefix(3)) { friend in
+                                PlayerAvatar(card: friend, size: 26)
+                                    .overlay(Circle().stroke(CourtlyColor.groupedBackground, lineWidth: 2))
+                            }
+                        }
+                        Text(mutualLine(profile))
+                            .font(CourtlyFont.caption)
+                            .foregroundStyle(CourtlyColor.ink)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            actions(profile)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 8)
+        .padding(.top, 4)
     }
 
-    private func summary(_ profile: PlayerProfile) -> String {
-        let card = profile.card
-        let played = card.hitsPlayed == 1 ? "1 hit played" : "\(card.hitsPlayed) hits played"
-        var parts = [card.level?.title, card.areaLabel?.components(separatedBy: ",").first, played].compactMap { $0 }
-        if profile.hitsTogether > 0 {
-            parts.append(profile.hitsTogether == 1 ? "1 hit together" : "\(profile.hitsTogether) hits together")
+    /// "4 hits · 12 friends · 1 together", numbers in bold.
+    private func stats(_ profile: PlayerProfile) -> AttributedString {
+        func part(_ n: Int, _ label: String) -> AttributedString {
+            var number = AttributedString("\(n)")
+            number.font = .system(size: 15, weight: .semibold)
+            return number + AttributedString(" " + label)
         }
-        return parts.joined(separator: " · ")
+        return part(profile.card.hitsPlayed, profile.card.hitsPlayed == 1 ? "hit" : "hits") + AttributedString("   ")
+            + part(profile.friendCount, profile.friendCount == 1 ? "friend" : "friends") + AttributedString("   ")
+            + part(profile.hitsTogether, "together")
+    }
+
+    /// "Friends with Ana, Luis + 3 more", the names in bold.
+    private func mutualLine(_ profile: PlayerProfile) -> AttributedString {
+        let names = profile.mutualCards.prefix(2).map(\.firstName)
+        let rest = profile.mutualCards.count - names.count
+        var line = AttributedString("Friends with ")
+        var bold = AttributedString(names.joined(separator: ", "))
+        bold.font = .system(size: 13, weight: .semibold)
+        line += bold
+        if rest > 0 { line += AttributedString(" + \(rest) more") }
+        return line
     }
 
     @ViewBuilder
@@ -137,18 +192,18 @@ struct PlayerProfileView: View {
             switch profile.relationship {
             case .friend:
                 ActionButton(title: "Invite to hit") { showsInviteToHit = true }
-                ActionButton(title: "Message", style: .grouped, isEnabled: profile.dmChatId != nil) {
+                ActionButton(title: "Message", style: .card, isEnabled: profile.dmChatId != nil) {
                     if let chatID = profile.dmChatId { navigate(.chat(chatID)) }
                 }
             case .requested:
-                ActionButton(title: "Requested", style: .grouped, isEnabled: false) {}
-                ActionButton(title: "Message", style: .grouped, isEnabled: false) {}
+                ActionButton(title: "Requested", style: .card, isLoading: isWorking) { showsCancelRequest = true }
+                ActionButton(title: "Message", style: .card, isEnabled: false) {}
             case .requestedMe:
-                ActionButton(title: "Add back", isLoading: isWorking) { addFriend() }
-                ActionButton(title: "Message", style: .grouped, isEnabled: false) {}
+                ActionButton(title: "Confirm", isLoading: isWorking) { respond(accept: true) }
+                ActionButton(title: "Delete", style: .card, isLoading: isWorking) { respond(accept: false) }
             case .none, .blocked:
                 ActionButton(title: "Add friend", isLoading: isWorking) { addFriend() }
-                ActionButton(title: "Message", style: .grouped, isEnabled: false) {}
+                ActionButton(title: "Message", style: .card, isEnabled: false) {}
             }
         }
     }
@@ -169,6 +224,36 @@ struct PlayerProfileView: View {
         Task { @MainActor in
             do {
                 _ = try await API.People.addFriend(playerID)
+                await load()
+                await inbox.load()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isWorking = false
+        }
+    }
+
+    private func respond(accept: Bool) {
+        isWorking = true
+        Task { @MainActor in
+            do {
+                _ = try await API.People.respondFriendRequest(playerID, accept: accept)
+                inbox.removeRequest(from: playerID)
+                await load()
+                await inbox.load()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isWorking = false
+        }
+    }
+
+    private func cancelRequest() {
+        isWorking = true
+        Task { @MainActor in
+            do {
+                _ = try await API.People.cancelFriendRequest(playerID)
+                inbox.removeRequest(from: playerID)
                 await load()
                 await inbox.load()
             } catch {
@@ -210,25 +295,58 @@ struct PlayerProfileView: View {
     }
 }
 
-/// "What — Casual, Singles" style row, 50pt tall.
-private struct InfoRow: View {
-    let title: String
-    let value: String
+/// Who you both know, from the "Friends with" line.
+private struct MutualFriendsSheet: View {
+    let name: String
+    let friends: [PlayerCard]
+    let open: (UUID) -> Void
+
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        HStack(spacing: 10) {
-            Text(title)
-                .font(CourtlyFont.body)
+        VStack(alignment: .leading, spacing: 0) {
+            Capsule()
+                .fill(CourtlyColor.placeholder)
+                .frame(width: 36, height: 5)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 10)
+                .padding(.bottom, 18)
+            Text("Friends with \(name)")
+                .font(CourtlyFont.sheetTitle)
+                .tracking(-0.4)
                 .foregroundStyle(CourtlyColor.ink)
-            Spacer(minLength: 12)
-            Text(value)
-                .font(CourtlyFont.secondary)
-                .foregroundStyle(CourtlyColor.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            ScrollView {
+                CardRows(items: friends) { friend in
+                    Button {
+                        open(friend.id)
+                    } label: {
+                        HStack(spacing: 14) {
+                            PlayerAvatar(card: friend, size: 44)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(friend.displayName)
+                                    .font(CourtlyFont.bodySemibold)
+                                    .foregroundStyle(CourtlyColor.ink)
+                                Text(friend.levelAndArea)
+                                    .font(CourtlyFont.caption)
+                                    .foregroundStyle(CourtlyColor.secondary)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 16)
+            }
+            TextActionButton(title: "Done") { dismiss() }
         }
-        .padding(.horizontal, 16)
-        .frame(height: 50)
+        .padding(.horizontal, CourtlyMetrics.screenPadding)
+        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.hidden)
+        .presentationCornerRadius(20)
     }
 }
 

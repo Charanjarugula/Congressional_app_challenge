@@ -68,6 +68,7 @@ struct JoinRequestView: View {
             .padding(.bottom, 24)
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .plainBackButton()
         .navigationTitle("Request")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

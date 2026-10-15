@@ -70,6 +70,7 @@ struct ChatThreadView: View {
             composer
         }
         .background(Color.white.ignoresSafeArea())
+        .plainBackButton()
         .toolbar {
             ToolbarItem(placement: .principal) { header }
         }

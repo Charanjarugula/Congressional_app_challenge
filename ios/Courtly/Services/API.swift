@@ -54,6 +54,18 @@ enum API {
             try await client.rpc("remove_friend", params: ["p_user": userID.uuidString])
         }
 
+        static func friendRequests() async throws -> FriendRequests {
+            try await client.rpc("get_friend_requests")
+        }
+
+        static func respondFriendRequest(_ userID: UUID, accept: Bool) async throws -> FriendshipResult {
+            try await client.rpc("respond_friend_request", params: ["p_user": userID.uuidString, "p_accept": accept])
+        }
+
+        static func cancelFriendRequest(_ userID: UUID) async throws -> FriendshipResult {
+            try await client.rpc("cancel_friend_request", params: ["p_user": userID.uuidString])
+        }
+
         static func search(_ query: String) async throws -> [SearchedPlayer] {
             try await client.rpc("search_players", params: ["p_query": query])
         }

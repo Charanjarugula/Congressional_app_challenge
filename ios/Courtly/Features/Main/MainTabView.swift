@@ -44,6 +44,25 @@ struct MainTabView: View {
         }
         // Placed before the inset so the pill floats above the tab bar instead of over it.
         .overlay(alignment: .bottomTrailing) {
+            if isAtRoot && selected == .people {
+                Menu {
+                    Button("Add friends", systemImage: "person.badge.plus") { paths[.people, default: []].append(.addFriends) }
+                    Button("New group", systemImage: "person.3") { paths[.people, default: []].append(.newGroup) }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 56, height: 56)
+                        .background(
+                            Circle()
+                                .fill(CourtlyColor.blue)
+                                .shadow(color: CourtlyColor.blue.opacity(0.3), radius: 12, y: 8)
+                        )
+                }
+                .accessibilityLabel("Add friends or start a group")
+                .padding(.trailing, 20)
+                .padding(.bottom, 16)
+            }
             if isAtRoot && selected == .play && (showsPlanPill || coachStep == 3) {
                 PlanHitPill { isPlanning = true }
                     .overlay(
@@ -196,6 +215,10 @@ struct MainTabView: View {
             selected = .people
             paths[.people] = [.chat(id)]
             Task { await hits.refreshAll() }
+        case .friendRequests:
+            selected = .people
+            paths[.people] = [.friendRequests]
+            Task { await inbox.load() }
         }
     }
 
@@ -247,7 +270,7 @@ struct MainTabView: View {
     private var dots: Set<MainTab> {
         var tabs = Set<MainTab>()
         if hits.needsReplyCount > 0 { tabs.insert(.play) }
-        if inbox.unreadCount > 0 { tabs.insert(.people) }
+        if inbox.unreadCount > 0 || inbox.requestCount > 0 { tabs.insert(.people) }
         return tabs
     }
 
@@ -296,6 +319,7 @@ struct MainTabView: View {
         case let .groupInfo(id): GroupInfoView(chatID: id)
         case let .player(id, hitID): PlayerProfileView(playerID: id, hitID: hitID)
         case .addFriends: AddFriendsView()
+        case .friendRequests: FriendRequestsView()
         case .newGroup: NewGroupView()
         case .account: AccountView()
         case .blockedPlayers: BlockedPlayersView()

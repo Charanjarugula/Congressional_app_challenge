@@ -36,7 +36,7 @@ struct PhotoCropView: View {
                         dismiss()
                         onCancel()
                     } label: {
-                        Text("Cancel")
+                        Text("Back")
                             .frame(minWidth: 64, minHeight: 44, alignment: .leading)
                             .contentShape(Rectangle())
                     }
@@ -51,7 +51,7 @@ struct PhotoCropView: View {
                         dismiss()
                         onChoose(cropped)
                     } label: {
-                        Text("Choose")
+                        Text("Confirm")
                             .frame(minWidth: 64, minHeight: 44, alignment: .trailing)
                             .contentShape(Rectangle())
                     }

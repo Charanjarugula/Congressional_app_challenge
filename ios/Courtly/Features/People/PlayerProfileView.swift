@@ -43,12 +43,13 @@ struct PlayerProfileView: View {
             }
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .plainBackButton()
         .navigationTitle(profile?.card.firstName ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             if profile != nil {
-                ToolbarItem(placement: .topBarTrailing) {
+                PlainToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showsActions = true
                     } label: {

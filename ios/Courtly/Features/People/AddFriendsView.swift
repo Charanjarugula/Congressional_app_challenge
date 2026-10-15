@@ -64,6 +64,7 @@ struct AddFriendsView: View {
             .padding(.bottom, 24)
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .plainBackButton()
         .navigationTitle("Add friends")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

@@ -49,6 +49,7 @@ struct BlockedPlayersView: View {
             .padding(.bottom, 24)
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .plainBackButton()
         .navigationTitle("Blocked players")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

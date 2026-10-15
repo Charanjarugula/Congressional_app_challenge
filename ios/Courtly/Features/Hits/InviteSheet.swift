@@ -137,10 +137,10 @@ struct InviteSheet: View {
 
     /// "Free Sunday" when the hit lands in a block they marked free, otherwise their level.
     private func friendDetail(_ card: PlayerCard) -> String {
-        if let mask = card.availabilityMask, let slot = AvailabilityMask.slot(for: hit.startsAt),
+        if let mask = card.availabilityMask, let slot = AvailabilityMask.slot(for: hit.startsAt, calendar: hit.calendar),
            AvailabilityMask(rawValue: mask).contains(day: slot.day, block: slot.block) {
-            let weekday = Calendar.current.component(.weekday, from: hit.startsAt)
-            return "Free \(Calendar.current.weekdaySymbols[weekday - 1])"
+            let weekday = hit.calendar.component(.weekday, from: hit.startsAt)
+            return "Free \(hit.calendar.weekdaySymbols[weekday - 1])"
         }
         return card.levelAndArea.isEmpty ? "Friend" : card.levelAndArea
     }

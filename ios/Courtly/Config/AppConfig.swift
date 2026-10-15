@@ -21,7 +21,7 @@ enum AppConfig {
     /// Leave it empty to hide Google behind the "not set up yet" message.
     static let googleClientID = "336892358128-vsl2u53dk74upp983s1rqgckho8qr9r1.apps.googleusercontent.com"
 
-    /// Key used to hash phone numbers and emails on the phone before matching. Only hashes are sent.
+    /// Key used to hash contacts' emails on the phone before matching. Only hashes are sent.
     static let contactsPepper = "courtly-contacts-v1"
 
     /// App Review signs in with this address and a fixed code, which is that account's password.

@@ -1,4 +1,5 @@
 (function () {
+  window.courtlyReady = true;   /* the page's inline fallback keeps content visible if this file never runs */
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* Reveal on scroll, and run looping illustrations only while visible */

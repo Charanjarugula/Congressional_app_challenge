@@ -161,6 +161,17 @@ final class HitsStore {
     }
 
     @MainActor
+    func update(_ hitID: UUID, courtID: UUID, startsAt: Date, durationMin: Int, format: PlayFormat, spots: Int,
+                visibility: HitVisibility) async throws -> Hit {
+        let hit = try await API.Hits.update(hitID, courtID: courtID, startsAt: startsAt, durationMin: durationMin,
+                                            format: format, spots: spots, visibility: visibility)
+        replace(hit)
+        myHits?.upcoming.sort { $0.startsAt < $1.startsAt }
+        refreshSoon()
+        return hit
+    }
+
+    @MainActor
     func requestToJoin(_ hitID: UUID) async throws -> Hit {
         let hit = try await API.Hits.requestToJoin(hitID)
         replace(hit)

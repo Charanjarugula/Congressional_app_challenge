@@ -16,6 +16,7 @@ struct HitDetailView: View {
     @State private var showsLeaveAlert = false
     @State private var showsCalendar = false
     @State private var showsInvite = false
+    @State private var showsEdit = false
     @State private var attendance: [UUID: Bool] = [:]
     @State private var standings: [UUID: Relationship] = [:]   // friend adds made on this screen
     @State private var errorMessage: String?
@@ -52,6 +53,15 @@ struct HitDetailView: View {
         .navigationTitle(hit?.format.shortTitle ?? "Hit")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            if let hit, hit.viewer.isHost, hit.isLive {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Edit") { showsEdit = true }
+                        .font(CourtlyFont.body)
+                        .foregroundStyle(CourtlyColor.blue)
+                }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             if let hit { bottomAction(hit) }
         }
@@ -96,6 +106,14 @@ struct HitDetailView: View {
         .sheet(isPresented: $showsInvite) {
             if let hit { InviteSheet(hit: hit) }
         }
+        .sheet(isPresented: $showsEdit) {
+            if let hit {
+                PlanHitView(editing: hit) { saved in
+                    hitVersion += 1
+                    self.hit = saved
+                }
+            }
+        }
         .errorAlert($errorMessage)
     }
 
@@ -110,6 +128,12 @@ struct HitDetailView: View {
                     .foregroundStyle(CourtlyColor.ink)
                 Spacer()
                 StatusPill(kind: hit.statusKind)
+            }
+            if let note = hit.yourTimeNote {
+                Text(note)
+                    .font(CourtlyFont.secondary)
+                    .foregroundStyle(CourtlyColor.secondary)
+                    .padding(.top, -8)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(headline(hit))

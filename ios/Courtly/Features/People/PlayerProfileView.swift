@@ -18,7 +18,7 @@ struct PlayerProfileView: View {
     @State private var showsBlockAlert = false
     @State private var showsReport = false
     @State private var showsInviteToHit = false
-    @State private var showsCancelRequest = false
+    @State private var pendingRequest: PendingFriendRequest?
     @State private var showsMutuals = false
     @State private var errorMessage: String?
 
@@ -73,10 +73,7 @@ struct PlayerProfileView: View {
             Button("Remove friend", role: .destructive) { removeFriend() }
             Button("Keep", role: .cancel) {}
         }
-        .confirmationDialog("Cancel your friend request?", isPresented: $showsCancelRequest, titleVisibility: .visible) {
-            Button("Cancel request", role: .destructive) { cancelRequest() }
-            Button("Keep it", role: .cancel) {}
-        }
+        .takeBackRequestDialog($pendingRequest) { _ in cancelRequest() }
         .alert("Block \(profile?.card.firstName ?? "this player")?", isPresented: $showsBlockAlert) {
             Button("Block", role: .destructive) { block() }
             Button("Cancel", role: .cancel) {}
@@ -197,7 +194,9 @@ struct PlayerProfileView: View {
                     if let chatID = profile.dmChatId { navigate(.chat(chatID)) }
                 }
             case .requested:
-                ActionButton(title: "Requested", style: .card, isLoading: isWorking) { showsCancelRequest = true }
+                ActionButton(title: "Requested", style: .card, isLoading: isWorking) {
+                    pendingRequest = PendingFriendRequest(id: playerID, firstName: profile.card.firstName)
+                }
                 ActionButton(title: "Message", style: .card, isEnabled: false) {}
             case .requestedMe:
                 ActionButton(title: "Confirm", isLoading: isWorking) { respond(accept: true) }
@@ -319,8 +318,8 @@ private struct OpenHitRow: View {
             } label: {
                 HStack(spacing: 14) {
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(HitFormatting.day.string(from: hit.startsAt))
-                        Text(HitFormatting.clock.string(from: hit.startsAt))
+                        Text(hit.dayText)
+                        Text(hit.clockText)
                     }
                     .font(CourtlyFont.rounded(17))
                     .foregroundStyle(CourtlyColor.ink)
@@ -429,8 +428,8 @@ private struct InviteToHitSheet: View {
                         CardRows(items: openHits) { hit in
                             HStack(spacing: 14) {
                                 VStack(alignment: .leading, spacing: 0) {
-                                    Text(HitFormatting.day.string(from: hit.startsAt))
-                                    Text(HitFormatting.clock.string(from: hit.startsAt))
+                                    Text(hit.dayText)
+                                    Text(hit.clockText)
                                 }
                                 .font(CourtlyFont.rounded(17))
                                 .foregroundStyle(CourtlyColor.ink)

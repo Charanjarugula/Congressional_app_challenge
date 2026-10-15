@@ -203,7 +203,7 @@ struct CourtPickerView: View {
                 let court = try await API.Courts.add(
                     name: place.name, address: place.address, city: place.city,
                     latitude: place.coordinate.latitude, longitude: place.coordinate.longitude,
-                    applePlaceID: place.appleID
+                    applePlaceID: place.appleID, timeZone: place.timeZone
                 )
                 onPick(court)
                 dismiss()
@@ -222,6 +222,7 @@ private struct PlaceResult: Identifiable {
     let city: String?
     let coordinate: CLLocationCoordinate2D
     let appleID: String?
+    let timeZone: String?
 
     var id: String { "\(name)|\(coordinate.latitude),\(coordinate.longitude)" }
 
@@ -236,6 +237,7 @@ private struct PlaceResult: Identifiable {
         // A plain address has no name of its own; the street stands in.
         guard let name = (item.name ?? address)?.nilIfEmpty else { return nil }
         self.name = name
+        timeZone = item.timeZone?.identifier
         if #available(iOS 18, *) {
             appleID = item.identifier?.rawValue
         } else {

@@ -11,8 +11,13 @@ struct Court: Codable, Identifiable, Hashable {
     let lng: Double
     let surface: String?
     let lights: Bool?
+    /// IANA zone of the court ("America/New_York"); a hit there reads in this zone.
+    var timeZone: String? = nil
     var miles: Double?
     var playedCount: Int?
+
+    /// The court's zone, or the device's when the server didn't say.
+    var zone: TimeZone { timeZone.flatMap(TimeZone.init(identifier:)) ?? .current }
 
     /// "Wellington" when the city is known, otherwise the court's name.
     var shortName: String { city ?? name }

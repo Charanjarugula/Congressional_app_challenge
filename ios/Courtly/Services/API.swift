@@ -135,6 +135,20 @@ enum API {
             ])
         }
 
+        /// The host changes a hit before it starts; players hear about a new time or court.
+        static func update(_ hitID: UUID, courtID: UUID, startsAt: Date, durationMin: Int, format: PlayFormat, spots: Int,
+                           visibility: HitVisibility) async throws -> Hit {
+            try await client.rpc("update_hit", params: [
+                "p_hit": hitID.uuidString,
+                "p_court_id": courtID.uuidString,
+                "p_starts_at": JSONCoding.string(from: startsAt),
+                "p_duration_min": durationMin,
+                "p_format": format.rawValue,
+                "p_spots": spots,
+                "p_visibility": visibility.rawValue,
+            ])
+        }
+
         static func requestToJoin(_ hitID: UUID) async throws -> Hit {
             try await client.rpc("request_to_join", params: ["p_hit": hitID.uuidString])
         }
@@ -190,8 +204,11 @@ enum API {
             try await client.rpc("get_nearby_courts", params: ["p_limit": limit])
         }
 
-        static func add(name: String, address: String?, city: String?, latitude: Double, longitude: Double, applePlaceID: String?) async throws -> Court {
+        /// `timeZone` is the place's IANA zone from Apple Maps; the server falls back to the adder's zone.
+        static func add(name: String, address: String?, city: String?, latitude: Double, longitude: Double, applePlaceID: String?,
+                        timeZone: String?) async throws -> Court {
             try await client.rpc("add_court", params: [
+                "p_time_zone": nullable(timeZone),
                 "p_name": name,
                 "p_address": nullable(address),
                 "p_city": nullable(city),

@@ -140,6 +140,20 @@ final class AppSession {
             // Only while the same player is still signed in; a late answer after a sign-out stays out.
             profile = me
             ProfileCache.save(me)
+            syncTimeZone(me)
+        }
+    }
+
+    /// "Free weekday evenings" means evenings where the player is, so the server keeps their zone.
+    /// Quietly follows the iPhone when they move; a failure tries again next time.
+    @MainActor
+    private func syncTimeZone(_ me: Profile) {
+        let zone = TimeZone.current.identifier
+        guard me.isOnboarded, me.timeZone != zone else { return }
+        Task { @MainActor in
+            guard let updated = try? await API.Profile.update(["time_zone": zone]), profile?.id == updated.id else { return }
+            profile = updated
+            ProfileCache.save(updated)
         }
     }
 
@@ -178,5 +192,6 @@ final class AppSession {
         profile = me
         ProfileCache.save(me)
         stage = me.isOnboarded ? .main : .onboarding(resume: true)
+        syncTimeZone(me)
     }
 }

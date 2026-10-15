@@ -2,16 +2,36 @@ import SwiftUI
 
 /// The Plan a hit form: when, where, what, how many spots, who can join.
 /// Opened from a chat it becomes "Request a hit": the open spots go to that chat as a card.
+/// Opened on a hit the viewer hosts it becomes "Edit hit", filled in with that hit.
+/// Day and time are the court's wall clock: 6:30 PM means 6:30 PM where the court is.
 struct PlanHitView: View {
     @Environment(HitsStore.self) private var hits
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
     let inviteChat: Chat?
+    let editing: Hit?
     let onPosted: (Hit) -> Void
 
     init(inviteTo chat: Chat? = nil, onPosted: @escaping (Hit) -> Void) {
         inviteChat = chat
+        editing = nil
         self.onPosted = onPosted
+    }
+
+    init(editing hit: Hit, onSaved: @escaping (Hit) -> Void) {
+        inviteChat = nil
+        editing = hit
+        onPosted = onSaved
+        // The pickers show device-zone dates; carry the court's wall clock over to them.
+        let parts = hit.calendar.dateComponents([.year, .month, .day, .hour, .minute], from: hit.startsAt)
+        let local = Calendar.current.date(from: parts) ?? hit.startsAt
+        _day = State(initialValue: Calendar.current.startOfDay(for: local))
+        _time = State(initialValue: local)
+        _duration = State(initialValue: hit.durationMin)
+        _format = State(initialValue: hit.format)
+        _spots = State(initialValue: hit.spotsTotal)
+        _visibility = State(initialValue: hit.visibility)
+        _court = State(initialValue: hit.court)
     }
 
     @State private var day = Calendar.current.startOfDay(for: Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now)
@@ -37,16 +57,44 @@ struct PlanHitView: View {
 
     private static let lastCourtKey = "plan.lastCourtID"
 
+    /// The court's zone, so a hit planned while travelling still starts at the court's 6:30 PM.
+    private var courtCalendar: Calendar {
+        var calendar = Calendar.current
+        calendar.timeZone = court?.zone ?? .current
+        return calendar
+    }
+
     private var startsAt: Date {
-        let calendar = Calendar.current
-        let parts = calendar.dateComponents([.hour, .minute], from: time)
-        return calendar.date(bySettingHour: parts.hour ?? 18, minute: parts.minute ?? 30, second: 0, of: day) ?? day
+        let device = Calendar.current
+        var parts = device.dateComponents([.year, .month, .day], from: day)
+        let clock = device.dateComponents([.hour, .minute], from: time)
+        parts.hour = clock.hour ?? 18
+        parts.minute = clock.minute ?? 30
+        return courtCalendar.date(from: parts) ?? day
+    }
+
+    /// Players already in: the spots can't drop below them.
+    private var playersIn: Int { editing?.players.filter { !$0.isHost }.count ?? 0 }
+
+    /// "Times are Pacific Time, at the court" when the court is in another zone than this iPhone.
+    private var zoneNote: String? {
+        guard let zone = court?.zone,
+              zone.secondsFromGMT(for: startsAt) != TimeZone.current.secondsFromGMT(for: startsAt) else { return nil }
+        let name = zone.localizedName(for: .generic, locale: Locale(identifier: "en_US")) ?? zone.identifier
+        let yours = HitFormatting.string("EEE h:mm a", startsAt, in: .current)
+        return "Times are \(name), where the court is. That's \(yours) your time."
+    }
+
+    private var hasChanges: Bool {
+        guard let editing else { return true }
+        return court?.id != editing.court.id || startsAt != editing.startsAt || duration != editing.durationMin
+            || format != editing.format || spots != editing.spotsTotal || visibility != editing.visibility
     }
 
     private var tooSoon: Bool { startsAt <= Date.now.addingTimeInterval(15 * 60) }
 
     private var canPost: Bool {
-        court != nil && !tooSoon && !isPosting
+        court != nil && !tooSoon && !isPosting && hasChanges
     }
 
     /// "Who can see my hits: Friends only" on You wins over the chip, so the chip says so.
@@ -62,7 +110,7 @@ struct PlanHitView: View {
 
     private var inviteExpiry: Date {
         if let customExpiry, customExpiry > .now, customExpiry < startsAt { return customExpiry }
-        let calendar = Calendar.current
+        let calendar = courtCalendar
         let eveningBefore = calendar.date(bySettingHour: 20, minute: 0, second: 0, of: calendar.date(byAdding: .day, value: -1, to: startsAt) ?? startsAt) ?? startsAt
         var expiry = min(startsAt.addingTimeInterval(-2 * 3600), eveningBefore)
         if expiry <= .now {
@@ -72,7 +120,13 @@ struct PlanHitView: View {
     }
 
     private var postTitle: String {
-        inviteChat.map { "Send to \($0.title)" } ?? "Post hit"
+        if editing != nil { return "Save changes" }
+        return inviteChat.map { "Send to \($0.title)" } ?? "Post hit"
+    }
+
+    private var screenTitle: String {
+        if editing != nil { return "Edit hit" }
+        return inviteChat == nil ? "Plan a hit" : "Request a hit"
     }
 
     var body: some View {
@@ -82,6 +136,13 @@ struct PlanHitView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     label("When", top: 16)
                     whenCard
+                    if let zoneNote {
+                        Text(zoneNote)
+                            .font(CourtlyFont.caption)
+                            .foregroundStyle(CourtlyColor.secondary)
+                            .padding(.top, 6)
+                            .padding(.horizontal, 4)
+                    }
                     label("Where")
                     whereRow
                     if let courtsError, courts.isEmpty {
@@ -94,7 +155,7 @@ struct PlanHitView: View {
                         ForEach(PlayFormat.allCases) { option in
                             Chip(title: option.shortTitle, isSelected: format == option) {
                                 format = option
-                                spots = Self.defaultSpots(for: option)
+                                spots = max(Self.defaultSpots(for: option), playersIn)
                             }
                         }
                     }
@@ -131,12 +192,19 @@ struct PlanHitView: View {
                         .foregroundStyle(CourtlyColor.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else if court == nil {
-                    Text("Pick a court to post.")
+                    Text(editing == nil ? "Pick a court to post." : "Pick a court.")
                         .font(CourtlyFont.caption)
                         .foregroundStyle(CourtlyColor.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                SafetyNote()
+                if editing == nil {
+                    SafetyNote()
+                } else if hasChanges, playersIn > 0 || (editing?.pendingRequestCount ?? 0) > 0 {
+                    Text("Players in the hit get a notification if the time or court changes.")
+                        .font(CourtlyFont.caption)
+                        .foregroundStyle(CourtlyColor.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 PrimaryButton(title: postTitle, isEnabled: canPost, isLoading: isPosting, action: post)
             }
                 .padding(.horizontal, CourtlyMetrics.screenPadding)
@@ -153,14 +221,14 @@ struct PlanHitView: View {
         .task { await seed() }
         .interactiveDismissDisabled(isPosting)
         .preferredColorScheme(.light)
-        .errorAlert($errorMessage, title: "Couldn’t post the hit")
+        .errorAlert($errorMessage, title: editing == nil ? "Couldn’t post the hit" : "Couldn’t save the hit")
     }
 
     // MARK: - Pieces
 
     private var navigationRow: some View {
         ZStack {
-            Text(inviteChat == nil ? "Plan a hit" : "Request a hit")
+            Text(screenTitle)
                 .font(CourtlyFont.bodySemibold)
                 .foregroundStyle(CourtlyColor.ink)
             HStack {
@@ -250,7 +318,7 @@ struct PlanHitView: View {
     private var expiryRow: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Open until \(HitFormatting.day.string(from: inviteExpiry)) \(HitFormatting.clock.string(from: inviteExpiry))")
+                Text("Open until \(HitFormatting.string("EEE h:mm a", inviteExpiry, in: courtCalendar.timeZone))")
                     .font(CourtlyFont.secondary)
                     .foregroundStyle(CourtlyColor.secondary)
                 Spacer()
@@ -270,6 +338,7 @@ struct PlanHitView: View {
                     displayedComponents: [.date, .hourAndMinute]
                 )
                 .datePickerStyle(.compact)
+                .environment(\.timeZone, courtCalendar.timeZone)
                 .tint(CourtlyColor.blue)
                 .padding(.horizontal, 16)
                 .frame(height: 48)
@@ -286,7 +355,7 @@ struct PlanHitView: View {
                 .foregroundStyle(CourtlyColor.ink)
             Spacer()
             HStack(spacing: 0) {
-                stepButton("−", enabled: spots > 1) { spots -= 1 }
+                stepButton("−", enabled: spots > max(1, playersIn)) { spots -= 1 }
                 Rectangle()
                     .fill(CourtlyColor.separator)
                     .frame(width: 1, height: 20)
@@ -325,12 +394,17 @@ struct PlanHitView: View {
     private func seed() async {
         if !didSeed {
             didSeed = true
+            guard editing == nil else { return await loadCourts() }
             if let first = session.profile?.formats.first {
                 format = first
                 spots = Self.defaultSpots(for: first)
             }
             if friendsOnlyProfile { visibility = .friends }
         }
+        await loadCourts()
+    }
+
+    private func loadCourts() async {
         do {
             let list = try await API.Courts.nearby(limit: 30)
             courts = list
@@ -349,7 +423,18 @@ struct PlanHitView: View {
         isPosting = true
         Task { @MainActor in
             do {
-                let hit = try await hits.create(
+                let hit: Hit
+                if let editing {
+                    hit = try await hits.update(
+                        editing.id, courtID: court.id, startsAt: startsAt, durationMin: duration,
+                        format: format, spots: spots, visibility: visibility
+                    )
+                    isPosting = false
+                    dismiss()
+                    onPosted(hit)
+                    return
+                }
+                hit = try await hits.create(
                     courtID: court.id, startsAt: startsAt, durationMin: duration,
                     format: format, spots: spots, visibility: visibility,
                     inviteChatID: inviteChat?.id, inviteExpiresAt: inviteChat == nil ? nil : chosenExpiry

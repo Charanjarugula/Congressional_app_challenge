@@ -2,7 +2,7 @@ import Foundation
 import MapKit
 import Observation
 
-/// Type-ahead place suggestions backed by MapKit, biased to Palm Beach County.
+/// Type-ahead place suggestions backed by MapKit, kept to the United States.
 /// Tapping a suggestion resolves it to a `HomeArea` (city label, ZIP when known, centroid).
 @Observable
 final class PlaceSearchCompleter: NSObject, MKLocalSearchCompleterDelegate {
@@ -20,17 +20,17 @@ final class PlaceSearchCompleter: NSObject, MKLocalSearchCompleterDelegate {
     private(set) var suggestions: [Suggestion] = []
 
     private let completer = MKLocalSearchCompleter()
-    private static let palmBeachCounty = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 26.65, longitude: -80.2),
-        latitudinalMeters: 120_000,
-        longitudinalMeters: 120_000
+    /// The lower 48 plus Alaska and Hawaii's latitudes; it only biases MapKit, the filter below does the rest.
+    private static let unitedStates = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 39.5, longitude: -98.35),
+        span: MKCoordinateSpan(latitudeDelta: 50, longitudeDelta: 70)
     )
 
     override init() {
         super.init()
         completer.delegate = self
         completer.resultTypes = .address
-        completer.region = Self.palmBeachCounty
+        completer.region = Self.unitedStates
         if #available(iOS 18.0, *) {
             completer.addressFilter = MKAddressFilter(including: [.locality, .subLocality, .postalCode])
         }

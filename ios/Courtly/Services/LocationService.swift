@@ -40,7 +40,7 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         // A ZIP is replaced by its centroid; a city keeps its own point, rounded. Looking a city label up
         // again could land on a namesake elsewhere, which is how a Wellington once ended up in New Zealand.
         if let zip = area.zip,
-           let placemark = try? await CLGeocoder().geocodeAddressString("\(zip), United States", in: serviceRegion)
+           let placemark = try? await CLGeocoder().geocodeAddressString("\(zip), United States")
                .first(where: { $0.isoCountryCode == "US" }),
            let location = placemark.location {
             return HomeArea(
@@ -58,17 +58,12 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
         )
     }
 
-    /// Courtly runs in the United States; a lookup is steered towards Palm Beach County and anything
-    /// abroad is dropped, so "Wellington" is Wellington, FL and never the one in New Zealand.
-    static let serviceRegion = CLCircularRegion(
-        center: CLLocationCoordinate2D(latitude: 26.65, longitude: -80.2), radius: 150_000, identifier: "palm-beach"
-    )
-
     static func area(matching query: String) async throws -> HomeArea {
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw LocationError.notFound }
-        let looksLikeZip = text.count == 5 && text.allSatisfy(\.isNumber)
-        let placemarks = try await CLGeocoder().geocodeAddressString(looksLikeZip ? "\(text), United States" : text, in: serviceRegion)
+        // Courtly runs in the United States: the lookup asks for a US place and anything abroad is
+        // dropped, so "Wellington" is never the one in New Zealand.
+        let placemarks = try await CLGeocoder().geocodeAddressString("\(text), United States")
         guard let placemark = placemarks.first(where: { $0.isoCountryCode == "US" }), let location = placemark.location else {
             throw LocationError.notFound
         }

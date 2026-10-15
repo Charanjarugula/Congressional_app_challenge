@@ -102,9 +102,9 @@ struct MyHitsView: View {
         } label: {
             HStack(spacing: 16) {
                 VStack(spacing: 0) {
-                    Text(HitFormatting.day.string(from: hit.startsAt).uppercased())
+                    Text(hit.dayText.uppercased())
                         .font(.system(size: 12, weight: .bold))
-                    Text(HitFormatting.clock.string(from: hit.startsAt))
+                    Text(hit.clockText)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                 }
                 .foregroundStyle(CourtlyColor.ink)

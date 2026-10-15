@@ -19,12 +19,13 @@ struct Profile: Codable, Equatable {
     var busyMask: Int32?
     var busyMaskWeek: Int32?
     var calendarProvider: CalendarProvider
-    var phoneE164: String?
     var hitVisibility: String
     var hitsPlayed: Int
     var coachMarksDone: Bool
     var onboardingCompletedAt: Date?
     var blockedCount: Int
+    /// IANA zone the availability grid is read in; kept in step with the iPhone.
+    var timeZone: String? = nil
 
     var isOnboarded: Bool { onboardingCompletedAt != nil }
 

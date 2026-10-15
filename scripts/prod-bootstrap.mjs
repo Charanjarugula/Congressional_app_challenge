@@ -54,8 +54,10 @@ if (!fresh) {
   const orgID = old?.organization_id ?? projects[0]?.organization_id ?? (await api("GET", "/organizations"))[0]?.id;
   if (!orgID) throw new Error("no organization found to create the project in");
   const dbPass = crypto.randomBytes(24).toString("base64url");
-  fs.writeFileSync(path.join(ROOT, ".prod-db-password"), `${dbPass}\n`, { mode: 0o600 });
-  console.log(`create  ${NEW_NAME} in organization ${orgID} (${REGION}); database password saved to .prod-db-password (gitignored)`);
+  // Into the macOS keychain, never a file in the repo folder (read it back with
+  // `security find-generic-password -a courtly-prod -s "Courtly prod database password" -w`).
+  execFileSync("security", ["add-generic-password", "-U", "-a", "courtly-prod", "-s", "Courtly prod database password", "-w", dbPass]);
+  console.log(`create  ${NEW_NAME} in organization ${orgID} (${REGION}); database password saved to the keychain as "Courtly prod database password"`);
   fresh = await api("POST", "/projects", { organization_id: orgID, name: NEW_NAME, db_pass: dbPass, region: REGION });
 }
 const REF = fresh.id;

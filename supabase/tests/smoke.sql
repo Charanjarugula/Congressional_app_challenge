@@ -838,6 +838,47 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   perform public.cancel_hit(v_hit_id);
 
+  -- A brand-new player with no friends still sees players near them and what is going on nearby.
+  -- A demo account nearby stays out of both the suggestions and the feed.
+  declare
+    v_new uuid := gen_random_uuid(); v_demo uuid := gen_random_uuid(); v_sugg jsonb; v_pulse jsonb; v_demo_hit jsonb;
+  begin
+    insert into auth.users (id, email) values (v_demo, 'demo.zed@courtly.app');
+    insert into public.profiles (id, first_name, last_name, birthday, level, formats, zip, area_label, home_point, onboarding_completed_at)
+    values
+      (v_new, 'Nia', 'Park', '1999-07-07', 'intermediate', '{casual}', '33414', 'Wellington, FL',
+       extensions.st_setsrid(extensions.st_makepoint(-80.2414, 26.6618), 4326), now());
+    update public.profiles set first_name = 'Zed', last_name = 'Demo', birthday = '1990-01-01', level = 'intermediate',
+      formats = '{casual}', zip = '33414', area_label = 'Wellington, FL', onboarding_completed_at = now(),
+      home_point = extensions.st_setsrid(extensions.st_makepoint(-80.2414, 26.6618), 4326)
+    where id = v_demo;
+    perform set_config('request.jwt.claims', json_build_object('sub', v_demo, 'role', 'authenticated')::text, true);
+    v_demo_hit := public.create_hit(v_court, now() + interval '3 days', 90, 'casual', 1, 'anyone');
+    perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);
+    v_sugg := public.get_friend_suggestions();
+    if not exists (select 1 from jsonb_array_elements(v_sugg) e where e->>'source' = 'nearby') then
+      raise exception 'no nearby suggestions for a new player: %', v_sugg;
+    end if;
+    if exists (select 1 from jsonb_array_elements(v_sugg) e where (e->>'id')::uuid = v_demo) then
+      raise exception 'a demo account was suggested to a real player';
+    end if;
+    v_feed := public.get_play_feed();
+    if exists (select 1 from jsonb_array_elements(v_feed->'near_you') e where (e->>'id')::uuid = (v_demo_hit->>'id')::uuid) then
+      raise exception 'a demo hit reached a real player''s feed';
+    end if;
+    v_pulse := public.get_area_pulse();
+    if (v_pulse->>'players')::int < 1 or (v_pulse->>'courts')::int < 1 or (v_pulse->>'radius_mi')::int < 25 then
+      raise exception 'area pulse: %', v_pulse;
+    end if;
+    -- The demo account itself still sees the other demo players' world, and real players nearby.
+    perform set_config('request.jwt.claims', json_build_object('sub', v_demo, 'role', 'authenticated')::text, true);
+    if (public.get_area_pulse()->>'players')::int < 1 then raise exception 'demo pulse empty'; end if;
+    -- No home area yet: nothing to count, no error.
+    update public.profiles set home_point = null where id = v_new;
+    perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);
+    if (public.get_area_pulse()->>'players')::int <> 0 then raise exception 'pulse without a home area'; end if;
+  end;
+
   -- A single message can be reported; its text stays with the report. Only the sender's own message, seen by the reporter.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   v_msg := public.send_message(public.find_dm_chat(a, b), gen_random_uuid(), 'a message worth reporting');

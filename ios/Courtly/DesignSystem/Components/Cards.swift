@@ -135,7 +135,7 @@ struct ValueRow: View {
                 .foregroundStyle(CourtlyColor.ink)
             Spacer(minLength: 12)
             Text(value)
-                .font(CourtlyFont.body)
+                .font(CourtlyFont.secondary)   // same size as the values on tappable rows
                 .foregroundStyle(CourtlyColor.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -295,8 +295,12 @@ struct SegmentedControl: View {
                                     .fill(CourtlyColor.ink)
                             }
                         }
+                        // The whole segment takes the tap, not just the letters: an unselected
+                        // segment has no fill, and a plain button only hits what it draws.
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(selectedIndex == index ? [.isSelected] : [])
             }
         }
         .padding(2)

@@ -12,6 +12,10 @@ struct PlayView: View {
     @State private var expanded: UUID?
     @State private var filters = ExploreFilters()
     @State private var showsFilters = false
+    @State private var choseTab = false   // the first feed picks the tab once; after that it's the player's
+    @State private var suggestions: [SuggestedPlayer] = []
+    @State private var requested: Set<UUID> = []
+    @State private var pulse: AreaPulse?
 
     var body: some View {
         ScrollView {
@@ -34,7 +38,25 @@ struct PlayView: View {
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "Play", art: .play) }
-        .refreshable { await hits.loadFeed(userInitiated: true) }
+        .refreshable {
+            await hits.loadFeed(userInitiated: true)
+            await loadDiscovery()
+        }
+        .task { await loadDiscovery() }
+        // A player with no friends' hits yet starts on Explore, where something is going on.
+        .onChange(of: hits.feed?.fromFriends.isEmpty, initial: true) { _, friendsEmpty in
+            guard !choseTab, let friendsEmpty, let feed = hits.feed else { return }
+            choseTab = true
+            if friendsEmpty && !feed.nearYou.isEmpty { tab = 1 }
+        }
+    }
+
+    /// Players to suggest and the local numbers, for the empty states. Quiet on failure: they only add.
+    private func loadDiscovery() async {
+        async let people = try? API.People.suggestions(knownIDs: [])
+        async let area = try? API.People.areaPulse()
+        if let people = await people { suggestions = people }
+        pulse = await area
     }
 
     @ViewBuilder
@@ -62,7 +84,12 @@ struct PlayView: View {
 
     @ViewBuilder
     private func friends(_ hitsFromFriends: [Hit]) -> some View {
-        if hitsFromFriends.isEmpty {
+        if hitsFromFriends.isEmpty && !suggestions.isEmpty {
+            QuietCard(title: "Nothing from friends yet", detail: "When a friend posts a hit, it shows up here first. Add a few players to get started.")
+                .padding(.top, 12)
+            SuggestedPlayersRow(players: suggestions, requested: $requested) { navigate(.addFriends) }
+                .padding(.top, 22)
+        } else if hitsFromFriends.isEmpty {
             VStack(spacing: 8) {
                 Text("Nothing from friends yet")
                     .font(.system(size: 20, weight: .bold))
@@ -116,12 +143,25 @@ struct PlayView: View {
         }
         let shown = filters.apply(to: nearby)
         if nearby.isEmpty {
-            QuietCard(title: "No open hits near you", detail: "Widen the distance in Filters, or plan one and players nearby can ask to join.")
+            QuietCard(title: "No open hits near you", detail: emptyExploreDetail)
+            Button("Plan a hit", action: onPlan)
+                .font(CourtlyFont.secondarySemibold)
+                .foregroundStyle(CourtlyColor.blue)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 12)
         } else if shown.isEmpty {
             QuietCard(title: "Nothing matches", detail: "Loosen a filter to see more.")
         } else {
             rows(shown)
         }
+    }
+
+    private var emptyExploreDetail: String {
+        if let pulse, pulse.players > 0 {
+            let who = pulse.players == 1 ? "1 player plays" : "\(pulse.players) players play"
+            return "\(who) within \(pulse.radiusMi) mi. Post a time and they can ask to join."
+        }
+        return "Widen the distance in Filters, or post a time and players nearby can ask to join."
     }
 
     private func rows(_ list: [Hit]) -> some View {

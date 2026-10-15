@@ -10,7 +10,6 @@ enum AppRoute: Hashable {
     case addFriends
     case friendRequests
     case newGroup
-    case account
     case blockedPlayers
 }
 

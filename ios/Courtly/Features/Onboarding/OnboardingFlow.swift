@@ -128,7 +128,11 @@ struct OnboardingFlow: View {
                     draft.contactsGranted = granted
                     push(.people)
                 },
-                onSkip: { push(.notifications) }
+                // Players near you don't need contacts, so skipping still shows them.
+                onSkip: {
+                    draft.contactsGranted = false
+                    push(.people)
+                }
             )
         case .people:
             PeopleToPlayWithView(draft: draft) { push(.notifications) }

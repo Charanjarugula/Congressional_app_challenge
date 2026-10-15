@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Three tips over the real app the first time in: the hit list, adding friends, planning a hit.
+/// Three tips over the real app the first time in: Friends and Explore on Play, the plus on People,
+/// the plus on Play.
 struct CoachMarksOverlay: View {
     let step: Int
-    /// Where the Plan a hit pill is, in the overlay's space, so the third tip sits right above it.
+    /// Where the plus is, in the overlay's space, so the second and third tips sit right above it.
     var pillFrame: CGRect? = nil
     var containerHeight: CGFloat = 0
     let onNext: () -> Void
@@ -18,31 +19,35 @@ struct CoachMarksOverlay: View {
                 case 1:
                     Spacer()
                     tooltip(
-                        text: "These are hits other people have posted. Find one that works for you and ask to join.",
+                        text: "Friends shows hits your friends posted. Explore shows open hits near you. Tap a hit to see who’s in, then ask to join.",
                         counter: "1 of 3", button: "Next", arrow: nil
                     )
                     Spacer()
                         .frame(height: 220)
                 case 2:
-                    tooltip(
-                        text: "Add your friends here. Each friend gets their own chat.",
-                        counter: "2 of 3", button: "Next", arrow: .top
-                    )
-                    .padding(.top, 66)
                     Spacer()
+                    tooltip(
+                        text: "Your chats and friend requests live here. Tap + to add friends or start a group.",
+                        counter: "2 of 3", button: "Next", arrow: .bottom
+                    )
+                    .padding(.bottom, plusClearance)
                 default:
                     Spacer()
                     tooltip(
-                        text: "Nobody posted a time that works? Post your own. Pick a day, a court and what you want to play.",
+                        text: "Nobody posted a time that works? Tap + to post your own. Pick a day, a court and how you want to play.",
                         counter: "3 of 3", button: "Got it", arrow: .bottom
                     )
-                    .padding(.bottom, pillFrame.map { containerHeight - $0.minY + 12 } ?? 160)
+                    .padding(.bottom, plusClearance)
                 }
             }
             .padding(.horizontal, CourtlyMetrics.screenPadding)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .transition(.opacity)
+    }
+
+    private var plusClearance: CGFloat {
+        pillFrame.map { containerHeight - $0.minY + 12 } ?? 160
     }
 
     private enum Arrow {
@@ -84,7 +89,7 @@ struct CoachMarksOverlay: View {
                     .fill(CourtlyColor.ink)
                     .frame(width: 12, height: 12)
                     .rotationEffect(.degrees(45))
-                    .offset(x: arrow == .top ? -28 : -60, y: arrow == .top ? -6 : 6)
+                    .offset(x: -22, y: arrow == .top ? -6 : 6)   // over the plus, 48pt in from the screen edge
             }
         }
     }

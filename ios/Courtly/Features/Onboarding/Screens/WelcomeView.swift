@@ -39,7 +39,7 @@ struct WelcomeView: View {
     }
 }
 
-/// The welcome artwork: a court seen from the baseline, drawn from the handoff's SVG coordinates (402×420).
+/// The welcome artwork: a court seen from the baseline, drawn as line segments on a 402×420 canvas.
 struct CourtLinesArt: View {
     private struct Line {
         let x1: CGFloat

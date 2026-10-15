@@ -135,7 +135,7 @@ struct ValueRow: View {
                 .foregroundStyle(CourtlyColor.ink)
             Spacer(minLength: 12)
             Text(value)
-                .font(CourtlyFont.body)
+                .font(CourtlyFont.secondary)   // same size as the values on tappable rows
                 .foregroundStyle(CourtlyColor.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)

@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 enum ProfileSheet: String, Identifiable {
-    case editProfile, availability, level, formats, area
+    case name, phone, availability, level, formats, area
 
     var id: String { rawValue }
 }
@@ -448,175 +448,153 @@ struct AvailabilitySheet: View {
 
 // MARK: - Edit profile
 
-struct EditProfileSheet: View {
+/// First and last name. Others see the first name and last initial.
+struct NameSheet: View {
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
     @State private var firstName = ""
     @State private var lastName = ""
-    @State private var pickerItem: PhotosPickerItem?
-    @State private var newPhoto: UIImage?
-    @State private var photoToCrop: CropTarget?
-    @State private var photoLoad = 0
-    @State private var isLoadingPhoto = false
     @State private var seeded = false
     @State private var isSaving = false
     @State private var errorMessage: String?
 
     private var canSave: Bool {
-        !firstName.trimmingCharacters(in: .whitespaces).isEmpty && !isSaving && !isLoadingPhoto
+        !firstName.trimmingCharacters(in: .whitespaces).isEmpty && !isSaving
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                Text("Edit profile")
-                    .font(CourtlyFont.bodySemibold)
-                    .foregroundStyle(CourtlyColor.ink)
-                HStack {
-                    Button("Cancel") { dismiss() }
-                        .font(CourtlyFont.body)
-                        .foregroundStyle(CourtlyColor.blue)
-                        .disabled(isSaving)
-                    Spacer()
-                    Button(isSaving ? "Saving…" : "Save", action: save)
-                        .font(CourtlyFont.bodySemibold)
-                        .foregroundStyle(CourtlyColor.blue)
-                        .disabled(!canSave)
-                }
+        SheetScaffold(title: "Name", canSave: canSave, isSaving: isSaving, detents: [.medium], onSave: save) {
+            SectionLabel(title: "First name")
+                .padding(.bottom, 8)
+            FieldBox(fill: CourtlyColor.card) {
+                TextField("First name", text: $firstName)
+                    .font(CourtlyFont.body)
+                    .textContentType(.givenName)
+                    .autocorrectionDisabled()
             }
-            .frame(height: 52)
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    VStack(spacing: 12) {
-                        ZStack(alignment: .bottomTrailing) {
-                            if let newPhoto {
-                                Image(uiImage: newPhoto)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 120, height: 120)
-                                    .clipShape(Circle())
-                            } else if let card = session.profile?.card {
-                                PlayerAvatar(card: card, size: 120)
-                            }
-                            PhotosPicker(selection: $pickerItem, matching: .images) {
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 40, height: 40)
-                                    .background(Circle().fill(CourtlyColor.blue))
-                                    .overlay(Circle().stroke(CourtlyColor.groupedBackground, lineWidth: 4))
-                            }
-                            .accessibilityLabel("Change photo")
-                        }
-                        PhotosPicker(selection: $pickerItem, matching: .images) {
-                            Text("Change photo")
-                                .font(CourtlyFont.secondarySemibold)
-                                .foregroundStyle(CourtlyColor.blue)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
-
-                    Card {
-                        VStack(spacing: 0) {
-                            nameRow("First name", text: $firstName, contentType: .givenName)
-                            HairlineSeparator()
-                            nameRow("Last name", text: $lastName, contentType: .familyName)
-                        }
-                    }
-                    .padding(.top, 24)
-                    Text("Others see your first name and last initial.")
-                        .font(CourtlyFont.caption)
-                        .foregroundStyle(CourtlyColor.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 10)
-                        .padding(.horizontal, 4)
-                }
-                .padding(.bottom, 24)
+            SectionLabel(title: "Last name")
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+            FieldBox(fill: CourtlyColor.card) {
+                TextField("Last name", text: $lastName)
+                    .font(CourtlyFont.body)
+                    .textContentType(.familyName)
+                    .autocorrectionDisabled()
             }
+            Text("Others see your first name and last initial.")
+                .font(CourtlyFont.caption)
+                .foregroundStyle(CourtlyColor.secondary)
+                .padding(.top, 10)
+                .padding(.horizontal, 4)
         }
-        .padding(.horizontal, CourtlyMetrics.screenPadding)
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
-        .presentationDetents([.large])
-        .presentationDragIndicator(.hidden)
-        .presentationCornerRadius(20)
-        .interactiveDismissDisabled(isSaving)
         .onAppear {
             guard !seeded, let profile = session.profile else { return }
             seeded = true
             firstName = profile.firstName
             lastName = profile.lastName
         }
-        .onChange(of: pickerItem) { _, item in loadPhoto(item) }
-        .fullScreenCover(item: $photoToCrop) { target in
-            PhotoCropView(image: target.image) {
-                photoToCrop = nil
-                pickerItem = nil
-            } onChoose: { cropped in
-                newPhoto = cropped
-                photoToCrop = nil
-                pickerItem = nil   // the same photo can be picked and framed again
-            }
-        }
         .errorAlert($errorMessage, title: "Couldn’t save")
-    }
-
-    private func nameRow(_ label: String, text: Binding<String>, contentType: UITextContentType) -> some View {
-        HStack {
-            Text(label)
-                .font(CourtlyFont.body)
-                .foregroundStyle(CourtlyColor.secondary)
-            Spacer()
-            TextField(label, text: text)
-                .font(CourtlyFont.bodySemibold)
-                .foregroundStyle(CourtlyColor.ink)
-                .multilineTextAlignment(.trailing)
-                .textContentType(contentType)
-                .autocorrectionDisabled()
-        }
-        .padding(.horizontal, 18)
-        .frame(height: 54)
-    }
-
-    private func loadPhoto(_ item: PhotosPickerItem?) {
-        guard let item else { return }
-        photoLoad += 1
-        let load = photoLoad
-        isLoadingPhoto = true   // Save waits: the photo chosen is the photo saved
-        Task { @MainActor in
-            defer { if load == photoLoad { isLoadingPhoto = false } }
-            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
-            // Decoding and scaling a camera photo is slow; keep it off the main thread. Kept large
-            // enough that zooming in on a face in the cropper stays sharp.
-            let image = await Task.detached(priority: .userInitiated) { UIImage(data: data)?.downscaled(to: 1800) }.value
-            guard load == photoLoad, let image else { return }   // a newer pick has taken over
-            photoToCrop = CropTarget(image: image)
-        }
     }
 
     private func save() {
         isSaving = true
         Task { @MainActor in
             do {
-                var patch: [String: Any] = [
+                try await session.updateProfile([
                     "first_name": firstName.trimmingCharacters(in: .whitespaces),
                     "last_name": lastName.trimmingCharacters(in: .whitespaces),
-                ]
-                let previousPhoto = session.profile?.photoPath
-                if let newPhoto, let data = newPhoto.jpegData(compressionQuality: 0.85), let me = session.profile?.id {
-                    patch["photo_path"] = try await API.Profile.uploadPhoto(data, for: me)
-                }
-                try await session.updateProfile(patch)
-                // The photo the profile stopped pointing at goes too; a failure here only leaves a stray file.
-                if let previousPhoto, let current = patch["photo_path"] as? String, previousPhoto != current {
-                    try? await API.Profile.removePhoto(at: previousPhoto)
-                }
+                ])
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription
             }
             isSaving = false
+        }
+    }
+}
+
+/// The profile photo on You: tap it to pick a new one, frame it in the circle, and it saves right away.
+struct ProfilePhotoButton: View {
+    @Environment(AppSession.self) private var session
+    let card: PlayerCard
+    var size: CGFloat = 96
+
+    @State private var pickerItem: PhotosPickerItem?
+    @State private var photoToCrop: CropTarget?
+    @State private var pending: UIImage?   // shown while it uploads
+    @State private var isWorking = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        PhotosPicker(selection: $pickerItem, matching: .images) {
+            ZStack(alignment: .bottomTrailing) {
+                Group {
+                    if let pending {
+                        Image(uiImage: pending).resizable().scaledToFill()
+                    } else {
+                        PlayerAvatar(card: card, size: size)
+                    }
+                }
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+                .overlay {
+                    if isWorking {
+                        Circle().fill(Color.black.opacity(0.35))
+                        ProgressView().tint(.white)
+                    }
+                }
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(CourtlyColor.blue))
+                    .overlay(Circle().stroke(CourtlyColor.groupedBackground, lineWidth: 3))
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(isWorking)
+        .accessibilityLabel("Change profile photo")
+        .onChange(of: pickerItem) { _, item in load(item) }
+        .fullScreenCover(item: $photoToCrop) { target in
+            PhotoCropView(image: target.image) {
+                photoToCrop = nil
+                pickerItem = nil
+            } onChoose: { cropped in
+                photoToCrop = nil
+                pickerItem = nil   // the same photo can be picked and framed again
+                upload(cropped)
+            }
+        }
+        .errorAlert($errorMessage, title: "Couldn’t change your photo")
+    }
+
+    private func load(_ item: PhotosPickerItem?) {
+        guard let item else { return }
+        isWorking = true
+        Task { @MainActor in
+            defer { isWorking = false }
+            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+            // Decoding a camera photo is slow; off the main thread, kept large enough to zoom in sharply.
+            let image = await Task.detached(priority: .userInitiated) { UIImage(data: data)?.downscaled(to: 1800) }.value
+            if let image { photoToCrop = CropTarget(image: image) }
+        }
+    }
+
+    private func upload(_ image: UIImage) {
+        guard let me = session.profile?.id, let data = image.jpegData(compressionQuality: 0.85) else { return }
+        pending = image
+        isWorking = true
+        Task { @MainActor in
+            defer { isWorking = false; pending = nil }
+            do {
+                let previous = session.profile?.photoPath
+                let path = try await API.Profile.uploadPhoto(data, for: me)
+                try await session.updateProfile(["photo_path": path])
+                // The photo the profile stopped pointing at goes too; a failure here only leaves a stray file.
+                if let previous, previous != path { try? await API.Profile.removePhoto(at: previous) }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }

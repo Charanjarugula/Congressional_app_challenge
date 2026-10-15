@@ -39,6 +39,7 @@ struct ChoiceRow: View {
 /// 56pt grouped-background container for text fields.
 struct FieldBox<Content: View>: View {
     var isHighlighted = false
+    var fill: Color = CourtlyColor.groupedBackground   // white on the grey sheets
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -50,7 +51,7 @@ struct FieldBox<Content: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
-                .fill(isHighlighted ? CourtlyColor.blueTint : CourtlyColor.groupedBackground)
+                .fill(isHighlighted ? CourtlyColor.blueTint : fill)
         )
     }
 }

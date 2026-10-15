@@ -317,7 +317,6 @@ struct MainTabView: View {
         case .addFriends: AddFriendsView()
         case .friendRequests: FriendRequestsView()
         case .newGroup: NewGroupView()
-        case .account: AccountView()
         case .blockedPlayers: BlockedPlayersView()
         }
     }

@@ -44,7 +44,7 @@ Maya posts a casual hit for Thursday at 6:30 PM at Wellington Tennis Center with
 | Area | Technology | What it does here |
 |---|---|---|
 | App | Swift, SwiftUI, iOS 17+ | The four tabs, onboarding, the sheets; talks to the backend over plain `URLSession`. |
-| Data and sign-in | Supabase: Postgres with PostGIS, Auth, Storage, Realtime | Profiles, courts, hits, chats; Apple and email sign-in; avatar photos; live refresh of open screens. |
+| Data and sign-in | Supabase: Postgres with PostGIS, Auth, Storage, Realtime | Profiles, courts, hits, chats; Apple, Google and email sign-in; avatar photos; live refresh of open screens. |
 | Backend logic | SQL functions behind row-level security, pg_cron, pg_net | Every read and write the app makes; reminders, expiry and day-after checks on a schedule; the push webhook. |
 | Edge Functions | Deno (TypeScript) | Push delivery over APNs, account deletion, Sign in with Apple token exchange, report emails. |
 | Device frameworks | APNs, EventKit, MapKit, Contacts, Core Location | Notifications, calendar busy times, court search and directions, contact matching, the player's area. |
@@ -55,7 +55,7 @@ Maya posts a casual hit for Thursday at 6:30 PM at Wellington Tennis Center with
 
 | Path | What |
 |---|---|
-| `ios/Courtly.xcodeproj` | Open this in Xcode 16 or newer. |
+| `ios/Courtly.xcodeproj` | Open this in Xcode 26 or newer. |
 | `ios/Courtly/App` | App entry, root view, session state, notification delegate. |
 | `ios/Courtly/Config` | Supabase URLs and keys per environment, policy links. |
 | `ios/Courtly/DesignSystem` | Color and type tokens, shared components (cards, pills, buttons, avatars). |
@@ -77,7 +77,7 @@ Maya posts a casual hit for Thursday at 6:30 PM at Wellington Tennis Center with
 
 ## Getting started
 
-You need a Mac with Xcode 16 or newer. Nothing else has to be installed to run the app in the simulator: Debug builds talk to the shared `courtly-dev` project with the public key in `AppConfig.swift`, and that key only works under the database's row-level security. Running on a phone needs your own Apple developer team. The backend harness needs Postgres 16 and `psql`.
+You need a Mac with Xcode 26 or newer (the app uses the iOS 26 SDK's age-range check). Nothing else has to be installed to run the app in the simulator: Debug builds talk to the shared `courtly-dev` project with the public key in `AppConfig.swift`, and that key only works under the database's row-level security. Running on a phone needs your own Apple developer team. The backend harness needs Postgres 16 and `psql`.
 
 ```sh
 git clone https://github.com/Charanjarugula/Congressional_app_challenge.git
@@ -122,9 +122,9 @@ Pull requests that touch `supabase/` run the migrations and the smoke test again
 
 ## Roadmap and known limitations
 
-Planned, with no dates attached: a TestFlight round and the App Store release; Google sign-in once a Google Cloud client id exists; push notifications once the APNs key is in the backend secrets.
+Planned, with no dates attached: the App Store release, after the current TestFlight testing.
 
-Limitations today: courts are the 25 seeded Palm Beach County public courts plus the ones players add; iOS 17 and later only, no Android; email sign-in codes depend on the project's SMTP settings (the built-in mailer allows two emails an hour); phone numbers are not collected, so friends are found by email or by adding each other; English only.
+Limitations today: courts are the 25 seeded Palm Beach County public courts plus the ones players add; iOS 17 and later only, no Android; phone numbers are not collected, so friends are found by email or by adding each other; English only.
 
 ## Credits
 

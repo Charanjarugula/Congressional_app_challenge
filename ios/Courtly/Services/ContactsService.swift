@@ -20,12 +20,13 @@ struct ContactsService {
         }
     }
 
-    func hashedContacts(limit: Int = 5000) throws -> [HashedContact] {
+    /// Emails only: they're verified at sign-in, while a phone number on a profile isn't, so matching
+    /// on phones would let someone pose as a contact. The server caps a check at 1,000.
+    func hashedContacts(limit: Int = 1000) throws -> [HashedContact] {
         let store = CNContactStore()
         let keys: [CNKeyDescriptor] = [
             CNContactGivenNameKey as CNKeyDescriptor,
             CNContactFamilyNameKey as CNKeyDescriptor,
-            CNContactPhoneNumbersKey as CNKeyDescriptor,
             CNContactEmailAddressesKey as CNKeyDescriptor,
         ]
         let request = CNContactFetchRequest(keysToFetch: keys)
@@ -34,8 +35,7 @@ struct ContactsService {
         try store.enumerateContacts(with: request) { contact, stop in
             let name = "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
             guard !name.isEmpty else { return }
-            var values: [String] = contact.phoneNumbers.compactMap { Self.normalizePhone($0.value.stringValue) }
-            values += contact.emailAddresses.map { String($0.value).lowercased().trimmingCharacters(in: .whitespaces) }
+            let values = contact.emailAddresses.map { String($0.value).lowercased().trimmingCharacters(in: .whitespaces) }
             for value in values {
                 if result.count >= limit { stop.pointee = true; break }
                 let hash = Self.hash(value)

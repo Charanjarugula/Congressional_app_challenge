@@ -38,7 +38,9 @@ begin
     if sqlerrm not in ('already_requested') then raise; end if;
   end;
 
-  -- A block marked busy keeps its hits out of the feed; clearing it brings them back.
+  -- A block marked busy keeps its hits out of the feed; clearing it brings them back. Checked as Alex,
+  -- who hasn't asked to join (a pending request hides the hit from Jordan's feed on its own).
+  perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
   if public.availability_bit(now() + interval '2 days') is not null then
     perform public.update_profile(jsonb_build_object('busy_mask', 1 << public.availability_bit(now() + interval '2 days')));
     if exists (select 1 from jsonb_array_elements(public.get_play_feed()->'near_you') e where (e->>'id')::uuid = v_hit_id) then
@@ -222,7 +224,7 @@ begin
   perform public.update_profile(jsonb_build_object('phone_e164', '+15615550142', 'email_hash', 'spoofed', 'radius_mi', 15));
   if (public.get_me()->>'radius_mi')::int <> 15 then raise exception 'update_profile radius'; end if;
   -- Hashes are the server's: the phone hash comes from the number, the email hash from the verified sign-in email.
-  if (select phone_hash from public.profiles where id = a) <> public.contact_hash('+15615550142') then raise exception 'phone_hash not derived'; end if;
+  if (select phone_hash from public.profiles where id = a) is not null then raise exception 'phone number hashed for matching (unverified)'; end if;
   if (select email_hash from public.profiles where id = a) = 'spoofed' then raise exception 'client set email_hash'; end if;
   insert into auth.users (id, email) values (v_pat, 'Pat.Lee@Example.com');
   if (select email_hash from public.profiles where id = v_pat) <> public.contact_hash('pat.lee@example.com') then raise exception 'email_hash not set on sign-up'; end if;
@@ -245,8 +247,11 @@ begin
     if sqlerrm <> 'invalid_radius' then raise; end if;
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
-  v_feed := public.match_contacts(array[public.contact_hash('+15615550142'), 'nothing']);
-  if jsonb_array_length(v_feed) <> 1 or (v_feed->0->'player'->>'id')::uuid <> a then raise exception 'match_contacts: %', v_feed; end if;
+  -- Contacts match on verified sign-in emails only; an unverified phone number never matches (0024).
+  update public.profiles set email_hash = public.contact_hash('maya@example.org') where id = a;
+  v_feed := public.match_contacts(array[public.contact_hash('+15615550142'), public.contact_hash('maya@example.org'), 'nothing']);
+  if jsonb_array_length(v_feed) <> 1 or (v_feed->0->'player'->>'id')::uuid <> a
+     or v_feed->0->>'hash' <> public.contact_hash('maya@example.org') then raise exception 'match_contacts: %', v_feed; end if;
   if v_feed->0->>'relationship' is null then raise exception 'match_contacts lost the relationship: %', v_feed; end if;
   -- Back to mid-onboarding for this check: an onboarded profile can't take an under-18 birthday (0023).
   update public.profiles set birthday = current_date - interval '12 years', onboarding_completed_at = null where id = b;
@@ -256,21 +261,36 @@ begin
   exception when others then
     if sqlerrm <> 'underage' then raise; end if;
   end;
+  if (select underage_at from public.profiles where id = b) is null then raise exception 'under-18 birthday not remembered'; end if;
+  update public.profiles set underage_at = null where id = b;   -- a moderator clearing it; players can't
   update public.profiles set birthday = '1994-05-02', onboarding_completed_at = now() where id = b;
 
   -- Row-level security as the app's role: Alex sees only hits visible to him, never Maya's profile row.
   execute 'set local role authenticated';
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
-  select count(*) into v_n from public.profiles;
-  if v_n <> 1 then raise exception 'rls: profiles visible to others (%)', v_n; end if;
+  -- Tables the app never reads directly are closed to the app's role altogether (0024).
+  declare v_table text;
+  begin
+    foreach v_table in array array['profiles', 'player_cards', 'friendships', 'chat_members', 'hit_players', 'blocks',
+                                   'attendance_checks', 'notifications', 'courts', 'hit_invites', 'device_tokens',
+                                   'reports', 'apple_tokens', 'admin_users', 'rate_limits'] loop
+      begin
+        execute format('select count(*) from public.%I', v_table);
+        raise exception 'rls: % is readable by the app role', v_table;
+      exception when insufficient_privilege then null;
+      end;
+    end loop;
+  end;
+  perform public.viewer_is_blocked_with(a);   -- used by the hit_players and messages rules
   select count(*) into v_n from public.hits where host_id = a and status = 'cancelled';
   if v_n <> 0 then raise exception 'rls: cancelled hit of a stranger is visible'; end if;
-  select count(*) into v_n from public.player_cards;
-  if v_n < 2 then raise exception 'rls: player_cards should list the other active players (%)', v_n; end if;
   select count(*) into v_n from public.join_requests;
   if v_n <> 0 then raise exception 'rls: alex sees % requests that are neither his nor on his hits', v_n; end if;
-  select count(*) into v_n from public.hit_invites;
-  if v_n < 1 then raise exception 'rls: alex should see the invite sent to his group'; end if;
+  begin
+    insert into public.messages (chat_id, sender_id, body) values (gen_random_uuid(), c, 'x');
+    raise exception 'rls: the app role inserted a message directly';
+  exception when insufficient_privilege then null;
+  end;
   execute 'reset role';
 
   -- Played hits and the day-after check. The reminder hit is moved into the past; the scheduler marks it played.
@@ -373,17 +393,23 @@ begin
 
   -- Device tokens: a token registered twice keeps one row, moves with the phone, and only its owner can take it back.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
-  perform public.register_device('tok-1', 'sandbox', '1.0');
-  perform public.register_device('tok-1', 'sandbox', '1.1');
-  select count(*) into v_n from public.device_tokens where token = 'tok-1' and user_id = a and app_version = '1.1';
+  perform public.register_device('65dcf16ea3dfa49069628089eb4a75483070f5584b2a21ee64912b5f621f12da', 'sandbox', '1.0');
+  begin
+    perform public.register_device('not-a-token', 'sandbox', '1.0');
+    raise exception 'a malformed push token was accepted';
+  exception when others then
+    if sqlerrm <> 'invalid_token' then raise; end if;
+  end;
+  perform public.register_device('65dcf16ea3dfa49069628089eb4a75483070f5584b2a21ee64912b5f621f12da', 'sandbox', '1.1');
+  select count(*) into v_n from public.device_tokens where token = '65dcf16ea3dfa49069628089eb4a75483070f5584b2a21ee64912b5f621f12da' and user_id = a and app_version = '1.1';
   if v_n <> 1 then raise exception 'register_device twice: % rows', v_n; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
-  perform public.unregister_device('tok-1');
-  if not exists (select 1 from public.device_tokens where token = 'tok-1' and user_id = a) then raise exception 'unregister_device removed another player''s token'; end if;
-  perform public.register_device('tok-1', 'sandbox');
-  if (select user_id from public.device_tokens where token = 'tok-1') <> b then raise exception 'register_device did not move the token to its new owner'; end if;
-  perform public.unregister_device('tok-1');
-  if exists (select 1 from public.device_tokens where token = 'tok-1') then raise exception 'unregister_device kept the token'; end if;
+  perform public.unregister_device('65dcf16ea3dfa49069628089eb4a75483070f5584b2a21ee64912b5f621f12da');
+  if not exists (select 1 from public.device_tokens where token = '65dcf16ea3dfa49069628089eb4a75483070f5584b2a21ee64912b5f621f12da' and user_id = a) then raise exception 'unregister_device removed another player''s token'; end if;
+  perform public.register_device('65dcf16ea3dfa49069628089eb4a75483070f5584b2a21ee64912b5f621f12da', 'sandbox');
+  if (select user_id from public.device_tokens where token = '65dcf16ea3dfa49069628089eb4a75483070f5584b2a21ee64912b5f621f12da') <> b then raise exception 'register_device did not move the token to its new owner'; end if;
+  perform public.unregister_device('65dcf16ea3dfa49069628089eb4a75483070f5584b2a21ee64912b5f621f12da');
+  if exists (select 1 from public.device_tokens where token = '65dcf16ea3dfa49069628089eb4a75483070f5584b2a21ee64912b5f621f12da') then raise exception 'unregister_device kept the token'; end if;
 
   -- Courts: a court added where a seeded one stands is that court; a new one is created once and found again by its Apple place id.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
@@ -875,6 +901,21 @@ begin
     if jsonb_array_length(public.search_players('Nia P')) <> 1 then raise exception 'first name and last initial should match'; end if;
     if jsonb_array_length(public.search_players('Nia Pa')) <> 0 then raise exception 'search revealed more than the last initial'; end if;
     perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);
+    -- Strangers don't see when someone is free or busy.
+    if public.get_player(a) ? 'availability_mask' and public.get_player(a)->>'availability_mask' is not null then
+      raise exception 'a stranger saw availability';
+    end if;
+    -- Nothing in public is callable without an account.
+    select count(*) into v_n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute');
+    if v_n <> 0 then raise exception '% public functions are callable without an account', v_n; end if;
+    -- A photo path can't climb out of the player's own folder.
+    begin
+      perform public.update_profile(jsonb_build_object('photo_path', v_new::text || '/../' || a::text || '/avatar-1.jpg'));
+      raise exception 'a photo path left the player''s folder';
+    exception when others then
+      if sqlerrm <> 'invalid_photo' then raise; end if;
+    end;
     -- A photo has to be in the player's own folder; a later birthday change can't make them under 18.
     begin
       perform public.update_profile(jsonb_build_object('photo_path', a::text || '/avatar-1.jpg'));
@@ -937,12 +978,34 @@ begin
   exception when others then
     if sqlerrm <> 'underage' then raise; end if;
   end;
+  -- The player can't just change the birthday back: the under-18 answer is remembered.
+  begin
+    perform public.update_profile(jsonb_build_object('birthday', (current_date - interval '30 years')::date));
+    raise exception 'changed an under-18 birthday after being told no';
+  exception when others then
+    if sqlerrm <> 'underage' then raise; end if;
+  end;
+  begin
+    perform public.search_players('Maya');
+    raise exception 'an under-18 sign-up searched players';
+  exception when others then
+    if sqlerrm <> 'underage' then raise; end if;
+  end;
+  update public.profiles set underage_at = null where id = v_pat2;   -- a moderator clearing a mistake
   update public.profiles set birthday = current_date - interval '18 years' where id = v_pat2;
   perform public.complete_onboarding();
 
   -- Underage deletion removes a half-onboarded account outright, with the friend request and DM it opened.
   insert into public.profiles (id, first_name, last_name) values (d, 'Sam', 'Lee');
   perform set_config('request.jwt.claims', json_build_object('sub', d, 'role', 'authenticated')::text, true);
+  -- No birthday yet: nothing social works (0024).
+  begin
+    perform public.add_friend(a);
+    raise exception 'a sign-up without a birthday added a friend';
+  exception when others then
+    if sqlerrm <> 'age_required' then raise; end if;
+  end;
+  update public.profiles set birthday = current_date - interval '20 years' where id = d;
   v_friend := public.add_friend(a);
   perform public.internal_delete_account(d, 'underage');
   if exists (select 1 from public.profiles where id = d) then raise exception 'underage profile kept'; end if;

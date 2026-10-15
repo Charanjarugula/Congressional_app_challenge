@@ -112,7 +112,7 @@ struct AddFriendsView: View {
             SectionHeader(title: "From your contacts", top: 24)
             Card(padding: 16) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Find friends who are already here. Only hashed phone numbers and emails are checked; your address book is never uploaded.")
+                    Text("Find friends who are already here. Only hashed email addresses are checked; your address book is never uploaded.")
                         .font(CourtlyFont.secondary)
                         .foregroundStyle(CourtlyColor.secondary)
                     ActionButton(title: "Check my contacts") {

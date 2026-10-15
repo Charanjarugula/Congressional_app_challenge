@@ -3,6 +3,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { signES256 } from "../_shared/apple-jwt.ts";
+import { webhookSecretMatches } from "../_shared/webhook.ts";
 
 const IN_APP_ONLY = new Set(["friend_added", "friend_accepted"]);
 
@@ -25,7 +26,7 @@ const json = (body: unknown, status = 200) =>
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method" }, 405);
-  if (req.headers.get("x-webhook-secret") !== Deno.env.get("WEBHOOK_SECRET")) return json({ error: "forbidden" }, 403);
+  if (!(await webhookSecretMatches(req))) return json({ error: "forbidden" }, 403);
 
   const { notification_id: id } = await req.json();
   if (!id) return json({ error: "notification_id required" }, 400);

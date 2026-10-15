@@ -1,9 +1,13 @@
 import SwiftUI
 
-/// 04 · Birthday. Wheel picker; Continue is held until the player meets the minimum age.
+/// 04 · Birthday. First, where the law requires it, Apple's age range check (Declared Age Range):
+/// under 18 stops here. Then the wheel picker; Continue is held until the player meets the minimum age.
 struct BirthdayView: View {
     @Bindable var draft: OnboardingDraft
     let onContinue: () -> Void
+
+    @State private var ageCheck: AgeAssurance.Result?
+    @State private var isChecking = false
 
     private var allowedRange: ClosedRange<Date> {
         let earliest = Calendar.current.date(byAdding: .year, value: -100, to: .now) ?? .distantPast
@@ -11,6 +15,53 @@ struct BirthdayView: View {
     }
 
     var body: some View {
+        Group {
+            switch ageCheck {
+            case nil:
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.white.ignoresSafeArea())
+            case .minor?:
+                stopped(
+                    title: "Courtly is for players 18 and over",
+                    detail: "Your Apple Account shows you’re under \(OnboardingDraft.minimumAge), so you can’t use Courtly. You can delete this account now."
+                ) {
+                    LeaveSignUpButton(title: "Delete this account")
+                }
+            case .mustConfirm?:
+                stopped(
+                    title: "Confirm your age to continue",
+                    detail: "Where you live, apps confirm your age range with Apple. Courtly only learns whether you’re 18 or older."
+                ) {
+                    VStack(spacing: 4) {
+                        PrimaryButton(title: "Try again", isLoading: isChecking) { Task { await runCheck() } }
+                        LeaveSignUpButton(title: "Delete this account")
+                    }
+                }
+            case .adult?, .useBirthdayGate?:
+                birthdayStep
+            }
+        }
+        .task { if ageCheck == nil { await runCheck() } }
+    }
+
+    @MainActor
+    private func runCheck() async {
+        guard !isChecking else { return }
+        isChecking = true
+        ageCheck = await AgeAssurance.check()
+        isChecking = false
+    }
+
+    private func stopped<Footer: View>(title: String, detail: String, @ViewBuilder footer: @escaping () -> Footer) -> some View {
+        OnboardingStepView(progress: 0.3, title: title, subtitle: detail, scrolls: false) {
+            EmptyView()
+        } footer: {
+            footer()
+        }
+    }
+
+    private var birthdayStep: some View {
         OnboardingStepView(
             progress: 0.3,
             title: "When’s your birthday?",

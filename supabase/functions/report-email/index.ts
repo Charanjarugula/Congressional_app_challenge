@@ -3,13 +3,14 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.16";
+import { webhookSecretMatches } from "../_shared/webhook.ts";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method" }, 405);
-  if (req.headers.get("x-webhook-secret") !== Deno.env.get("WEBHOOK_SECRET")) return json({ error: "forbidden" }, 403);
+  if (!(await webhookSecretMatches(req))) return json({ error: "forbidden" }, 403);
 
   const to = Deno.env.get("ADMIN_EMAIL");
   const user = Deno.env.get("REPORT_SMTP_USER");

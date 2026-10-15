@@ -30,10 +30,10 @@ You post a **hit**: one time, one public court, the kind of tennis you want (cas
 - **Day-after check**: say whether each player showed up; repeated no-shows are counted (`MyHitsView`; `submit_attendance`).
 - **Safety**: block players, report them, and every report reaches the support inbox by email (`ReportView`, `BlockedPlayersView`; `report_user`, the `report-email` function).
 - **Live updates**: open chats and the hit lists refresh when another phone changes them (`RealtimeHub`).
-- **Sign in** with Apple or an email code; **delete your account** from the app (`AuthService`; the `delete-account` function).
-- **Reminders and pushes** the day before and the hour before a confirmed hit, and for requests, invites and messages, once the APNs key is configured in the backend (`send-push`, the scheduler in `0008_scheduler.sql`).
+- **Sign in** with Apple, Google or an email code; **delete your account** from the app (`AuthService`; the `delete-account` function).
+- **Reminders and pushes** the day before and the hour before a confirmed hit, and for requests, invites and messages (`send-push`, the scheduler in `0008_scheduler.sql`).
 
-Not yet: Google sign-in (the button says so until a client id exists), phone numbers (never collected), courts outside Palm Beach County, Android.
+Not yet: Android. Phone numbers are never collected.
 
 ## How it works
 

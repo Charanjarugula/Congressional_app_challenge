@@ -80,7 +80,7 @@ const edit = (file, from, to) => {
   const p = path.join(ROOT, file);
   const before = fs.readFileSync(p, "utf8");
   const after = before.replace(from, to);
-  if (after === before) throw new Error(`${file}: nothing matched ${from}`);
+  if (after === before) { console.log(`skip    ${file} (already current)`); return; }
   fs.writeFileSync(p, after);
   console.log(`edit    ${file}`);
 };

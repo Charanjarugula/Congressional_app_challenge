@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// 02b · Email code. The code from the email (six digits, or eight if the project still sends
-/// the default length); the same step for new and returning players.
+/// 02b · Email code. The six-digit code from the email (the App Review account types its eight-digit
+/// password here instead); the same step for new and returning players.
 struct EmailCodeView: View {
     let email: String
     /// Runs after the session exists; the button keeps spinning until it returns.

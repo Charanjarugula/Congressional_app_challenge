@@ -4,6 +4,7 @@ import SwiftUI
 /// Find players by name, from your contacts, or from who you already play with.
 struct AddFriendsView: View {
     @Environment(InboxStore.self) private var inbox
+    @Environment(\.navigate) private var navigate
     @State private var query = ""
     @State private var results: [SearchedPlayer] = []
     @State private var isSearching = false
@@ -44,7 +45,7 @@ struct AddFriendsView: View {
                 } else if !contactMatches.isEmpty {
                     SectionHeader(title: "From your contacts", top: 24)
                     CardRows(items: contactMatches.map(\.player)) { card in
-                        personRow(card, subtitle: card.levelAndArea.isEmpty ? "In your contacts" : card.levelAndArea, relationship: relationship(for: card.id, fallback: friendIDs.contains(card.id) ? .friend : .none))
+                        personRow(card, subtitle: card.levelAndArea.isEmpty ? "In your contacts" : card.levelAndArea, relationship: relationship(for: card.id, fallback: contactRelationship(card.id)))
                     }
                 }
                 SectionHeader(title: "Suggested for you", top: 24)
@@ -122,20 +123,28 @@ struct AddFriendsView: View {
         }
     }
 
+    /// Tapping the photo or name opens their profile; the button on the right is separate.
     private func personRow(_ card: PlayerCard, subtitle: String, relationship: Relationship) -> some View {
         HStack(spacing: 14) {
-            PlayerAvatar(card: card, size: 48)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(card.displayName)
-                    .font(CourtlyFont.bodySemibold)
-                    .foregroundStyle(CourtlyColor.ink)
-                    .lineLimit(1)
-                Text(subtitle)
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.secondary)
-                    .lineLimit(1)
+            Button { navigate(.player(card.id)) } label: {
+                HStack(spacing: 14) {
+                    PlayerAvatar(card: card, size: 48)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(card.displayName)
+                            .font(CourtlyFont.bodySemibold)
+                            .foregroundStyle(CourtlyColor.ink)
+                            .lineLimit(1)
+                        Text(subtitle)
+                            .font(CourtlyFont.caption)
+                            .foregroundStyle(CourtlyColor.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                }
+                .contentShape(Rectangle())
             }
-            Spacer(minLength: 8)
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens their profile")
             addButton(for: card, relationship: relationship)
         }
         .padding(.vertical, 12)
@@ -163,6 +172,12 @@ struct AddFriendsView: View {
     private func subtitle(for result: SearchedPlayer) -> String {
         if let mutual = result.mutualFriends.mutualLabel { return mutual }
         return result.card.levelAndArea.isEmpty ? "On Courtly" : result.card.levelAndArea
+    }
+
+    /// What the server said about a contact match, with friends known from the friend list.
+    private func contactRelationship(_ id: UUID) -> Relationship {
+        if friendIDs.contains(id) { return .friend }
+        return contactMatches.first { $0.player.id == id }?.relationship ?? .none
     }
 
     private func relationship(for id: UUID, fallback: Relationship) -> Relationship {
@@ -204,8 +219,12 @@ struct AddFriendsView: View {
         }
     }
 
+    /// Runs each time the screen appears, including coming back from a profile where a request may
+    /// have been sent or taken back, so every row shows the server's answer again.
     private func loadSuggestions() async {
         defer { isLoadingSuggestions = false }
+        relationships = [:]
+        if trimmedQuery.count >= 2 { scheduleSearch(query) }
         if let friends = try? await API.People.friends() {
             friendIDs = Set(friends.map(\.id))
         }

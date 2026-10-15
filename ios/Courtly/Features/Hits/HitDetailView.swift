@@ -263,8 +263,11 @@ struct HitDetailView: View {
                         Task { await perform { try await hits.claimInvite(invite.id) } }
                     }
                 } else {
-                    PrimaryButton(title: hit.isFull ? "Full" : "Ask to join", isEnabled: !hit.isFull, isLoading: isWorking) {
-                        Task { await perform { try await hits.requestToJoin(hit.id) } }
+                    VStack(spacing: 8) {
+                        SafetyNote()
+                        PrimaryButton(title: hit.isFull ? "Full" : "Ask to join", isEnabled: !hit.isFull, isLoading: isWorking) {
+                            Task { await perform { try await hits.requestToJoin(hit.id) } }
+                        }
                     }
                 }
             }

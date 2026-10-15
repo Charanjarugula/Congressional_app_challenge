@@ -26,4 +26,4 @@ deploy's `secrets` step passes them to the function). Without them the function 
    `select private.suspend_user('<player id>', false);`
 4. Reply to the reporter from the inbox if they left a way to reach them.
 
-Reports are kept 30 days, then removed by the `courtly-purge-reports` job.
+Reports are kept 90 days, then removed by the `courtly-purge-reports` job.

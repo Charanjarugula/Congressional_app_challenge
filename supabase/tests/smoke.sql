@@ -866,6 +866,7 @@ begin
     if exists (select 1 from jsonb_array_elements(v_feed->'near_you') e where (e->>'id')::uuid = (v_demo_hit->>'id')::uuid) then
       raise exception 'a demo hit reached a real player''s feed';
     end if;
+    if jsonb_array_length(public.search_players('Zed')) <> 0 then raise exception 'a demo account came up in name search'; end if;
     v_pulse := public.get_area_pulse();
     if (v_pulse->>'players')::int < 1 or (v_pulse->>'courts')::int < 1 or (v_pulse->>'radius_mi')::int < 25 then
       raise exception 'area pulse: %', v_pulse;
@@ -873,6 +874,7 @@ begin
     -- The demo account itself still sees the other demo players' world, and real players nearby.
     perform set_config('request.jwt.claims', json_build_object('sub', v_demo, 'role', 'authenticated')::text, true);
     if (public.get_area_pulse()->>'players')::int < 1 then raise exception 'demo pulse empty'; end if;
+    if jsonb_array_length(public.search_players('Nia')) <> 1 then raise exception 'demo account cannot find a real player by name'; end if;
     -- No home area yet: nothing to count, no error.
     update public.profiles set home_point = null where id = v_new;
     perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);

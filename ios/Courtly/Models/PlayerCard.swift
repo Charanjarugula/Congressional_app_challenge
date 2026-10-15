@@ -35,6 +35,8 @@ struct PlayerCard: Codable, Identifiable, Equatable, Hashable {
 struct ContactMatch: Codable {
     let hash: String
     let player: PlayerCard
+    /// Where this person stands with you; missing from older servers, so optional.
+    let relationship: Relationship?
 }
 
 /// A `get_friend_suggestions` row.

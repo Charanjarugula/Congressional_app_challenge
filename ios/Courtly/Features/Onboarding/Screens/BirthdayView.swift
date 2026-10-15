@@ -14,7 +14,7 @@ struct BirthdayView: View {
         OnboardingStepView(
             progress: 0.3,
             title: "When’s your birthday?",
-            subtitle: "We’ll use this to match you with players around your age.",
+            subtitle: "Only used to confirm you’re 18 or older. Other players never see it.",
             scrolls: false
         ) {
             DatePicker("Birthday", selection: $draft.birthday, in: allowedRange, displayedComponents: .date)

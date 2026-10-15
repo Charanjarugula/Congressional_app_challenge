@@ -18,12 +18,13 @@ SwiftUI (iOS 17+) talking to Supabase (Postgres with PostGIS, Auth, Storage, Edg
 | `ios/Courtly/Models` | Plain data types matching the backend's JSON shapes. |
 | `ios/Courtly/Services` | Supabase client, typed `API` wrappers, device services (location, calendar, contacts, notifications), snapshot cache. |
 | `supabase/migrations` | The schema, row-level security, and every database function the app calls, in order. |
-| `supabase/functions` | Edge Functions: `send-push`, `delete-account`, `apple-token-exchange`. |
+| `supabase/functions` | Edge Functions: `send-push`, `delete-account`, `apple-token-exchange`, `report-email` (emails each report to the support inbox). |
 | `supabase/seed` | Public courts and the blocked-words list. |
 | `supabase/demo` | The demo world: four demo players and everything the App Review account sees, rebuilt by the deploy's `demo` step. |
 | `supabase/reviewer` | The App Review account: create or update, and remove. |
 | `supabase/tests` | The smoke test that runs after each deploy, the reviewer-side check of the demo world, and a local Postgres harness. |
 | `scripts/supabase-deploy.mjs` | Deploys migrations, seeds, settings, secrets and functions through the Supabase management API. |
+| `scripts/testflight.sh` | Archives the Release app and uploads it to TestFlight with an App Store Connect API key. |
 | `site/` | Privacy policy, terms and support pages. Vercel root directory is `site`. |
 
 ## Running the app
@@ -44,7 +45,7 @@ Play, My Hits, the People list and the profile keep the last response on disk so
 
 ## Deploying the backend
 
-A push to `main` that touches `supabase/`, the deploy script or the workflow deploys the **dev** project with the default steps (`check migrate seed settings auth secrets functions test status`). Prod is deployed only by hand: run the **Backend deploy** workflow (Actions tab) with target `prod`. The workflow takes a target (`dev` or `prod`) and the steps to run. Repository secrets it reads: `SUPABASE_ACCESS_TOKEN` (required), `WEBHOOK_SECRET` and `REVIEWER_PASSWORD` (keep the push webhook and the App Review account in agreement with what is deployed), `APNS_KEY_ID`, `APNS_TEAM_ID` and `APNS_PRIVATE_KEY` (push and Sign in with Apple), `GOOGLE_CLIENT_ID`, `SMTP_USER` and `SMTP_PASS` (email codes through Gmail). `scripts/supabase-deploy.mjs` lists which step uses which. Optional steps: `reviewer` and `reviewer-remove` for the App Review account, `demo` and `demo-remove` for the world it sees (friends, chats, requests, hits); run `demo` on prod before submitting to App Review and `demo-remove` before launch. `DEMO_PASSWORD`, when set, is the demo players' sign-in password. `status` prints one line per fact about the deployed project (migrations recorded, cron jobs, grants, counts) without changing anything.
+A push to `main` that touches `supabase/`, the deploy script or the workflow deploys the **dev** project with the default steps (`check migrate seed settings auth secrets functions test status`). Prod is deployed only by hand: run the **Backend deploy** workflow (Actions tab) with target `prod`. The workflow takes a target (`dev` or `prod`) and the steps to run. Repository secrets it reads: `SUPABASE_ACCESS_TOKEN` (required), `WEBHOOK_SECRET` and `REVIEWER_PASSWORD` (keep the push webhook and the App Review account in agreement with what is deployed), `APNS_KEY_ID`, `APNS_TEAM_ID` and `APNS_PRIVATE_KEY` (push and Sign in with Apple), `GOOGLE_CLIENT_ID`, `SMTP_USER` and `SMTP_PASS` (email codes and report emails through Gmail; after changing them, run the `auth` and `secrets` steps on both projects so sign-in codes and report emails use the same password). `scripts/supabase-deploy.mjs` lists which step uses which. Optional steps: `reviewer` and `reviewer-remove` for the App Review account, `demo` and `demo-remove` for the world it sees (friends, chats, requests, hits); run `demo` on prod before submitting to App Review and `demo-remove` before launch. `DEMO_PASSWORD`, when set, is the demo players' sign-in password. `status` prints one line per fact about the deployed project (migrations recorded, cron jobs, grants, counts) without changing anything.
 
 ### Auth configuration
 

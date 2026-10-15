@@ -111,7 +111,10 @@ struct PlanHitView: View {
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            PrimaryButton(title: postTitle, isEnabled: canPost, isLoading: isPosting, action: post)
+            VStack(spacing: 8) {
+                SafetyNote()
+                PrimaryButton(title: postTitle, isEnabled: canPost, isLoading: isPosting, action: post)
+            }
                 .padding(.horizontal, CourtlyMetrics.screenPadding)
                 .padding(.top, 8)
                 .padding(.bottom, 16)

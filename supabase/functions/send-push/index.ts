@@ -4,6 +4,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { signES256 } from "../_shared/apple-jwt.ts";
 import { webhookSecretMatches } from "../_shared/webhook.ts";
+import { json } from "../_shared/http.ts";
 
 const IN_APP_ONLY = new Set(["friend_added", "friend_accepted"]);
 
@@ -20,9 +21,6 @@ async function providerToken(): Promise<string> {
   cachedToken = { value, issuedAt: now };
   return value;
 }
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method" }, 405);

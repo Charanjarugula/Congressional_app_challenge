@@ -519,6 +519,7 @@ struct ProfilePhotoButton: View {
     let card: PlayerCard
     var size: CGFloat = 96
 
+    @State private var showsPicker = false
     @State private var pickerItem: PhotosPickerItem?
     @State private var photoToCrop: CropTarget?
     @State private var pending: UIImage?   // shown while it uploads
@@ -526,7 +527,7 @@ struct ProfilePhotoButton: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        PhotosPicker(selection: $pickerItem, matching: .images) {
+        Button { showsPicker = true } label: {
             ZStack(alignment: .bottomTrailing) {
                 Group {
                     if let pending {
@@ -554,15 +555,20 @@ struct ProfilePhotoButton: View {
         .buttonStyle(.plain)
         .disabled(isWorking)
         .accessibilityLabel("Change profile photo")
+        .photosPicker(isPresented: $showsPicker, selection: $pickerItem, matching: .images)
         .onChange(of: pickerItem) { _, item in load(item) }
-        .fullScreenCover(item: $photoToCrop) { target in
-            PhotoCropView(image: target.image) {
-                photoToCrop = nil
-                pickerItem = nil
-            } onChoose: { cropped in
-                photoToCrop = nil
-                pickerItem = nil   // the same photo can be picked and framed again
-                upload(cropped)
+        // The cropper hangs off its own view, not the picker's: two presentations on one view can
+        // leave the second stuck on screen after the first one closes.
+        .background {
+            Color.clear.fullScreenCover(item: $photoToCrop) { target in
+                PhotoCropView(image: target.image) {
+                    photoToCrop = nil
+                    pickerItem = nil
+                } onChoose: { cropped in
+                    photoToCrop = nil
+                    pickerItem = nil   // the same photo can be picked and framed again
+                    upload(cropped)
+                }
             }
         }
         .errorAlert($errorMessage, title: "Couldn’t change your photo")
@@ -576,6 +582,9 @@ struct ProfilePhotoButton: View {
             // Decoding a camera photo is slow; off the main thread, kept large enough to zoom in sharply.
             if let data = try? await item.loadTransferable(type: Data.self),
                let image = await Task.detached(priority: .userInitiated, operation: { UIImage(data: data)?.downscaled(to: 1800) }).value {
+                // Let the photo library finish sliding away before the cropper comes up.
+                for _ in 0..<40 where showsPicker { try? await Task.sleep(for: .milliseconds(50)) }
+                try? await Task.sleep(for: .milliseconds(350))
                 photoToCrop = CropTarget(image: image)
             } else {
                 pickerItem = nil   // so picking the same photo again tries again

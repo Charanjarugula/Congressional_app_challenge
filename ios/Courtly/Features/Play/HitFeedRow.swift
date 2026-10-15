@@ -74,14 +74,7 @@ struct HitFeedRow: View {
                         .accessibilityLabel("Open in Maps")
                     }
                     if hit.hasPendingRequest {
-                        VStack(spacing: 6) {
-                            ActionButton(title: "Requested", style: .grouped, isEnabled: false) {}
-                            Button("Cancel request") { cancel() }
-                                .font(CourtlyFont.secondarySemibold)
-                                .foregroundStyle(CourtlyColor.red)
-                                .frame(maxWidth: .infinity)
-                                .disabled(isJoining)
-                        }
+                        ActionButton(title: "Requested", style: .grouped, isLoading: isJoining) { cancel() }
                     } else {
                         ActionButton(title: "Request to join", isLoading: isJoining) { join() }
                     }

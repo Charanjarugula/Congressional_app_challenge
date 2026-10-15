@@ -19,7 +19,10 @@ Deno.serve(async (req) => {
 
   const { authorization_code: code } = await req.json();
   if (!code) return json({ error: "authorization_code required" }, 400);
-  if (!Deno.env.get("APPLE_SIWA_PRIVATE_KEY")) return json({ error: "apple_not_configured" }, 503);
+  if (!Deno.env.get("APPLE_SIWA_PRIVATE_KEY")) {
+    console.error("apple exchange skipped: APPLE_SIWA_PRIVATE_KEY is not set");
+    return json({ error: "apple_not_configured" }, 503);
+  }
 
   const form = new URLSearchParams({
     client_id: Deno.env.get("APPLE_CLIENT_ID")!,
@@ -33,7 +36,11 @@ Deno.serve(async (req) => {
     body: form,
   });
   const data = await response.json();
-  if (!response.ok || !data.refresh_token) return json({ error: "apple_exchange_failed", detail: data }, 502);
+  if (!response.ok || !data.refresh_token) {
+    // Without a stored token, account deletion can't revoke this player's Apple sign-in; make it visible.
+    console.error(`apple exchange failed ${response.status}: ${data?.error ?? "no refresh_token"}`);
+    return json({ error: "apple_exchange_failed", detail: data }, 502);
+  }
 
   const { error } = await admin.rpc("internal_store_apple_token", { p_user: user.id, p_refresh_token: data.refresh_token });
   if (error) return json({ error: error.message }, 500);

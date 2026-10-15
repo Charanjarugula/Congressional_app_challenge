@@ -13,6 +13,7 @@ struct ReportView: View {
     @State private var alsoBlock = false
     @State private var isSending = false
     @State private var errorMessage: String?
+    @State private var sentAndBlocked: Bool?   // set once the report lands: shows the thank-you first
 
     var body: some View {
         VStack(spacing: 0) {
@@ -91,6 +92,13 @@ struct ReportView: View {
         }
         .preferredColorScheme(.light)
         .errorAlert($errorMessage, title: "Couldn’t send the report")
+        .alert("Report sent", isPresented: Binding(get: { sentAndBlocked != nil }, set: { _ in })) {
+            Button("OK") { onDone(sentAndBlocked ?? false) }
+        } message: {
+            Text(sentAndBlocked == true
+                 ? "Thanks. We review every report within 24 hours. You’ve also blocked \(player.firstName)."
+                 : "Thanks. We review every report within 24 hours.")
+        }
     }
 
     private func send() {
@@ -100,7 +108,7 @@ struct ReportView: View {
             do {
                 try await API.People.report(player.id, reason: reason, details: nil, alsoBlock: alsoBlock, hitID: hitID, messageID: message?.id)
                 isSending = false
-                onDone(alsoBlock)
+                sentAndBlocked = alsoBlock
             } catch {
                 isSending = false
                 errorMessage = error.localizedDescription

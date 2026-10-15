@@ -26,33 +26,47 @@ Deno.serve(async (req) => {
   const steps: Record<string, string> = {};
   const tryAgain = (error: string, message: string, status: number) => json({ error, message, steps }, status);
 
-  // Apple requires revoking the token when the account is deleted. A token Apple no longer recognises
-  // (400) is fine; Apple being unreachable is not: nothing is deleted yet, and the app says to try again.
-  // Without the Apple keys configured there is nothing to revoke with, and deletion must still work.
+  // Apple requires revoking the token when the account is deleted. Apple being unreachable (network
+  // or 5xx) stops here: nothing is deleted yet, and the app says to try again. Apple answering
+  // invalid_grant means the token is already dead, which is fine. Anything else (our key or client
+  // id wrong) is logged loudly but doesn't trap the player in an account they asked to delete.
   const { data: refreshToken, error: tokenError } = await admin.rpc("internal_apple_refresh_token", { p_user: user.id });
   if (tokenError) return tryAgain("apple_token_lookup", tokenError.message, 500);
   if (refreshToken && Deno.env.get("APPLE_SIWA_PRIVATE_KEY")) {
-    let status = 0;
+    let clientSecret: string | null = null;
     try {
-      const form = new URLSearchParams({
-        client_id: Deno.env.get("APPLE_CLIENT_ID")!,
-        client_secret: await appleClientSecret(),
-        token: refreshToken,
-        token_type_hint: "refresh_token",
-      });
-      const response = await fetch("https://appleid.apple.com/auth/revoke", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: form,
-      });
-      status = response.status;
-    } catch {
-      status = 0;
+      clientSecret = await appleClientSecret();
+    } catch (error) {
+      console.error("apple revoke: client secret could not be made; check APPLE_SIWA_* secrets", error);
+      steps.apple = "config error: client secret";
     }
-    if (!(status >= 200 && status < 300) && status !== 400) {
-      return tryAgain("apple_revoke_failed", "Apple couldn’t be reached to revoke your sign-in. Try again in a few minutes.", 503);
+    if (clientSecret) {
+      let status = 0;
+      let appleError = "";
+      try {
+        const response = await fetch("https://appleid.apple.com/auth/revoke", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: Deno.env.get("APPLE_CLIENT_ID")!,
+            client_secret: clientSecret,
+            token: refreshToken,
+            token_type_hint: "refresh_token",
+          }),
+        });
+        status = response.status;
+        if (status === 400) appleError = String((await response.json().catch(() => ({})))?.error ?? "");
+      } catch {
+        status = 0;
+      }
+      if (status === 0 || status >= 500) {
+        return tryAgain("apple_revoke_failed", "Apple couldn’t be reached to revoke your sign-in. Try again in a few minutes.", 503);
+      }
+      if (status === 400 && appleError !== "invalid_grant") {
+        console.error(`apple revoke refused: ${appleError || "unknown"}; check APPLE_CLIENT_ID and the Sign in with Apple key`);
+      }
+      steps.apple = status === 400 ? `revoke 400 ${appleError || "unknown"}` : `revoke ${status}`;
     }
-    steps.apple = `revoke ${status}`;
   } else {
     steps.apple = refreshToken ? "keys not configured" : "no token";
   }

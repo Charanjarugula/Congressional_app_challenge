@@ -19,19 +19,32 @@ struct BirthdayView: View {
         ) {
             DatePicker("Birthday", selection: $draft.birthday, in: allowedRange, displayedComponents: .date)
                 .datePickerStyle(.wheel)
+                .onChange(of: draft.birthday) { _, _ in draft.birthdayChosen = true }
                 .labelsHidden()
                 .frame(maxWidth: .infinity)
                 .frame(height: 216)
                 .padding(.top, 32)
 
-            if !draft.meetsMinimumAge {
+            if !draft.birthdayChosen {
+                Text("Scroll to your birthday.")
+                    .font(CourtlyFont.caption)
+                    .foregroundStyle(CourtlyColor.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 12)
+            } else if !draft.meetsMinimumAge {
                 Text("Courtly is for players \(OnboardingDraft.minimumAge) and over.")
                     .font(CourtlyFont.caption)
                     .foregroundStyle(CourtlyColor.red)
+                    .frame(maxWidth: .infinity)
                     .padding(.top, 12)
             }
         } footer: {
-            PrimaryButton(title: "Continue", isEnabled: draft.meetsMinimumAge, action: onContinue)
+            VStack(spacing: 4) {
+                PrimaryButton(title: "Continue", isEnabled: draft.birthdayChosen && draft.meetsMinimumAge, action: onContinue)
+                if draft.birthdayChosen && !draft.meetsMinimumAge {
+                    LeaveSignUpButton(title: "Delete this account")
+                }
+            }
         }
     }
 }

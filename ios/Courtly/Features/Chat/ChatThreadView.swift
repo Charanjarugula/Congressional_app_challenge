@@ -120,9 +120,15 @@ struct ChatThreadView: View {
         }
         .sheet(item: $reporting) { message in
             if let sender = message.sender {
-                ReportView(player: sender, message: message) { _ in
+                ReportView(player: sender, message: message) { blocked in
                     reporting = nil
-                    Task { await refresh() }
+                    if blocked {
+                        // They can't be messaged any more; leave the thread instead of failing on the next send.
+                        Task { await inbox.load() }
+                        navigate.pop()
+                    } else {
+                        Task { await refresh() }
+                    }
                 }
             }
         }

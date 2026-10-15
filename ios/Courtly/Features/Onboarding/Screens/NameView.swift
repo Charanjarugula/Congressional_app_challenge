@@ -36,7 +36,10 @@ struct NameView: View {
             )
             .padding(.top, 28)
         } footer: {
-            PrimaryButton(title: "Continue", isEnabled: canContinue, action: onContinue)
+            VStack(spacing: 4) {
+                PrimaryButton(title: "Continue", isEnabled: canContinue, action: onContinue)
+                LeaveSignUpButton()
+            }
         }
         .task {
             try? await Task.sleep(for: .milliseconds(400))

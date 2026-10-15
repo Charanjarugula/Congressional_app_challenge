@@ -252,11 +252,12 @@ enum API {
         }
 
         /// The server removes hits, chats, photos and the sign-in; the device forgets everything afterwards.
-        static func delete() async throws {
+        /// `mode` "full" anonymizes a finished account; "underage" removes one that never finished sign-up.
+        static func delete(mode: String = "full") async throws {
             struct Receipt: Decodable {
                 let deleted: Bool?
             }
-            let _: Receipt = try await client.invoke("delete-account", body: ["mode": "full"])
+            let _: Receipt = try await client.invoke("delete-account", body: ["mode": mode])
         }
     }
 

@@ -77,16 +77,24 @@ struct CreateAccountView: View {
         }
     }
 
+    /// The two names are real links to the pages, opened in Safari.
     private var termsText: some View {
-        (Text("By continuing, you are agreeing to our ")
-            + Text("Terms of Service").fontWeight(.semibold).underline().foregroundStyle(CourtlyColor.ink)
-            + Text(" and ")
-            + Text("Privacy Policy").fontWeight(.semibold).underline().foregroundStyle(CourtlyColor.ink)
-            + Text("."))
+        Text(termsMarkdown)
             .font(CourtlyFont.caption)
             .foregroundStyle(CourtlyColor.secondary)
+            .tint(CourtlyColor.ink)
             .multilineTextAlignment(.center)
             .lineSpacing(3)
+    }
+
+    private var termsMarkdown: AttributedString {
+        var text = (try? AttributedString(markdown: "By continuing, you are agreeing to our [Terms of Service](\(AppConfig.termsURL.absoluteString)) and [Privacy Policy](\(AppConfig.privacyURL.absoluteString)).")) ?? AttributedString("By continuing, you are agreeing to our Terms of Service and Privacy Policy.")
+        for run in text.runs where run.link != nil {
+            text[run.range].font = CourtlyFont.captionSemibold
+            text[run.range].underlineStyle = .single
+            text[run.range].foregroundColor = CourtlyColor.ink
+        }
+        return text
     }
 
     private func continueWithEmail() {

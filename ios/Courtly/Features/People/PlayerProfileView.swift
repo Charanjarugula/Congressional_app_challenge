@@ -8,6 +8,7 @@ struct PlayerProfileView: View {
 
     @Environment(HitsStore.self) private var hits
     @Environment(InboxStore.self) private var inbox
+    @Environment(AppSession.self) private var session
     @Environment(\.navigate) private var navigate
     @State private var profile: PlayerProfile?
     @State private var loadFailed = false
@@ -286,6 +287,7 @@ struct PlayerProfileView: View {
     private func afterBlock() async {
         await inbox.load()
         await hits.refreshAll()
+        await session.refreshProfile()   // the Blocked players count on You
         navigate.pop()
     }
 }

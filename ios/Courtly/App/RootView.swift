@@ -13,6 +13,7 @@ struct RootView: View {
                     .transition(.opacity)
             case let .onboarding(resume):
                 OnboardingFlow(resumeProfile: resume)
+                    .id("\(resume)-\(session.signOutCount)")   // a sign-out or switch never keeps the old screens or draft
                     .transition(.opacity)
             case .main:
                 MainTabView(account: session.profile?.id)

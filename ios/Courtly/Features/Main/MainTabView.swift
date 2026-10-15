@@ -265,6 +265,8 @@ struct MainTabView: View {
     private func stack(for tab: MainTab) -> some View {
         NavigationStack(path: path(for: tab)) {
             root(for: tab)
+                // Room under the last row so the floating plus never covers it.
+                .contentMargins(.bottom, 76, for: .scrollContent)
                 .toolbar(.hidden, for: .tabBar)
                 .navigationDestination(for: AppRoute.self) { route in
                     destination(route)

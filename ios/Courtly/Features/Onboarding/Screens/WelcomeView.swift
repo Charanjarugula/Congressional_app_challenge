@@ -9,10 +9,13 @@ struct WelcomeView: View {
         ZStack(alignment: .top) {
             CourtlyColor.blue.ignoresSafeArea()
 
-            CourtLinesArt()
-                .padding(.top, 90)
-                .ignoresSafeArea(edges: .top)
-                .accessibilityHidden(true)
+            // On short screens (iPhone SE) the art shrinks so it stays clear of the headline.
+            GeometryReader { proxy in
+                CourtLinesArt()
+                    .frame(maxWidth: .infinity, maxHeight: max(0, proxy.size.height - 330), alignment: .top)
+                    .padding(.top, 40)
+            }
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 0) {
                 Spacer()

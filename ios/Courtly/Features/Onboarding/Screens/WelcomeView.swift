@@ -22,14 +22,20 @@ struct WelcomeView: View {
                 Text("Courtly")
                     .font(CourtlyFont.secondarySemibold)
                     .tracking(0.2)
-                Text("Play more tennis.\nPlan less.")
+                Text("Hit more.\nPlan less.")
                     .font(.system(size: 38, weight: .bold))
                     .tracking(-0.8)
                     .lineSpacing(1)
                     .padding(.top, 10)
-                PrimaryButton(title: "Get started", style: .white, action: onGetStarted)
+                PrimaryButton(title: "Get started", style: .lime, action: onGetStarted)
                     .padding(.top, 36)
-                TextActionButton(title: "I already have an account", color: .white, action: onSignIn)
+                Button(action: onSignIn) {
+                    Text("I already have an account")
+                        .font(CourtlyFont.secondarySemibold)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                }
+                .buttonStyle(PressableButtonStyle())
             }
             .foregroundStyle(.white)
             .padding(.horizontal, CourtlyMetrics.screenPadding)
@@ -62,9 +68,6 @@ struct CourtLinesArt: View {
         Line(x1: 201, y1: 130, x2: 201, y2: 300, width: 2),
         Line(x1: 201, y1: 60, x2: 201, y2: 66, width: 2),
         Line(x1: 201, y1: 392, x2: 201, y2: 400, width: 2),
-        Line(x1: 40, y1: 215, x2: 362, y2: 215, width: 4, opacity: 0.9),
-        Line(x1: 40, y1: 200, x2: 40, y2: 217, width: 3),
-        Line(x1: 362, y1: 200, x2: 362, y2: 217, width: 3),
     ]
 
     var body: some View {
@@ -80,6 +83,11 @@ struct CourtLinesArt: View {
                     style: StrokeStyle(lineWidth: line.width * scale, lineCap: .round)
                 )
             }
+            // Exact clean-net artwork from the approved Figma frame, on the same 402×420 canvas.
+            context.draw(
+                Image("WelcomeNet"),
+                in: CGRect(x: 37.5 * scale, y: 164 * scale, width: 327 * scale, height: 57 * scale)
+            )
             let shadow = Path(ellipseIn: CGRect(x: 293 * scale, y: 335 * scale, width: 18 * scale, height: 6 * scale))
             context.fill(shadow, with: .color(CourtlyColor.blueDeep))
             let ball = Path(ellipseIn: CGRect(x: 293 * scale, y: 321 * scale, width: 14 * scale, height: 14 * scale))

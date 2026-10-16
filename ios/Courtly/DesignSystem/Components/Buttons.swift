@@ -10,13 +10,25 @@ struct PressableButtonStyle: ButtonStyle {
     }
 }
 
-/// 52pt tall, 14pt radius. Blue on white screens, white on the blue welcome screen.
+/// 52pt tall, 14pt radius. Explicit styles keep screen-specific accents local.
 struct PrimaryButton: View {
     enum Style {
-        case blue, white
+        case blue, white, lime
 
-        var background: Color { self == .blue ? CourtlyColor.blue : .white }
-        var foreground: Color { self == .blue ? .white : CourtlyColor.blue }
+        var background: Color {
+            switch self {
+            case .blue: CourtlyColor.blue
+            case .white: .white
+            case .lime: CourtlyColor.lime
+            }
+        }
+        var foreground: Color {
+            switch self {
+            case .blue: .white
+            case .white: CourtlyColor.blue
+            case .lime: CourtlyColor.ink
+            }
+        }
     }
 
     let title: String

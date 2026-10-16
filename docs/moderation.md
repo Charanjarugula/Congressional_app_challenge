@@ -16,7 +16,7 @@ deploy's `secrets` step passes them to the function). Without them the function 
 
 ## Launch owner
 
-Charan Jarugula confirmed on October 16, 2026 that he can access courtly.support@gmail.com and will monitor it daily. The production audit found two open reports; review those before launch.
+Charan Jarugula confirmed on October 16, 2026 that he can access courtly.support@gmail.com and will monitor it daily. The two production reports were reviewed on October 16, 2026 under owner authorization and marked `reviewed`: one was an explicit delivery test and the other contained an ordinary tennis invitation with no abusive content. No suspension was warranted; the original records remain intact.
 
 ## Every day
 

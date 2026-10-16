@@ -1,6 +1,6 @@
 # App Store launch
 
-Courtly’s first release is free, U.S.-only, and for players 18 and older. The listing stays in Prepare for Submission until the release checklist below is complete. Release is manual so approval does not publish the app unexpectedly.
+Courtly’s first release is free, U.S.-only, and for players 18 and older. The listing is Ready for Review in a draft submission; it has not been submitted to Apple. Release is manual so approval does not publish the app unexpectedly.
 
 ## Listing assets
 
@@ -20,14 +20,14 @@ Refresh demo hits before submission if they have moved into history. Keep the ba
 ## Submission gate
 
 - [x] Five screenshots exported from Figma at each of two iPhone sizes, visually inspected, uploaded, and processed (`COMPLETE`, no errors).
-- [ ] Final build selected, with icon and privacy manifest verified in its archive.
+- [x] Build `202610161852` selected, processed as VALID / APP_STORE_ELIGIBLE, and available in TestFlight; icon and privacy manifest verified in its archive.
 - [x] Production review account signs in with the exact code saved in App Store Connect; `get_me` returns HTTP 200.
 - [x] Privacy label published with owner approval; manifest updated to match. Deploy the policy changes in this PR before submission.
 - [x] 18+ override retained; age assurance declared for the existing Declared Age Range integration; content rights confirmed by owner and saved. Archive declares no non-exempt encryption.
 - [x] Free price and U.S.-only availability saved. Mac and Vision Pro distribution disabled for this iPhone-focused launch.
 - [x] Free Apps Agreement is Active in App Store Connect. No new agreement accepted.
 - [x] Charan confirmed access to the support inbox and daily monitoring; moderation procedure documented.
-- [ ] Owner reviews the two outstanding production reports before launch.
+- [x] Both production reports reviewed under owner authorization and marked `reviewed`; no suspension warranted.
 - [ ] New-user, returning-user, report/block, account deletion, and permission-denial journeys verified on the final build.
 - [ ] User approves the finished listing and authorizes submission to Apple.
 
@@ -53,7 +53,7 @@ The archive manifest and App Store privacy questionnaire are separate declaratio
 
 ## Evidence
 
-2026-10-16 production check: [backend run](https://github.com/Charanjarugula/Congressional_app_challenge/actions/runs/38949610819) passed smoke tests; 29 migrations recorded through `0032_start_time_only.sql`; no failed cron runs in the preceding 24 hours. Review account present. The audit found no moderator account and two open reports, which require owner follow-up.
+2026-10-16 production check: [backend run](https://github.com/Charanjarugula/Congressional_app_challenge/actions/runs/38949610819) passed smoke tests; 29 migrations recorded through `0032_start_time_only.sql`; no failed cron runs in the preceding 24 hours. Review account present. The audit found no moderator account and two open reports. Support email delivery was confirmed in the inbox; both production reports have since been reviewed and marked `reviewed`. No player was suspended.
 
 ## Apple references
 

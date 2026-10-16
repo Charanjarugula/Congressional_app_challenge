@@ -30,7 +30,7 @@ struct Court: Codable, Identifiable, Hashable {
     var detailLine: String? {
         var parts: [String] = []
         if let surface, !surface.isEmpty { parts.append(surface.capitalized) }
-        if lights == true { parts.append("Lights") }
+        if let lights { parts.append(lights ? "Lights" : "No lights") }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 

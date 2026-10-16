@@ -9,8 +9,8 @@ struct HitSummary: View {
     private var availabilityLabel: String {
         if hit.status == .cancelled { return "This hit is no longer happening" }
         if hit.status == .expired { return "This hit has expired" }
-        if hit.status == .played { return "\(hit.durationMin) min · \(hit.format.shortTitle)" }
-        return hit.spotsOpen > 0 ? "\(hit.durationMin) min · \(hit.spotsLabel) open" : "\(hit.durationMin) min · All set"
+        if hit.status == .played { return [hit.durationLabel, hit.format.shortTitle].compactMap { $0 }.joined(separator: " · ") }
+        return [hit.durationLabel, hit.spotsOpen > 0 ? "\(hit.spotsLabel) open" : "All set"].compactMap { $0 }.joined(separator: " · ")
     }
 
     var body: some View {

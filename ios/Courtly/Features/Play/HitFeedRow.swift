@@ -37,7 +37,7 @@ struct HitFeedRow: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        Text("\(hit.dateText) · \(hit.clockText) · \(hit.durationMin) min")
+                        Text([hit.dateText, hit.clockText, hit.durationLabel].compactMap { $0 }.joined(separator: " · "))
                             .font(CourtlyFont.secondary)
                             .foregroundStyle(CourtlyColor.ink)
                         Button(action: openInMaps) {
@@ -96,7 +96,7 @@ struct HitFeedRow: View {
     /// showing it here saves the tap.
     private var clashingHit: Hit? {
         (hits.myHits?.upcoming ?? []).first { mine in
-            mine.id != hit.id && mine.isMember && mine.isLive && mine.startsAt < hit.endsAt && mine.endsAt > hit.startsAt
+            mine.id != hit.id && mine.isMember && mine.isLive && mine.overlaps(hit)
         }
     }
 

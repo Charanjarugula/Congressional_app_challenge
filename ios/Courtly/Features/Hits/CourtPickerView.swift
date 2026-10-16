@@ -1,7 +1,7 @@
 import MapKit
 import SwiftUI
 
-/// Courts near you first; search Apple Maps for a park or tennis center to add one.
+/// Search places or full street addresses, then confirm the exact location and court details.
 struct CourtPickerView: View {
     let courts: [Court]
     let selected: Court?
@@ -13,6 +13,8 @@ struct CourtPickerView: View {
     @State private var results: [PlaceResult] = []
     @State private var isSearching = false
     @State private var addingID: String?
+    @State private var chosenPlace: PlaceResult?
+    @State private var searchError: String?
     @State private var searchTask: Task<Void, Never>?
     @State private var errorMessage: String?
 
@@ -25,7 +27,7 @@ struct CourtPickerView: View {
                     FieldBox(fill: .white, cornerRadius: 22) {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(CourtlyColor.secondary)
-                        TextField("Search courts or parks", text: $query)
+                        TextField("Address, court, or place name", text: $query)
                             .font(CourtlyFont.body)
                             .autocorrectionDisabled()
                             .submitLabel(.search)
@@ -57,10 +59,17 @@ struct CourtPickerView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("cancelCourtSearch")
                         .disabled(addingID != nil)   // a court is being added; closing now would hand it back to a closed sheet
                 }
             }
             .onChange(of: query) { _, newValue in scheduleSearch(newValue) }
+            .onDisappear { searchTask?.cancel() }
+            .sheet(item: $chosenPlace) { place in
+                CourtLocationConfirmation(place: place) { name, surface, lights in
+                    try await save(place, name: name, surface: surface, lights: lights)
+                }
+            }
             .interactiveDismissDisabled(addingID != nil)
             .errorAlert($errorMessage, title: "Couldn’t add that court")
         }
@@ -73,12 +82,11 @@ struct CourtPickerView: View {
     private var nearbySection: some View {
         SectionHeader(title: "Near you")
         if courts.isEmpty {
-            QuietCard(title: "No courts near you yet", detail: "Search for a park or tennis center above to add one.")
+            QuietCard(title: "No courts near you yet", detail: "Search a full address or place name to add a court.")
         } else {
             CardRows(items: courts, radius: 22) { court in
                 Button {
-                    onPick(court)
-                    dismiss()
+                    chosenPlace = PlaceResult(court: court)
                 } label: {
                     HStack(spacing: 14) {
                         VStack(alignment: .leading, spacing: 1) {
@@ -100,7 +108,7 @@ struct CourtPickerView: View {
                 }
                 .buttonStyle(.plain)
             }
-            Text("Can’t find it? Search for the park or tennis center above and we’ll add it.")
+            Text("Search by street address, court, or park name. Include a city for more precise results.")
                 .font(CourtlyFont.caption)
                 .foregroundStyle(CourtlyColor.secondary)
                 .padding(.top, 12)
@@ -110,14 +118,17 @@ struct CourtPickerView: View {
     @ViewBuilder
     private var resultsSection: some View {
         SectionHeader(title: isSearching ? "Searching…" : "Results")
-        if results.isEmpty {
+        if let searchError {
+            QuietCard(title: "Couldn’t search places", detail: searchError)
+            Button("Try again") { scheduleSearch(query) }.padding(.top, 12)
+        } else if results.isEmpty {
             if !isSearching {
-                QuietCard(title: "No places found", detail: "Try the park or tennis center’s name.")
+                QuietCard(title: "No places found", detail: "Try a full street address with its city, or a court name.")
             }
         } else {
             CardRows(items: results, radius: 22) { place in
                 Button {
-                    add(place)
+                    chosenPlace = place
                 } label: {
                     HStack(spacing: 14) {
                         Image(systemName: "mappin.circle.fill")
@@ -139,7 +150,7 @@ struct CourtPickerView: View {
                         if addingID == place.id {
                             ProgressView().controlSize(.small)
                         } else {
-                            Text("Use")
+                            Text("Review")
                                 .font(CourtlyFont.secondarySemibold)
                                 .foregroundStyle(CourtlyColor.blue)
                                 .padding(.horizontal, 14)
@@ -159,7 +170,7 @@ struct CourtPickerView: View {
 
     private func courtDetail(_ court: Court) -> String {
         var parts: [String] = []
-        if let city = court.city { parts.append(city) }
+        if let address = court.address ?? court.city { parts.append(address) }
         if let miles = court.miles { parts.append(HitFormatting.miles(miles)) }
         if let played = court.playedCount, played > 0 { parts.append(played == 1 ? "Played here once" : "Played here \(played) times") }
         return parts.joined(separator: " · ")
@@ -169,6 +180,7 @@ struct CourtPickerView: View {
 
     private func scheduleSearch(_ text: String) {
         searchTask?.cancel()
+        searchError = nil
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 2 else {
             results = []
@@ -188,31 +200,49 @@ struct CourtPickerView: View {
                     latitudinalMeters: 80_000, longitudinalMeters: 80_000
                 )
             }
-            let response = try? await MKLocalSearch(request: request).start()
-            guard !Task.isCancelled else { return }
-            results = (response?.mapItems ?? []).compactMap(PlaceResult.init)
+            do {
+                let response = try await MKLocalSearch(request: request).start()
+                guard !Task.isCancelled else { return }
+                results = response.mapItems.compactMap(PlaceResult.init)
+            } catch {
+                guard !Task.isCancelled else { return }
+                results = []
+                searchError = "Check your connection and try again."
+            }
             isSearching = false
         }
     }
 
-    private func add(_ place: PlaceResult) {
+    private func save(_ place: PlaceResult, name: String, surface: String?, lights: Bool?) async throws {
+        if let existing = place.existingCourt, existing.surface == surface, existing.lights == lights {
+            onPick(existing)
+            chosenPlace = nil
+            dismiss()
+            return
+        }
         guard addingID == nil else { return }
         addingID = place.id
-        Task { @MainActor in
-            do {
-                let court = try await API.Courts.add(
-                    name: place.name, address: place.address, city: place.city,
-                    latitude: place.coordinate.latitude, longitude: place.coordinate.longitude,
-                    applePlaceID: place.appleID, timeZone: place.timeZone
-                )
-                onPick(court)
-                dismiss()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            addingID = nil
+        defer { addingID = nil }
+        // Resolve the place's zone, never silently schedule a remote court in the player's zone.
+        var zone = place.timeZone
+        if zone == nil {
+            let placemarks = try await CLGeocoder().reverseGeocodeLocation(
+                CLLocation(latitude: place.coordinate.latitude, longitude: place.coordinate.longitude))
+            zone = placemarks.first?.timeZone?.identifier
         }
+        guard let zone else {
+            throw NSError(domain: "CourtLocation", code: 1, userInfo: [NSLocalizedDescriptionKey:
+                "We couldn’t determine this location’s time zone. Try searching a more complete address."])
+        }
+        let court = try await API.Courts.add(
+            name: name, address: place.address, city: place.city,
+            latitude: place.coordinate.latitude, longitude: place.coordinate.longitude,
+            applePlaceID: place.appleID, timeZone: zone, surface: surface, lights: lights)
+        onPick(court)
+        chosenPlace = nil
+        dismiss()
     }
+
 }
 
 /// What the picker needs from an Apple Maps result.
@@ -223,11 +253,22 @@ private struct PlaceResult: Identifiable {
     let coordinate: CLLocationCoordinate2D
     let appleID: String?
     let timeZone: String?
+    var existingCourt: Court? = nil
+
+    init(court: Court) {
+        name = court.name
+        address = court.address
+        city = court.city
+        coordinate = court.coordinate
+        appleID = nil
+        timeZone = court.timeZone
+        existingCourt = court
+    }
 
     var id: String { "\(name)|\(coordinate.latitude),\(coordinate.longitude)" }
 
     var detail: String? {
-        [address, city].compactMap { $0 }.joined(separator: ", ").nilIfEmpty
+        address ?? city
     }
 
     init?(item: MKMapItem) {
@@ -259,10 +300,99 @@ private enum PlaceDetails {
 
     static func street(of item: MKMapItem) -> String? {
         let placemark = item.placemark
-        return [placemark.subThoroughfare, placemark.thoroughfare].compactMap { $0 }.joined(separator: " ").nilIfEmpty
+        let street = [placemark.subThoroughfare, placemark.thoroughfare].compactMap { $0 }.joined(separator: " ")
+        return [street.nilIfEmpty, placemark.locality, placemark.administrativeArea,
+                placemark.postalCode, placemark.country].compactMap { $0 }.joined(separator: ", ").nilIfEmpty
     }
 }
 
 private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
+/// Address and map stay tied to the selected search result; only court facts are editable.
+private struct CourtLocationConfirmation: View {
+    let place: PlaceResult
+    let onSave: (String, String?, Bool?) async throws -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var surface = ""
+    @State private var lighting = "unknown"
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Map(initialPosition: .region(MKCoordinateRegion(
+                        center: place.coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.003, longitudeDelta: 0.003)))) {
+                        Marker(place.name, coordinate: place.coordinate).tint(CourtlyColor.blue)
+                    }
+                    .frame(height: 190)
+                    .accessibilityLabel("Selected location: \(place.detail ?? place.name)")
+                    Text(place.detail ?? place.name).textSelection(.enabled)
+                } header: { Text("Confirm location") }
+                  footer: { Text("Check the pin and address. Go back to search if this isn’t your court.") }
+                Section("Court details") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Court name").font(.caption).foregroundStyle(CourtlyColor.secondary)
+                        TextField("Court name", text: $name)
+                            .accessibilityIdentifier("courtName")
+                            .disabled(place.existingCourt != nil)
+                    }
+                    Picker("Surface", selection: $surface) {
+                        Text("Not sure").tag("")
+                        Text("Hard").tag("hard")
+                        Text("Clay").tag("clay")
+                        Text("Grass").tag("grass")
+                        Text("Carpet").tag("carpet")
+                        Text("Other").tag("other")
+                    }
+                    .disabled(place.existingCourt?.surface != nil)
+                    Picker("Lights", selection: $lighting) {
+                        Text("Not sure").tag("unknown")
+                        Text("Yes").tag("yes")
+                        Text("No").tag("no")
+                    }
+                    .disabled(place.existingCourt?.lights != nil)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(CourtlyColor.surface)
+            .navigationTitle("Use this court")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Back") { dismiss() }.disabled(isSaving)
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                ActionButton(title: isSaving ? "Saving…" : "Use this court", style: .lime) {
+                    guard !isSaving else { return }
+                    isSaving = true
+                    Task { @MainActor in
+                        do {
+                            try await onSave(name.trimmingCharacters(in: .whitespacesAndNewlines),
+                                             surface.isEmpty ? nil : surface,
+                                             lighting == "unknown" ? nil : lighting == "yes")
+                        } catch { errorMessage = error.localizedDescription }
+                        isSaving = false
+                    }
+                }
+                .disabled(isSaving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .padding(20)
+                .background(CourtlyColor.surface)
+            }
+            .onAppear {
+                name = place.name
+                surface = place.existingCourt?.surface ?? ""
+                lighting = place.existingCourt?.lights.map { $0 ? "yes" : "no" } ?? "unknown"
+            }
+            .interactiveDismissDisabled(isSaving)
+            .errorAlert($errorMessage, title: "Couldn’t use this court")
+        }
+        .tint(CourtlyColor.blue)
+    }
 }

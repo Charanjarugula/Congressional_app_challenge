@@ -121,12 +121,12 @@ enum API {
             try await client.rpc("get_hit", params: ["p_hit": hitID.uuidString])
         }
 
-        static func create(courtID: UUID, startsAt: Date, durationMin: Int, format: PlayFormat, spots: Int, visibility: HitVisibility,
+        static func create(courtID: UUID, startsAt: Date, durationMin: Int?, format: PlayFormat, spots: Int, visibility: HitVisibility,
                            inviteChatID: UUID? = nil, inviteExpiresAt: Date? = nil) async throws -> Hit {
             try await client.rpc("create_hit", params: [
                 "p_court_id": courtID.uuidString,
                 "p_starts_at": JSONCoding.string(from: startsAt),
-                "p_duration_min": durationMin,
+                "p_duration_min": nullable(durationMin),
                 "p_format": format.rawValue,
                 "p_spots": spots,
                 "p_visibility": visibility.rawValue,
@@ -136,13 +136,13 @@ enum API {
         }
 
         /// The host changes a hit before it starts; players hear about a new time or court.
-        static func update(_ hitID: UUID, courtID: UUID, startsAt: Date, durationMin: Int, format: PlayFormat, spots: Int,
+        static func update(_ hitID: UUID, courtID: UUID, startsAt: Date, durationMin: Int?, format: PlayFormat, spots: Int,
                            visibility: HitVisibility) async throws -> Hit {
             try await client.rpc("update_hit", params: [
                 "p_hit": hitID.uuidString,
                 "p_court_id": courtID.uuidString,
                 "p_starts_at": JSONCoding.string(from: startsAt),
-                "p_duration_min": durationMin,
+                "p_duration_min": nullable(durationMin),
                 "p_format": format.rawValue,
                 "p_spots": spots,
                 "p_visibility": visibility.rawValue,
@@ -206,9 +206,11 @@ enum API {
 
         /// `timeZone` is the place's IANA zone from Apple Maps; the server falls back to the adder's zone.
         static func add(name: String, address: String?, city: String?, latitude: Double, longitude: Double, applePlaceID: String?,
-                        timeZone: String?) async throws -> Court {
+                        timeZone: String?, surface: String? = nil, lights: Bool? = nil) async throws -> Court {
             try await client.rpc("add_court", params: [
                 "p_time_zone": nullable(timeZone),
+                "p_surface": nullable(surface),
+                "p_lights": nullable(lights),
                 "p_name": name,
                 "p_address": nullable(address),
                 "p_city": nullable(city),

@@ -104,7 +104,7 @@ final class ModelDecodingTests: XCTestCase {
         let court = try JSONCoding.decoder.decode(Court.self, from: json)
         XCTAssertEqual(court.zone, TimeZone.current)
         XCTAssertEqual(court.shortName, "Park")
-        XCTAssertNil(court.detailLine)
+        XCTAssertEqual(court.detailLine, "No lights")
     }
 
     func testFriendRowFlattensTheCard() throws {

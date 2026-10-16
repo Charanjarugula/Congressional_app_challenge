@@ -1090,5 +1090,49 @@ begin
   select count(*) into v_n from public.messages where chat_id = (v_group->>'id')::uuid;
   if v_n < 1 then raise exception 'group thread lost after deletion'; end if;
 
+  -- No invented end time: NULL survives create/edit, allows nearby starts, and archives by court day.
+  declare
+    u uuid := gen_random_uuid(); guest uuid := gen_random_uuid(); hc uuid; h1 jsonb; h2 jsonb; at_time timestamptz := now() + interval '20 days';
+  begin
+    insert into public.profiles (id, first_name, last_name, birthday, level, formats, onboarding_completed_at)
+    values (u, 'Start', 'Only', '1990-01-01', 'intermediate', '{casual}', now());
+    perform set_config('request.jwt.claims', json_build_object('sub', u, 'role', 'authenticated')::text, true);
+    h1 := public.add_court('Address test court', '123 Example Street, Paris, 75001, France', 'Paris',
+      48.86, 2.34, null, 'clay', false, 'Europe/Paris');
+    hc := (h1->>'id')::uuid;
+    if h1->>'address' <> '123 Example Street, Paris, 75001, France' or h1->>'surface' <> 'clay'
+       or (h1->>'lights')::boolean is distinct from false then raise exception 'court details lost'; end if;
+    -- Dedupe can complete missing metadata, never replace recorded facts.
+    h2 := public.add_court('Address test court', '123 Example Street, Paris, 75001, France', 'Paris',
+      48.86, 2.34, null, 'hard', true, 'Europe/Paris');
+    if (h2->>'id')::uuid <> hc or h2->>'surface' <> 'clay' or (h2->>'lights')::boolean is distinct from false
+      then raise exception 'dedupe overwrote court details'; end if;
+    h1 := public.create_hit(hc, at_time, null, 'casual', 2, 'anyone');
+    if (h1->>'start_time_only')::boolean is distinct from true then raise exception 'start-only flag missing'; end if;
+    if (select duration_min from public.hits where id = (h1->>'id')::uuid) is not null then raise exception 'invented duration'; end if;
+    if public.has_overlapping_hit(u, at_time + interval '30 minutes', null) then raise exception 'invented overlap'; end if;
+    if not public.has_overlapping_hit(u, at_time, null) then raise exception 'same start allowed'; end if;
+    h2 := public.create_hit(hc, at_time + interval '30 minutes', null, 'singles', 1, 'anyone');
+    h2 := public.update_hit((h2->>'id')::uuid, hc, at_time + interval '45 minutes', null, 'singles', 1, 'anyone');
+    if (h2->>'start_time_only')::boolean is distinct from true then raise exception 'edit lost start-only'; end if;
+    if public.hit_archive_at('2026-10-24 22:30:00+00', null, hc) <> '2026-10-25 23:00:00+00'::timestamptz
+      then raise exception 'court-local DST archive cutoff wrong'; end if;
+    if public.hit_archive_at(at_time, 60, hc) <> at_time + interval '60 minutes' then raise exception 'legacy end changed'; end if;
+    insert into public.profiles (id, first_name, last_name, birthday, level, formats, onboarding_completed_at)
+    values (guest, 'Start', 'Guest', '1990-01-01', 'intermediate', '{casual}', now());
+    perform set_config('request.jwt.claims', json_build_object('sub', guest, 'role', 'authenticated')::text, true);
+    h2 := public.request_to_join((h1->>'id')::uuid);
+    perform set_config('request.jwt.claims', json_build_object('sub', u, 'role', 'authenticated')::text, true);
+    perform public.respond_to_request((h2->'viewer'->'request'->>'id')::uuid, true);
+    if not exists (select 1 from jsonb_array_elements(public.get_my_hits()->'upcoming') e where e->>'id' = h1->>'id')
+      then raise exception 'start-only hit missing from upcoming'; end if;
+    update public.hits set starts_at = now() - interval '2 days' where id = (h1->>'id')::uuid;
+    perform public.run_hit_scheduler();
+    if (select status from public.hits where id = (h1->>'id')::uuid) <> 'played' then raise exception 'start-only never archived'; end if;
+    if not exists (select 1 from jsonb_array_elements(public.get_my_hits()->'past') e where e->>'id' = h1->>'id')
+      then raise exception 'start-only hit missing from history'; end if;
+
+  end;
+
   raise exception 'SMOKE_OK';
 end $$;

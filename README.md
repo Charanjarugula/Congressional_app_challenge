@@ -16,6 +16,31 @@ Palm Beach County has many free public courts and plenty of people who would pla
 
 You post a **hit**: one time, one public court, the kind of tennis you want (casual rally, singles, doubles or drills) and how many spots are open. Friends and nearby players see it and ask to join; when you accept, the hit is confirmed and a chat opens for it. You can invite a friend or a whole group straight to a hit, mark the hours you are usually free so the right hits reach you, and after you play, say who showed up. The app is where hits get found and organized; the website is a landing page with the policies and the support address.
 
+## A look around
+
+<p align="center">
+  <img src="docs/assets/readme/play.png" width="300" alt="The Play tab: a request from Priya waiting for a reply, Ana's acceptance, and two open hits from friends with their day, time and court">
+</p>
+
+| Plan a hit | A hit | My Hits | A chat |
+|:-:|:-:|:-:|:-:|
+| <img src="docs/assets/readme/plan.png" width="190" alt="The Plan a hit sheet: day, time and length, the court, the format, spots to fill, and who can join"> | <img src="docs/assets/readme/hit.png" width="190" alt="A confirmed hit: Friday 6:30 PM at Wellington Tennis Center with Ana, a map, Chat and Add to calendar buttons, court details and Leave hit"> | <img src="docs/assets/readme/my-hits.png" width="190" alt="My Hits: two confirmed hits this week, each with its day, time, partner, format and court"> | <img src="docs/assets/readme/chat.png" width="190" alt="A direct chat with Luis, with the messages so far and the composer"> |
+| Pick a day, time, court, format and open spots. | Who is in, the court on a map, and the actions you have. | Upcoming and past hits, with the day-after check. | One chat per hit, plus friends and groups. |
+
+<details>
+<summary>Welcome, People, You and the website</summary>
+<p align="center">
+  <img src="docs/assets/readme/welcome.png" width="190" alt="The welcome screen: a court drawn in white lines on blue, the line Play more tennis, plan less, and the Get started button">
+  <img src="docs/assets/readme/people.png" width="190" alt="The People tab: a friend request from Marcus, the Wellington Weekend Crew group, and direct chats with Luis and Ana">
+  <img src="docs/assets/readme/you.png" width="190" alt="The You tab: name, email, level, formats, area, availability, notifications, hit visibility and blocked players">
+</p>
+<p align="center">
+  <img src="docs/assets/readme/site.png" width="600" alt="The landing page at courtly-sage.vercel.app: a phone with the app icon and the line Find someone to hit with at a public court near you">
+</p>
+</details>
+
+The screens are the App Review account on the development project; every player on them is a seeded demo player, not a real person.
+
 ## What works today
 
 - **Post a hit** with a time, court, format and open spots; edit or cancel it later (`PlanHitView`, `HitDetailView`; `create_hit`, `update_hit`, `cancel_hit`).
@@ -73,6 +98,7 @@ Maya posts a casual hit for Thursday at 6:30 PM at Wellington Tennis Center with
 | `scripts/testflight.sh` | Archives the Release app and uploads it to TestFlight with an App Store Connect API key. |
 | `site/` | Landing page, privacy policy, terms and support pages. Vercel root directory is `site`. |
 | `docs/moderation.md` | How reports are handled day to day. |
+| `docs/assets/readme` | The screenshots above. |
 | `.github/workflows` | iOS build and tests, backend test, backend deploy. |
 
 ## Getting started

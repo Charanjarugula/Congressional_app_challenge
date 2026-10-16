@@ -134,7 +134,11 @@ struct PlanHitView: View {
             navigationRow
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    label("When", top: 16)
+                    Text(screenTitle)
+                        .font(.largeTitle.bold())
+                        .foregroundStyle(CourtlyColor.ink)
+                        .accessibilityAddTraits(.isHeader)
+                    label("When", top: 24)
                     whenCard
                     if let zoneNote {
                         Text(zoneNote)
@@ -153,7 +157,7 @@ struct PlanHitView: View {
                     label("What")
                     HStack(spacing: 8) {
                         ForEach(PlayFormat.allCases) { option in
-                            Chip(title: option.shortTitle, isSelected: format == option) {
+                            Chip(title: option.shortTitle, isSelected: format == option, outlined: true) {
                                 format = option
                                 spots = max(Self.defaultSpots(for: option), playersIn)
                             }
@@ -167,23 +171,23 @@ struct PlanHitView: View {
                     label("Who can join")
                     HStack(spacing: 8) {
                         ForEach([HitVisibility.anyone, .friends]) { option in
-                            Chip(title: option.title, isSelected: visibility == option) { visibility = option }
+                            Chip(title: option.title, isSelected: visibility == option, outlined: true) { visibility = option }
                                 .disabled(option == .anyone && friendsOnlyProfile)
                                 .opacity(option == .anyone && friendsOnlyProfile ? 0.4 : 1)
                         }
                     }
                     if friendsOnlyProfile {
-                        Text("Your hits are set to Friends only on the You tab.")
+                        Text("Your hits are set to Friends only in Settings.")
                             .font(CourtlyFont.caption)
                             .foregroundStyle(CourtlyColor.secondary)
                             .padding(.top, 6)
                     }
                 }
-                .padding(.horizontal, CourtlyMetrics.screenPadding)
+                .padding(.horizontal, 24)
                 .padding(.bottom, 24)
             }
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
                 if tooSoon {
@@ -205,12 +209,12 @@ struct PlanHitView: View {
                         .foregroundStyle(CourtlyColor.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                PrimaryButton(title: postTitle, isEnabled: canPost, isLoading: isPosting, action: post)
+                PrimaryButton(title: postTitle, style: .lime, compact: true, isEnabled: canPost, isLoading: isPosting, action: post)
             }
-                .padding(.horizontal, CourtlyMetrics.screenPadding)
+                .padding(.horizontal, 24)
                 .padding(.top, 8)
                 .padding(.bottom, 16)
-                .background(CourtlyColor.groupedBackground)
+                .background(CourtlyColor.surface)
         }
         .sheet(isPresented: $showsCourtPicker) {
             CourtPickerView(courts: courts, selected: court) { picked in
@@ -227,26 +231,24 @@ struct PlanHitView: View {
     // MARK: - Pieces
 
     private var navigationRow: some View {
-        ZStack {
-            Text(screenTitle)
-                .font(CourtlyFont.bodySemibold)
-                .foregroundStyle(CourtlyColor.ink)
-            HStack {
-                Button("Cancel") { dismiss() }
-                    .font(CourtlyFont.body)
-                    .foregroundStyle(CourtlyColor.blue)
-                    .disabled(isPosting)   // the hit is already on its way; closing now would hide where it went
-                Spacer()
-            }
+        HStack {
+            Button("Cancel") { dismiss() }
+                .font(.body)
+                .foregroundStyle(CourtlyColor.blue)
+                .frame(minHeight: 44)
+                .disabled(isPosting)
+            Spacer()
         }
-        .frame(height: 52)
-        .padding(.horizontal, CourtlyMetrics.screenPadding)
+        .padding(.horizontal, 24)
     }
 
-    private func label(_ title: String, top: CGFloat = 18) -> some View {
-        SectionLabel(title: title)
+    private func label(_ title: String, top: CGFloat = 20) -> some View {
+        Text(title)
+            .font(.headline)
+            .foregroundStyle(CourtlyColor.ink)
+            .accessibilityAddTraits(.isHeader)
             .padding(.top, top)
-            .padding(.bottom, 8)
+            .padding(.bottom, 12)
     }
 
     private var whenCard: some View {
@@ -279,10 +281,10 @@ struct PlanHitView: View {
                                 .font(CourtlyFont.secondarySemibold)
                                 .foregroundStyle(duration == minutes ? .white : CourtlyColor.ink)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 40)
+                                .frame(minHeight: 44)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(duration == minutes ? CourtlyColor.blue : CourtlyColor.groupedBackground)
+                                        .fill(duration == minutes ? CourtlyColor.blue : CourtlyColor.surface)
                                 )
                         }
                         .buttonStyle(PressableButtonStyle())
@@ -292,8 +294,8 @@ struct PlanHitView: View {
                 .padding(.bottom, 14)
             }
         }
-        .background(RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous).fill(CourtlyColor.card))
-        .clipShape(RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous))
+        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(CourtlyColor.card))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var whereRow: some View {
@@ -301,16 +303,23 @@ struct PlanHitView: View {
             showsCourtPicker = true
         } label: {
             HStack {
-                Text(court?.name ?? "Choose a court")
-                    .font(CourtlyFont.body)
-                    .foregroundStyle(court == nil ? CourtlyColor.blue : CourtlyColor.ink)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(court?.name ?? "Choose a court")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(court == nil ? CourtlyColor.blue : CourtlyColor.ink)
+                    if let city = court?.city {
+                        Text(city)
+                            .font(.caption)
+                            .foregroundStyle(CourtlyColor.secondary)
+                    }
+                }
                 Spacer()
                 ChevronMark()
             }
             .padding(.horizontal, 16)
-            .frame(height: 48)
-            .background(RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous).fill(CourtlyColor.card))
+            .padding(.vertical, 14)
+            .frame(minHeight: 48)
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(CourtlyColor.card))
         }
         .buttonStyle(PressableButtonStyle())
     }
@@ -342,7 +351,7 @@ struct PlanHitView: View {
                 .tint(CourtlyColor.blue)
                 .padding(.horizontal, 16)
                 .frame(height: 48)
-                .background(RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous).fill(CourtlyColor.card))
+                .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(CourtlyColor.card))
                 .padding(.top, 8)
             }
         }
@@ -361,11 +370,11 @@ struct PlanHitView: View {
                     .frame(width: 1, height: 20)
                 stepButton("+", enabled: spots < 7) { spots += 1 }
             }
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(CourtlyColor.groupedBackground))
+            .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(CourtlyColor.surface))
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous).fill(CourtlyColor.card))
+        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(CourtlyColor.card))
     }
 
     private func stepButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -373,10 +382,11 @@ struct PlanHitView: View {
             Text(symbol)
                 .font(.system(size: 22))
                 .foregroundStyle(enabled ? CourtlyColor.blue : CourtlyColor.placeholder)
-                .frame(width: 44, height: 36)
+                .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
+        .accessibilityLabel(symbol == "+" ? "Add a player spot" : "Remove a player spot")
     }
 
     // MARK: - Behaviour
@@ -450,7 +460,7 @@ struct PlanHitView: View {
     }
 }
 
-/// 48pt white row with a title and a blue value ("Day — Thu, Oct 16").
+/// A grouped disclosure row with the current selection beneath its label.
 private struct FormRow: View {
     let title: String
     let value: String
@@ -459,16 +469,20 @@ private struct FormRow: View {
     var body: some View {
         Button(action: action) {
             HStack {
-                Text(title)
-                    .font(CourtlyFont.body)
-                    .foregroundStyle(CourtlyColor.ink)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(CourtlyColor.ink)
+                    Text(value)
+                        .font(.caption)
+                        .foregroundStyle(CourtlyColor.secondary)
+                }
                 Spacer()
-                Text(value)
-                    .font(CourtlyFont.body)
-                    .foregroundStyle(CourtlyColor.blue)
+                ChevronMark()
             }
             .padding(.horizontal, 16)
-            .frame(height: 48)
+            .padding(.vertical, 14)
+            .frame(minHeight: 48)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

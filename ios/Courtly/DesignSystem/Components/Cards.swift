@@ -42,10 +42,11 @@ struct Card<Content: View>: View {
 /// A white card whose rows are separated by hairlines.
 struct CardRows<Data: RandomAccessCollection, Row: View>: View where Data.Element: Identifiable {
     let items: Data
+    var radius: CGFloat = CourtlyMetrics.cardRadius
     @ViewBuilder let row: (Data.Element) -> Row
 
     var body: some View {
-        Card {
+        Card(radius: radius) {
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     if index > 0 { HairlineSeparator() }
@@ -197,11 +198,11 @@ struct ActionButton: View {
             case .blue: CourtlyColor.blue
             case .lime: CourtlyColor.lime
             case .quiet: CourtlyColor.blueTint
-            case .grouped: CourtlyColor.groupedBackground
+            case .grouped: CourtlyColor.card
             case .card: CourtlyColor.card
             }
         }
-        var foreground: Color { self == .blue ? .white : self == .quiet ? CourtlyColor.blue : CourtlyColor.ink }
+        var foreground: Color { self == .blue ? .white : self == .lime ? CourtlyColor.ink : CourtlyColor.blue }
     }
 
     let title: String
@@ -229,6 +230,12 @@ struct ActionButton: View {
             .frame(height: height)
             .foregroundStyle(style.foreground)
             .background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(style.background))
+            .overlay {
+                if style == .card || style == .grouped {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(CourtlyColor.blue, lineWidth: 1)
+                }
+            }
             .opacity(isEnabled ? 1 : 0.45)
         }
         .buttonStyle(PressableButtonStyle())
@@ -257,6 +264,7 @@ struct DestructiveTextButton: View {
 struct Chip: View {
     let title: String
     let isSelected: Bool
+    var outlined = false
     let action: () -> Void
 
     var body: some View {
@@ -265,15 +273,21 @@ struct Chip: View {
                 .font(CourtlyFont.secondarySemibold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-                .foregroundStyle(isSelected ? .white : CourtlyColor.ink)
+                .foregroundStyle(isSelected ? .white : (outlined ? CourtlyColor.blue : CourtlyColor.ink))
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(isSelected ? CourtlyColor.blue : CourtlyColor.card)
                 )
+                .overlay {
+                    if outlined {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(CourtlyColor.blue, lineWidth: 1)
+                    }
+                }
         }
-        .buttonStyle(PressableButtonStyle())
+        .buttonStyle(SelectionButtonStyle())
     }
 }
 

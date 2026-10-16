@@ -8,14 +8,33 @@ enum AuthError: LocalizedError {
     case googleNotConfigured
     case missingToken
     case invalidCode
+    /// Apple couldn't start: usually no Apple Account on the device, or one waiting for its password.
+    case appleUnavailable
+    case appleFailed
+    case googleFailed
 
     var errorDescription: String? {
         switch self {
         case .cancelled: "Sign-in was cancelled."
         case .googleNotConfigured: "Google sign-in isn’t set up yet. Use Apple or email for now."
-        case .missingToken: "The sign-in provider didn’t return a token."
+        case .missingToken: "Sign-in didn’t finish. Please try again."
         case .invalidCode: "That code didn’t work. Check the email and try again."
+        case .appleUnavailable: "Sign in with Apple isn’t available right now. Check that you’re signed in to your Apple Account in Settings, or continue with email."
+        case .appleFailed: "Sign in with Apple didn’t finish. Please try again, or continue with email."
+        case .googleFailed: "Google sign-in didn’t finish. Please try again, or use Apple or email."
         }
+    }
+
+    /// What the sign-in screen says for any failure. Our own errors and connection problems already
+    /// read well; anything else from the system (a raw domain and code) becomes a plain sentence.
+    static func message(for error: Error) -> String {
+        if error is AuthError || error is SupabaseError { return error.localizedDescription }
+        if let error = error as? URLError {
+            return error.code == .notConnectedToInternet || error.code == .networkConnectionLost
+                ? "You’re offline. Check your connection and try again."
+                : "Couldn’t reach Courtly. Check your connection and try again."
+        }
+        return "Sign-in didn’t finish. Please try again."
     }
 }
 
@@ -164,10 +183,12 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
     }
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        if let authError = error as? ASAuthorizationError, authError.code == .canceled {
-            continuation?.resume(throwing: AuthError.cancelled)
-        } else {
-            continuation?.resume(throwing: error)
+        // Apple's own text ("The operation couldn’t be completed. (…AuthorizationError error 1000.)")
+        // never reaches the player.
+        switch (error as? ASAuthorizationError)?.code {
+        case .canceled?: continuation?.resume(throwing: AuthError.cancelled)
+        case .unknown?, .notInteractive?: continuation?.resume(throwing: AuthError.appleUnavailable)
+        default: continuation?.resume(throwing: AuthError.appleFailed)
         }
         continuation = nil
     }
@@ -200,7 +221,7 @@ final class WebAuthCoordinator: NSObject, ASWebAuthenticationPresentationContext
                 } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
                     continuation.resume(throwing: AuthError.cancelled)
                 } else {
-                    continuation.resume(throwing: error ?? AuthError.missingToken)
+                    continuation.resume(throwing: error == nil ? AuthError.missingToken : AuthError.googleFailed)
                 }
             }
             session.presentationContextProvider = self

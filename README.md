@@ -1,3 +1,5 @@
+![Courtly — Hit more. Plan less.](docs/assets/readme/courtly-banner.png)
+
 # Courtly
 
 **Hit more. Plan less.**

@@ -4,7 +4,7 @@
 
 # Courtly
 
-**Find a tennis partner for this week, at a public court near you.** Courtly is an iOS app that helps tennis players of all levels find hitting partners based of location and time built.
+**Find a tennis partner for this week, at a public court near you.** Courtly is an iOS app that helps tennis players of all levels find hitting partners by location and time.
 
 In development; not yet in the App Store. The privacy policy, terms and support contact live at [courtly-sage.vercel.app](https://courtly-sage.vercel.app).
 

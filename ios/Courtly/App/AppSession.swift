@@ -29,6 +29,13 @@ final class AppSession {
     private var sessionLostObserver: NSObjectProtocol?
     private var draftSaveTask: Task<Void, Never>?
 
+    #if DEBUG && targetEnvironment(simulator)
+    init(previewProfile: Profile) {
+        profile = previewProfile
+        stage = .main
+    }
+    #endif
+
     init() {
         profile = ProfileCache.load()
         // A refresh the server rejected means this session is over; the app goes back to Welcome.

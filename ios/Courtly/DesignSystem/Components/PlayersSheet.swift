@@ -21,7 +21,7 @@ struct PlayersSheet: View {
                 .tracking(-0.4)
                 .foregroundStyle(CourtlyColor.ink)
             ScrollView {
-                CardRows(items: players) { player in
+                CardRows(items: players, radius: 22) { player in
                     Button {
                         open(player.id)
                     } label: {
@@ -47,8 +47,8 @@ struct PlayersSheet: View {
             }
             TextActionButton(title: "Done") { dismiss() }
         }
-        .padding(.horizontal, CourtlyMetrics.screenPadding)
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .padding(.horizontal, 24)
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(20)

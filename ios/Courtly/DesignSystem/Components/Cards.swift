@@ -118,7 +118,8 @@ struct SettingsRow: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(height: 50)
+            .padding(.vertical, 10)
+            .frame(minHeight: 50)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -143,7 +144,8 @@ struct ValueRow: View {
                 .truncationMode(.middle)
         }
         .padding(.horizontal, 16)
-        .frame(height: 50)
+        .padding(.vertical, 10)
+            .frame(minHeight: 50)
     }
 }
 
@@ -230,12 +232,6 @@ struct ActionButton: View {
             .frame(height: height)
             .foregroundStyle(style.foreground)
             .background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(style.background))
-            .overlay {
-                if style == .card || style == .grouped {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(CourtlyColor.blue, lineWidth: 1)
-                }
-            }
             .opacity(isEnabled ? 1 : 0.45)
         }
         .buttonStyle(PressableButtonStyle())
@@ -264,7 +260,6 @@ struct DestructiveTextButton: View {
 struct Chip: View {
     let title: String
     let isSelected: Bool
-    var outlined = false
     let action: () -> Void
 
     var body: some View {
@@ -273,19 +268,14 @@ struct Chip: View {
                 .font(CourtlyFont.secondarySemibold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-                .foregroundStyle(isSelected ? .white : (outlined ? CourtlyColor.blue : CourtlyColor.ink))
+                .foregroundStyle(isSelected ? .white : CourtlyColor.blue)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(isSelected ? CourtlyColor.blue : CourtlyColor.card)
                 )
-                .overlay {
-                    if outlined {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(CourtlyColor.blue, lineWidth: 1)
-                    }
-                }
+
         }
         .buttonStyle(SelectionButtonStyle())
     }

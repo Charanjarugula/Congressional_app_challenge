@@ -157,7 +157,7 @@ struct PlanHitView: View {
                     label("What")
                     HStack(spacing: 8) {
                         ForEach(PlayFormat.allCases) { option in
-                            Chip(title: option.shortTitle, isSelected: format == option, outlined: true) {
+                            Chip(title: option.shortTitle, isSelected: format == option) {
                                 format = option
                                 spots = max(Self.defaultSpots(for: option), playersIn)
                             }
@@ -171,7 +171,7 @@ struct PlanHitView: View {
                     label("Who can join")
                     HStack(spacing: 8) {
                         ForEach([HitVisibility.anyone, .friends]) { option in
-                            Chip(title: option.title, isSelected: visibility == option, outlined: true) { visibility = option }
+                            Chip(title: option.title, isSelected: visibility == option) { visibility = option }
                                 .disabled(option == .anyone && friendsOnlyProfile)
                                 .opacity(option == .anyone && friendsOnlyProfile ? 0.4 : 1)
                         }

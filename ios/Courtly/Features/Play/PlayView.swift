@@ -31,13 +31,14 @@ struct PlayView: View {
                         .padding(.top, 80)
                 }
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.top, 4)
             .padding(.bottom, 96)
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "Play", art: .play) }
+        .background(CourtlyColor.surface.ignoresSafeArea())
+        .navigationTitle("Explore")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(CourtlyColor.surface, for: .navigationBar)
         .refreshable {
             await hits.loadFeed(userInitiated: true)
             await loadDiscovery()
@@ -64,6 +65,16 @@ struct PlayView: View {
 
     @ViewBuilder
     private func content(_ feed: PlayFeed) -> some View {
+        if tab == 0 && !feed.fromFriends.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Plan a hit").font(.title2.bold()).foregroundStyle(.white)
+                Text("Pick a time, court and format.").font(.footnote).foregroundStyle(.white)
+                PrimaryButton(title: "Plan a hit", style: .lime, compact: true, action: onPlan)
+            }
+            .padding(18)
+            .background(CourtlyColor.blue, in: RoundedRectangle(cornerRadius: 22))
+            .padding(.top, 12)
+        }
         if !feed.needsReply.isEmpty {
             SectionHeader(title: "Needs your reply")
             VStack(spacing: 10) {
@@ -73,7 +84,7 @@ struct PlayView: View {
             }
         }
 
-        SegmentedControl(options: ["Friends", "Explore"], selectedIndex: $tab)
+        SegmentedControl(options: ["Friends", "Discover"], selectedIndex: $tab, courtside: true)
             .padding(.top, feed.needsReply.isEmpty ? 4 : 22)
 
         if tab == 0 {
@@ -88,8 +99,14 @@ struct PlayView: View {
     @ViewBuilder
     private func friends(_ hitsFromFriends: [Hit]) -> some View {
         if hitsFromFriends.isEmpty && !suggestions.isEmpty {
-            QuietCard(title: "Nothing from friends yet", detail: "When a friend posts a hit, it shows up here first. Add a few players to get started.")
-                .padding(.top, 12)
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Nothing from friends yet").font(.title2.bold()).foregroundStyle(CourtlyColor.ink)
+                Text("When a friend posts a hit, it shows up here first.")
+                    .font(.subheadline).foregroundStyle(CourtlyColor.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+            .padding(.top, 16)
             SuggestedPlayersRow(players: suggestions, requested: $requested) { navigate(.addFriends) }
                 .padding(.top, 22)
         } else if hitsFromFriends.isEmpty {
@@ -120,7 +137,7 @@ struct PlayView: View {
 
     @ViewBuilder
     private func explore(_ nearby: [Hit]) -> some View {
-        HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Button { showsFilters = true } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "line.3.horizontal.decrease")
@@ -128,19 +145,18 @@ struct PlayView: View {
                     Text(filters.activeCount == 0 ? "Filters" : "Filters · \(filters.activeCount)")
                         .font(CourtlyFont.captionSemibold)
                 }
-                .foregroundStyle(filters.activeCount == 0 ? CourtlyColor.ink : .white)
+                .foregroundStyle(CourtlyColor.ink)
                 .padding(.horizontal, 14)
-                .frame(height: 34)
-                .background(Capsule().fill(filters.activeCount == 0 ? CourtlyColor.card : CourtlyColor.ink))
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(CourtlyColor.lime, in: RoundedRectangle(cornerRadius: 16))
             }
             .buttonStyle(.plain)
             Text("Within \(session.profile?.radius.title ?? "") of \(session.profile?.areaLabel?.components(separatedBy: ",").first ?? "you")")
                 .font(CourtlyFont.caption)
                 .foregroundStyle(CourtlyColor.secondary)
                 .lineLimit(1)
-            Spacer(minLength: 0)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 16)
         .sheet(isPresented: $showsFilters) {
             ExploreFiltersSheet(filters: $filters, radius: session.profile?.radius ?? .ten)
         }
@@ -169,12 +185,14 @@ struct PlayView: View {
     }
 
     private func rows(_ list: [Hit]) -> some View {
-        CardRows(items: list) { hit in
+        LazyVStack(spacing: 16) {
+          ForEach(list) { hit in
             HitFeedRow(hit: hit, isExpanded: expanded == hit.id) {
                 withAnimation(.easeInOut(duration: 0.22)) {
                     expanded = expanded == hit.id ? nil : hit.id
                 }
             }
+          }
         }
     }
 }

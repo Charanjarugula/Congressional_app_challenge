@@ -17,29 +17,12 @@ struct HitFeedRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button(action: onTap) {
-                HStack(spacing: 14) {
-                    PlayerAvatar(card: hit.host, size: 44)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(hit.feedTitle)
-                            .font(CourtlyFont.bodySemibold)
-                            .foregroundStyle(CourtlyColor.ink)
-                            .lineLimit(1)
-                        Text(hit.feedSubtitle)
-                            .font(CourtlyFont.secondary)
-                            .foregroundStyle(CourtlyColor.secondary)
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(CourtlyColor.placeholder)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                }
-                .padding(.vertical, 12)
-                .padding(.horizontal, 16)
+                HitSummary(hit: hit)
+                    .padding(18)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityHint(isExpanded ? "Collapse hit details" : "Expand hit details")
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 16) {
@@ -81,17 +64,17 @@ struct HitFeedRow: View {
                                 .foregroundStyle(CourtlyColor.secondary)
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: .infinity)
-                            ActionButton(title: "See that hit", style: .grouped) { navigate(.hit(clash.id)) }
+                            ActionButton(title: "See that hit", style: .lime, height: 48, radius: 16) { navigate(.hit(clash.id)) }
                         }
                     } else if hit.hasPendingRequest {
-                        ActionButton(title: "Requested", style: .grouped, isLoading: isJoining) { cancel() }
+                        ActionButton(title: "Requested", style: .quiet, height: 48, radius: 16, isLoading: isJoining) { cancel() }
                     } else if hit.wasDeclined {
                         Text("\(hit.host.firstName) passed on this one.")
                             .font(CourtlyFont.caption)
                             .foregroundStyle(CourtlyColor.secondary)
                             .frame(maxWidth: .infinity)
                     } else {
-                        ActionButton(title: "Ask to join", isLoading: isJoining) { join() }
+                        ActionButton(title: "Ask to join", style: .lime, height: 48, radius: 16, isLoading: isJoining) { join() }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -99,6 +82,7 @@ struct HitFeedRow: View {
                 .transition(.opacity)
             }
         }
+        .background(.white, in: RoundedRectangle(cornerRadius: 22))
         .sheet(isPresented: $showsPlayers) {
             PlayersSheet(title: "Who's in", players: hit.everyone) { id in
                 showsPlayers = false

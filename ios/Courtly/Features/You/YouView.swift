@@ -34,7 +34,7 @@ struct YouView: View {
         }
         .background(CourtlyColor.groupedBackground.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "You", art: .you) }
+        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "Settings", art: .you) }
         .refreshable { await session.refreshProfile() }
         .sheet(item: $sheet) { which in
             switch which {

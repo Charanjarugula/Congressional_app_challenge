@@ -7,10 +7,10 @@ enum MainTab: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .play: "Play"
+        case .play: "Explore"
         case .myHits: "My Hits"
         case .people: "People"
-        case .you: "You"
+        case .you: "Settings"
         }
     }
 

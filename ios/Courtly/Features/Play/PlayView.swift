@@ -1,210 +1,243 @@
 import SwiftUI
 
-/// Hits you can join. Whatever waits on your answer comes first; under it, two lists: hits your friends
-/// are hosting, and everything open near you with a couple of filters.
+/// One searchable inventory. Friends narrows the same list rather than competing with Discover.
 struct PlayView: View {
     @Environment(HitsStore.self) private var hits
     @Environment(AppSession.self) private var session
     @Environment(\.navigate) private var navigate
     let onPlan: () -> Void
 
-    @State private var tab = 0
-    @State private var expanded: UUID?
+    @State private var friendsOnly = false
     @State private var filters = ExploreFilters()
+    @State private var searchArea: HomeArea?
     @State private var showsFilters = false
-    @State private var choseTab = false   // the first feed picks the tab once; after that it's the player's
-    @State private var suggestions: [SuggestedPlayer] = []
-    @State private var requested: Set<UUID> = []
-    @State private var pulse: AreaPulse?
+    @State private var showsSearch = false
+    @State private var showsReplies = false
+
+    private var areaLabel: String { searchArea?.label ?? session.profile?.areaLabel ?? "Choose an area" }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if let feed = hits.feed {
-                    content(feed)
-                } else if let error = hits.lastError, !hits.isLoadingFeed {
-                    QuietCard(title: "Couldn’t load hits", detail: error)
-                        .padding(.top, 22)
-                } else {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 80)
+        VStack(spacing: 0) {
+            header
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    scopeControls
+                    if let feed = hits.feed {
+                        content(feed)
+                    } else if let error = hits.lastError, !hits.isLoadingFeed {
+                        errorView(error)
+                    } else {
+                        ProgressView("Finding hits…")
+                            .frame(maxWidth: .infinity).padding(.vertical, 48)
+                    }
                 }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 20)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 4)
-            .padding(.bottom, 96)
+            .refreshable { await hits.loadFeed(userInitiated: true) }
         }
-        .background(CourtlyColor.surface.ignoresSafeArea())
-        .navigationTitle("Explore")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(CourtlyColor.surface, for: .navigationBar)
-        .refreshable {
-            await hits.loadFeed(userInitiated: true)
-            await loadDiscovery()
+        .background(CourtlyColor.card.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showsFilters) {
+            ExploreFiltersSheet(filters: $filters, inventory: inventory, friendIDs: friendIDs)
         }
-        .task { await loadDiscovery() }
-        // A player with no friends' hits yet starts on Explore, where something is going on.
-        .onChange(of: hits.feed?.fromFriends.isEmpty, initial: true) { _, friendsEmpty in
-            guard !choseTab, let friendsEmpty, let feed = hits.feed else { return }
-            choseTab = true
-            if friendsEmpty && !feed.nearYou.isEmpty { tab = 1 }
+        .sheet(isPresented: $showsSearch) {
+            ExploreSearchSheet(filters: $filters, area: $searchArea, homeArea: session.profile?.homeArea)
         }
     }
 
-    /// Players to suggest and the local numbers, for the empty states. Quiet on failure: they only add.
-    private func loadDiscovery() async {
-        async let people = try? API.People.suggestions(knownIDs: [])
-        async let area = try? API.People.areaPulse()
-        if let people = await people {
-            suggestions = people
-            requested = []   // the server only suggests people with no request either way, so start clean
-        }
-        pulse = await area
+    private var inventory: [Hit] {
+        guard let feed = hits.feed else { return [] }
+        return ExploreInventory.hits(feed, friendsOnly: friendsOnly, area: searchArea)
     }
+    private var friendIDs: Set<UUID> { Set(hits.feed?.fromFriends.map(\.id) ?? []) }
 
-    @ViewBuilder
-    private func content(_ feed: PlayFeed) -> some View {
-        if tab == 0 && !feed.fromFriends.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Plan a hit").font(.title2.bold()).foregroundStyle(.white)
-                Text("Pick a time, court and format.").font(.footnote).foregroundStyle(.white)
-                PrimaryButton(title: "Plan a hit", style: .lime, compact: true, action: onPlan)
-            }
-            .padding(18)
-            .background(CourtlyColor.blue, in: RoundedRectangle(cornerRadius: 22))
-            .padding(.top, 12)
-        }
-        let replies = feed.needsReply.filter { $0.kind != .invite || !$0.hit.isMember }
-        if !replies.isEmpty {
-            SectionHeader(title: "Needs your reply")
-            VStack(spacing: 10) {
-                ForEach(replies) { item in
-                    NeedsReplyCard(item: item)
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Explore").font(.largeTitle.bold()).foregroundStyle(.white)
+                .accessibilityAddTraits(.isHeader)
+            Button { showsSearch = true } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label { Text(areaLabel) } icon: { Image(systemName: "mappin.and.ellipse").foregroundStyle(CourtlyColor.blue) }
+                        .font(.body.weight(.semibold)).foregroundStyle(CourtlyColor.ink)
+                    HStack(spacing: 10) {
+                        Image(systemName: "clock").foregroundStyle(CourtlyColor.secondary)
+                        Text(filters.timeSummary).foregroundStyle(CourtlyColor.secondary)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.down").foregroundStyle(CourtlyColor.blue)
+                    }
+                    .font(.subheadline)
                 }
-            }
-        }
-
-        SegmentedControl(options: ["Friends", "Discover"], selectedIndex: $tab, courtside: true)
-            .padding(.top, replies.isEmpty ? 4 : 22)
-
-        filterControls
-
-        if tab == 0 {
-            let shown = filters.apply(to: feed.fromFriends)
-            if !feed.fromFriends.isEmpty && shown.isEmpty {
-                QuietCard(title: "Nothing matches", detail: "Loosen a filter to see more.")
-            } else {
-                friends(shown)
-            }
-        } else {
-            explore(feed.nearYou)
-        }
-    }
-
-    // MARK: - Friends
-
-    @ViewBuilder
-    private func friends(_ hitsFromFriends: [Hit]) -> some View {
-        if hitsFromFriends.isEmpty && !suggestions.isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Nothing from friends yet").font(.title2.bold()).foregroundStyle(CourtlyColor.ink)
-                Text("When a friend posts a hit, it shows up here first.")
-                    .font(.subheadline).foregroundStyle(CourtlyColor.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(18)
-            .padding(.top, 16)
-            SuggestedPlayersRow(players: suggestions, requested: $requested) { navigate(.addFriends) }
-                .padding(.top, 22)
-        } else if hitsFromFriends.isEmpty {
-            VStack(spacing: 8) {
-                Text("Nothing from friends yet")
-                    .font(.system(size: 20, weight: .bold))
-                    .tracking(-0.3)
-                    .foregroundStyle(CourtlyColor.ink)
-                Text("When a friend posts a hit, it shows up here first.")
-                    .font(CourtlyFont.secondary)
-                    .foregroundStyle(CourtlyColor.secondary)
-                    .multilineTextAlignment(.center)
-                Button("Add friends") { navigate(.addFriends) }
-                    .font(CourtlyFont.secondarySemibold)
-                    .foregroundStyle(CourtlyColor.blue)
-                    .padding(.top, 4)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 24)
-            .padding(.top, 56)
-        } else {
-            rows(hitsFromFriends)
-                .padding(.top, 12)
-        }
-    }
-
-    // MARK: - Explore
-
-    @ViewBuilder
-    private var filterControls: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button { showsFilters = true } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "line.3.horizontal.decrease")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(filters.activeCount == 0 ? "Filters" : "Filters · \(filters.activeCount)")
-                        .font(CourtlyFont.captionSemibold)
-                }
-                .foregroundStyle(CourtlyColor.ink)
-                .padding(.horizontal, 14)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .background(CourtlyColor.lime, in: RoundedRectangle(cornerRadius: 16))
+                .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                .background(CourtlyColor.card, in: RoundedRectangle(cornerRadius: 18))
             }
             .buttonStyle(.plain)
-            Text(filters.distance == .any ? "Any distance" : "Within \(filters.distance.title) of \(session.profile?.areaLabel?.components(separatedBy: ",").first ?? "your area")")
-                .font(CourtlyFont.caption)
-                .foregroundStyle(CourtlyColor.secondary)
-                .lineLimit(1)
+            .accessibilityIdentifier("explore-search")
+            .accessibilityHint("Change city, day or start time")
         }
-        .padding(.vertical, 16)
-        .sheet(isPresented: $showsFilters) {
-            ExploreFiltersSheet(filters: $filters)
-        }
+        .padding(.horizontal, 24).padding(.top, 8).padding(.bottom, 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(CourtlyColor.blue.ignoresSafeArea(edges: .top))
     }
 
-    @ViewBuilder
-    private func explore(_ nearby: [Hit]) -> some View {
-        let shown = filters.apply(to: nearby)
-        if nearby.isEmpty {
-            QuietCard(title: "No open hits yet", detail: emptyExploreDetail)
-            Button("Plan a hit", action: onPlan)
-                .font(CourtlyFont.secondarySemibold)
-                .foregroundStyle(CourtlyColor.blue)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 12)
-        } else if shown.isEmpty {
-            QuietCard(title: "Nothing matches", detail: "Loosen a filter to see more.")
+    private var scopeControls: some View {
+        HStack(spacing: 26) {
+            scope("All hits", selected: !friendsOnly) { friendsOnly = false }
+            scope("Friends", selected: friendsOnly) { friendsOnly = true }
+            Spacer(minLength: 0)
+            Button { showsFilters = true } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.title3).foregroundStyle(CourtlyColor.ink)
+                    .frame(width: 46, height: 44)
+                    .background(CourtlyColor.surface, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(alignment: .topTrailing) {
+                        if filters.activeCount > 0 {
+                            Text("\(filters.activeCount)").font(.caption2.bold())
+                                .foregroundStyle(.white).padding(4)
+                                .background(CourtlyColor.blue, in: Circle())
+                        }
+                    }
+            }
+            .accessibilityLabel("Filters")
+            .accessibilityValue("\(filters.activeCount) active")
+            .accessibilityIdentifier("open-filters")
+        }
+        .padding(.top, 16).padding(.bottom, 8)
+    }
+
+    private func scope(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).font(.body.weight(.semibold))
+                .foregroundStyle(selected ? CourtlyColor.blue : CourtlyColor.secondary)
+                .frame(minHeight: 44)
+                .overlay(alignment: .bottomLeading) {
+                    Capsule().fill(selected ? CourtlyColor.blue : .clear).frame(width: 28, height: 3)
+                }
+        }
+        .buttonStyle(.plain).accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    @ViewBuilder private func content(_ feed: PlayFeed) -> some View {
+        let replies = feed.needsReply.filter { $0.kind != .invite || (!$0.hit.isMember && $0.hit.openInvite != nil) }
+        if !replies.isEmpty {
+            DisclosureGroup(isExpanded: $showsReplies) {
+                VStack(spacing: 10) { ForEach(replies) { NeedsReplyCard(item: $0) } }
+                    .padding(.vertical, 12)
+            } label: {
+                Text("Needs your reply (\(replies.count))").font(.subheadline.weight(.semibold))
+            }
+            .tint(CourtlyColor.blue).padding(.vertical, 12)
+        }
+        if let error = hits.lastError { errorView(error) }
+        let shown = filters.apply(to: inventory, friendIDs: friendIDs)
+        HStack {
+            Text("\(shown.count) \(shown.count == 1 ? "hit" : "hits") · \(filters.distance == .any ? "All distances" : filters.distance.title)")
+                .font(.caption).foregroundStyle(CourtlyColor.secondary)
+                .accessibilityIdentifier("explore-count")
+            Spacer()
+            Menu {
+                Picker("Sort by", selection: $filters.sort) {
+                    ForEach(ExploreFilters.Sort.allCases) { Text($0.title).tag($0) }
+                }
+            } label: {
+                HStack(spacing: 4) { Text(filters.sort.title); Image(systemName: "chevron.down") }
+                    .font(.footnote.weight(.semibold)).foregroundStyle(CourtlyColor.blue).frame(minHeight: 44)
+            }
+            .accessibilityIdentifier("explore-sort")
+        }
+        if shown.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(friendsOnly ? "No matching hits from friends" : "No hits for this search")
+                    .font(.title2.bold())
+                Text("Try another time or fewer filters. Or post a hit for others to join.")
+                    .font(.subheadline).foregroundStyle(CourtlyColor.secondary)
+                Button("Clear filters") { filters = ExploreFilters() }
+                    .frame(minHeight: 44).foregroundStyle(CourtlyColor.blue)
+                if friendsOnly {
+                    Button("See all hits") { friendsOnly = false }
+                        .frame(minHeight: 44).foregroundStyle(CourtlyColor.blue)
+                }
+                PrimaryButton(title: "Plan a hit", style: .lime, compact: true, action: onPlan)
+            }
+            .padding(.vertical, 32).foregroundStyle(CourtlyColor.ink)
         } else {
-            rows(shown)
-        }
-    }
-
-    private var emptyExploreDetail: String {
-        if let pulse, pulse.players > 0 {
-            let who = pulse.players == 1 ? "1 player plays" : "\(pulse.players) players play"
-            let area = pulse.town.map { "around \($0)" } ?? "in your area"
-            return "\(who) \(area). Post a time and they can ask to join."
-        }
-        return "Post a time and players can ask to join."
-    }
-
-    private func rows(_ list: [Hit]) -> some View {
-        LazyVStack(spacing: 16) {
-          ForEach(list) { hit in
-            HitFeedRow(hit: hit, isExpanded: expanded == hit.id) {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    expanded = expanded == hit.id ? nil : hit.id
+            LazyVStack(spacing: 0) {
+                ForEach(shown) { hit in
+                    Button { navigate(.hit(hit.id)) } label: {
+                        ExploreSessionRow(hit: hit, isFriend: friendIDs.contains(hit.id) || hit.relationship(with: hit.host.id) == .friend)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("explore-hit-\(hit.id)")
+                    .accessibilityHint("Open hit details and joining options")
+                    Rectangle().fill(CourtlyColor.line).frame(height: 1).accessibilityHidden(true)
                 }
             }
-          }
         }
+    }
+
+    private func errorView(_ error: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Couldn’t refresh hits").font(.headline)
+            Text(error).font(.footnote).foregroundStyle(CourtlyColor.secondary)
+            Button("Try again") { Task { await hits.loadFeed(userInitiated: true) } }
+                .frame(minHeight: 44).disabled(hits.isLoadingFeed)
+        }.padding(.vertical, 16)
+    }
+}
+
+private struct ExploreSessionRow: View {
+    let hit: Hit
+    let isFriend: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 12) { time; details }
+            } else {
+                HStack(alignment: .top, spacing: 18) { time.frame(width: 74, alignment: .leading); details }
+            }
+        }
+        .padding(.vertical, 16)
+        .foregroundStyle(CourtlyColor.ink)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var time: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(hit.calendar.isDateInToday(hit.startsAt) ? "TODAY" : HitFormatting.string("EEE, MMM d", hit.startsAt, in: hit.zone).uppercased())
+                .font(.caption2.weight(.semibold)).foregroundStyle(CourtlyColor.blue)
+            Text(HitFormatting.string("h:mm", hit.startsAt, in: hit.zone))
+                .font(.title2.bold()).fixedSize()
+            Text(HitFormatting.string("a", hit.startsAt, in: hit.zone) + (hit.isInAnotherZone ? " \(hit.zone.abbreviation(for: hit.startsAt) ?? "")" : ""))
+                .font(.caption).foregroundStyle(CourtlyColor.secondary)
+        }
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(hit.format.shortTitle).font(.title3.weight(.semibold))
+                Spacer(minLength: 4)
+                if let miles = hit.miles {
+                    Text(String(format: "%.1f mi", miles)).font(.footnote).foregroundStyle(CourtlyColor.blue).fixedSize()
+                }
+            }
+            Text(hit.court.name).font(.footnote).foregroundStyle(CourtlyColor.secondary)
+            Text([hit.host.level?.title, "\(hit.durationMin) min"].compactMap { $0 }.joined(separator: " · "))
+                .font(.footnote).foregroundStyle(CourtlyColor.secondary)
+            HStack(spacing: 7) {
+                PlayerAvatar(card: hit.host, size: 24).accessibilityHidden(true)
+                Text(hit.host.displayName).font(.footnote.weight(.medium))
+                if isFriend {
+                    Text("Friend").font(.caption2.weight(.semibold)).padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(CourtlyColor.lime, in: RoundedRectangle(cornerRadius: 5))
+                }
+            }
+            Text(hit.isMember ? "You’re in" : hit.hasPendingRequest ? "Requested" : hit.isFull ? "Full" : "\(hit.spotsLabel) open")
+                .font(.caption.weight(.semibold))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }

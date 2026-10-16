@@ -70,9 +70,12 @@ struct MainTabView: View {
                 selected = .myHits
                 paths[.myHits] = [.hit(hit.id)]
             }
+            .preferredColorScheme(.light)
         }
         .tint(CourtlyColor.blue)
-        .preferredColorScheme(.light)
+        // White status indicators only while Explore's blue header is visible.
+        .preferredColorScheme(selected == .play && isAtRoot ? .dark : .light)
+        .environment(\.colorScheme, .light)
         .environment(hits)
         .environment(inbox)
         // Near you and the "Fits your…" captions follow the player's area, availability, level

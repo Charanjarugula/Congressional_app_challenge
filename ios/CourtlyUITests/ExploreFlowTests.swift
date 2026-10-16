@@ -1,85 +1,116 @@
 import XCTest
 
 final class ExploreFlowTests: XCTestCase {
-    func testExpandFiltersCancelAndNavigation() {
+    private let friend = "explore-hit-00000000-0000-0000-0000-000000000101"
+    private let stranger = "explore-hit-00000000-0000-0000-0000-000000000102"
+    private let far = "explore-hit-00000000-0000-0000-0000-000000000103"
+
+    private func launch() -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["--explore-ui-checks"]
+        app.launchEnvironment["TZ"] = "UTC"
         app.launch()
-        let discover = app.buttons["Discover"]
-        XCTAssertTrue(discover.waitForExistence(timeout: 10))
-        discover.tap()
-        XCTAssertTrue(discover.isSelected)
-        app.buttons["open-filters"].tap()
-        let tomorrow = app.buttons["Tomorrow"]
-        XCTAssertTrue(tomorrow.waitForExistence(timeout: 5))
-        tomorrow.tap()
-        XCTAssertTrue(tomorrow.isSelected)
-        capture(app, "Filters")
-        app.buttons["Cancel"].tap()
-        app.buttons["open-filters"].tap()
-        XCTAssertTrue(app.buttons["Any day"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Any day"].isSelected, "Cancelled filter changes must not persist")
-        app.buttons["Cancel"].tap()
-        app.buttons["Friends"].tap()
-        app.buttons["open-filters"].tap()
-        app.swipeUp()
-        XCTAssertTrue(app.buttons["Any distance"].isSelected)
-        app.buttons["50 mi"].tap()
-        app.buttons["Show hits"].tap()
-        app.buttons["Discover"].tap()
-        app.buttons["open-filters"].tap()
-        app.swipeUp()
-        XCTAssertTrue(app.buttons["50 mi"].isSelected)
-        app.buttons["Reset"].tap()
-        app.buttons["Show hits"].tap()
-        let hit = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Casual hitting' AND label CONTAINS 'Jordan'")).firstMatch
-        XCTAssertTrue(hit.waitForExistence(timeout: 5))
-        capture(app, "Explore card")
-        hit.tap()
-        let join = app.buttons["Ask to join"]
-        if !join.isHittable { app.swipeUp() }
-        XCTAssertTrue(join.isHittable)
-        XCTAssertTrue(app.buttons["Open in Maps"].exists)
-        capture(app, "Expanded hit")
-        app.buttons["Settings"].tap()
-        XCTAssertTrue(app.buttons["Settings"].isSelected)
-        app.buttons["Explore"].tap()
-        XCTAssertTrue(app.buttons["Explore"].isSelected)
-        XCTAssertTrue(discover.isSelected)
+        XCTAssertTrue(app.buttons["All hits"].waitForExistence(timeout: 10))
+        return app
     }
 
-    func testRealFeedDistanceAndJoinedInvitation() {
+    func testUnifiedInventorySortingScopeAndDetail() {
+        let app = launch()
+        XCTAssertTrue(app.staticTexts["explore-count"].label.contains("3 hits"), "Duplicate friend listing must appear only once")
+        XCTAssertLessThan(app.buttons[friend].frame.minY, app.buttons[stranger].frame.minY)
+        XCTAssertFalse(app.buttons["I’m in"].exists, "A joined invitation must not be actionable again")
+        capture(app, "Explore All hits")
+        app.buttons["Friends"].tap()
+        XCTAssertTrue(app.staticTexts["explore-count"].label.contains("1 hit"))
+        app.buttons["All hits"].tap()
+        app.buttons["explore-sort"].tap()
+        app.buttons["Soonest"].tap()
+        XCTAssertLessThan(app.buttons[stranger].frame.minY, app.buttons[friend].frame.minY)
+        app.buttons[stranger].tap()
+        XCTAssertTrue(app.buttons["Ask to join"].waitForExistence(timeout: 8))
+        capture(app, "Explore opens hit detail")
+        app.buttons["Back"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["All hits"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["explore-sort"].label.contains("Soonest"))
+        app.buttons["Plan a hit"].tap()
+        XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
+        capture(app, "Explore opens planning")
+        app.buttons["Cancel"].tap()
+    }
+
+    func testFiltersApplyCancelResetAndEmptyRecovery() {
+        let app = launch()
+        app.buttons["open-filters"].tap()
+        XCTAssertTrue(app.buttons["Doubles"].waitForExistence(timeout: 5))
+        app.buttons["Doubles"].tap()
+        capture(app, "Explore filters")
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(app.staticTexts["explore-count"].label.contains("3 hits"))
+        app.buttons["open-filters"].tap()
+        XCTAssertFalse(app.buttons["Doubles"].isSelected)
+        app.buttons["Doubles"].tap()
+        app.buttons["apply-filters"].tap()
+        XCTAssertTrue(app.staticTexts["explore-count"].label.contains("1 hit"))
+        XCTAssertTrue(app.buttons[far].exists, "No implicit 50-mile cutoff")
+        app.buttons["Friends"].tap()
+        XCTAssertTrue(app.staticTexts["No matching hits from friends"].waitForExistence(timeout: 5))
+        capture(app, "Explore empty search")
+        app.buttons["See all hits"].tap()
+        XCTAssertTrue(app.buttons[far].exists)
+        app.buttons["open-filters"].tap()
+        app.buttons["Reset all"].tap()
+        app.swipeUp()
+        app.buttons["Set a maximum"].tap()
+        app.buttons["50 mi"].tap()
+        app.buttons["apply-filters"].tap()
+        XCTAssertTrue(app.staticTexts["explore-count"].label.contains("2 hits"))
+        app.buttons["open-filters"].tap()
+        app.buttons["Reset all"].tap()
+        app.buttons["apply-filters"].tap()
+        XCTAssertTrue(app.staticTexts["explore-count"].label.contains("3 hits"))
+    }
+
+    func testTimeSearchCancelApplyAndExactTimes() {
+        let app = launch()
+        app.buttons["explore-search"].tap()
+        XCTAssertTrue(app.buttons["Tomorrow"].waitForExistence(timeout: 5))
+        app.buttons["Tomorrow"].tap()
+        app.buttons["Cancel"].tap()
+        app.buttons["explore-search"].tap()
+        XCTAssertTrue(app.buttons["Any day"].isSelected)
+        app.buttons["Tomorrow"].tap()
+        let afternoon = app.buttons["Afternoon · 12–5"]
+        if !afternoon.isHittable { app.swipeUp() }
+        afternoon.tap()
+        capture(app, "Explore where and when")
+        app.buttons["Show hits"].tap()
+        XCTAssertTrue(app.staticTexts["explore-count"].label.contains("1 hit"))
+        XCTAssertTrue(app.buttons[stranger].exists)
+        app.buttons["explore-search"].tap()
+        app.swipeUp()
+        app.buttons["Choose exact times"].tap()
+        XCTAssertTrue(app.datePickers.count >= 2)
+        capture(app, "Explore exact time pickers")
+        app.buttons["Cancel"].tap()
+    }
+
+    func testLargeText() {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--remaining-ui-checks"]
+        app.launchArguments = ["--explore-ui-checks", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityM"]
         app.launch()
-        app.buttons["Explore check"].tap()
-        let friends = app.buttons["Friends"]
-        XCTAssertTrue(friends.waitForExistence(timeout: 5))
-        XCTAssertLessThan(friends.frame.minY, app.frame.height * 0.5)
-        XCTAssertFalse(app.staticTexts["Needs your reply"].exists)
-        XCTAssertFalse(app.buttons["I’m in"].exists)
-        capture(app, "Explore compact header")
-        for segment in ["Friends", "Discover"] {
-            app.buttons[segment].tap()
-            let filters = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Filters")).firstMatch
-            filters.tap()
-            app.swipeUp()
-            app.buttons["50 mi"].tap()
-            app.buttons["Show hits"].tap()
-            XCTAssertTrue(app.staticTexts["Nothing matches"].waitForExistence(timeout: 5))
-            filters.tap()
-            app.buttons["Reset"].tap()
-            app.buttons["Show hits"].tap()
-            XCTAssertFalse(app.staticTexts["Nothing matches"].exists)
-        }
+        XCTAssertTrue(app.buttons["All hits"].waitForExistence(timeout: 10))
+        capture(app, "Explore larger text")
+        app.buttons["open-filters"].tap()
+        XCTAssertTrue(app.buttons["Singles"].waitForExistence(timeout: 5))
+        app.buttons["Singles"].tap()
+        app.buttons["apply-filters"].tap()
+        XCTAssertTrue(app.staticTexts["explore-count"].label.contains("1 hit"))
     }
 
     private func capture(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
+        attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
 }

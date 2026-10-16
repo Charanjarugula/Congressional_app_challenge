@@ -1,34 +1,61 @@
 #if DEBUG && targetEnvironment(simulator)
 import SwiftUI
 
-/// Isolated visual and interaction checks. No fixtures or entry point are compiled into TestFlight.
+/// Exercises the production Explore view. Only the data and navigation destinations are fixtures.
 struct ExplorePreviewHarness: View {
-    @State private var expanded = false
-    @State private var filters = ExploreFilters()
-    @State private var showsFilters = false
     @State private var selected = MainTab.play
-    @State private var segment = 0
-    @State private var hits = HitsStore(account: nil)
-    private let hit = Self.exampleHit
+    @State private var paths: [AppRoute] = []
+    @State private var planning = false
+    @State private var session = AppSession(previewProfile: RemainingFlowsHarness.profile)
+    @State private var hits = HitsStore(previewFeed: Self.feed)
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    SegmentedControl(options: ["Friends", "Discover"], selectedIndex: $segment, courtside: true)
-                    Button("Filters") { showsFilters = true }
-                        .accessibilityIdentifier("open-filters")
-                    HitFeedRow(hit: hit, isExpanded: expanded) { expanded.toggle() }
+        NavigationStack(path: $paths) {
+            PlayView(onPlan: { planning = true })
+                .contentMargins(.bottom, 76, for: .scrollContent)
+                .navigationDestination(for: AppRoute.self) { route in
+                    if case .hit(let id) = route,
+                       let hit = ExploreInventory.hits(Self.feed).first(where: { $0.id == id }) {
+                        HitDetailView(preview: hit)
+                    }
                 }
-                .padding(24)
-            }
-            .navigationTitle(selected.title)
-            .background(CourtlyColor.surface)
-            .safeAreaInset(edge: .bottom) { GlassTabBar(selected: $selected, dots: [.people]) }
-            .sheet(isPresented: $showsFilters) { ExploreFiltersSheet(filters: $filters) }
+                .overlay(alignment: .bottomTrailing) {
+                    if paths.isEmpty {
+                        PlusButton(label: "Plan a hit") { planning = true }
+                            .padding(.trailing, 20).padding(.bottom, 16)
+                    }
+                }
+                .safeAreaInset(edge: .bottom) {
+                    if paths.isEmpty { GlassTabBar(selected: $selected, dots: []) }
+                }
+                .sheet(isPresented: $planning) { PlanHitView { _ in planning = false }.preferredColorScheme(.light) }
         }
-        .environment(hits)
-        .preferredColorScheme(.light)
+        .environment(session).environment(hits)
+        .environment(\.navigate, NavigateAction(push: { paths.append($0) }, pop: { if !paths.isEmpty { paths.removeLast() } }))
+        .preferredColorScheme(paths.isEmpty ? .dark : .light)
+        .environment(\.colorScheme, .light)
+    }
+
+    static let friendID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
+    static let strangerID = UUID(uuidString: "00000000-0000-0000-0000-000000000102")!
+    static let farID = UUID(uuidString: "00000000-0000-0000-0000-000000000103")!
+    static var feed: PlayFeed {
+        let calendar = exampleHit.calendar
+        let base = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: .now))!
+        func make(_ id: UUID, miles: Double, hour: Double, format: PlayFormat) -> Hit {
+            let source = exampleHit
+            return Hit(id: id, host: source.host, court: source.court, startsAt: calendar.date(bySettingHour: Int(hour), minute: Int((hour.truncatingRemainder(dividingBy: 1)) * 60), second: 0, of: base)!,
+                       durationMin: 90, format: format, spotsTotal: 2, spotsOpen: 2, visibility: .anyone,
+                       status: .open, chatId: nil, players: [], miles: miles, pendingRequestCount: 0,
+                       unreadMessages: 0, viewer: .init(isHost: false, isPlayer: false))
+        }
+        let friend = make(friendID, miles: 0.74, hour: 17.5, format: .casual)
+        let stranger = make(strangerID, miles: 0.71, hour: 12, format: .singles)
+        let far = make(farID, miles: 52.4, hour: 18, format: .doubles)
+        var joined = friend
+        joined.viewer.isPlayer = true
+        let stale = NeedsReplyItem(kind: .invite, requestId: nil, inviteId: UUID(), player: nil, host: friend.host, hit: joined, createdAt: .now)
+        return PlayFeed(needsReply: [stale], fromFriends: [friend], nearYou: [stranger, friend, far], freeThisWeek: [], myUpcomingCount: 0, badge: 0)
     }
 
     static var exampleHit: Hit {

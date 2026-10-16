@@ -1,6 +1,6 @@
 # Handling reports
 
-Apple expects reports on Courtly to be acted on within a day. This is how.
+Courtly’s published support policy promises to review reports within 24 hours. Apple’s user-generated content rules require timely responses. This is the operating procedure for meeting that commitment.
 
 ## Where reports arrive
 
@@ -13,6 +13,10 @@ moderator automatically.
 Report emails need the Gmail app password as the `SMTP_USER` and `SMTP_PASS` GitHub secrets (the
 deploy's `secrets` step passes them to the function). Without them the function answers
 "email not configured" and only the in-app notice goes out.
+
+## Launch owner
+
+Charan Jarugula confirmed on October 16, 2026 that he can access courtly.support@gmail.com and will monitor it daily. The production audit found two open reports; review those before launch.
 
 ## Every day
 

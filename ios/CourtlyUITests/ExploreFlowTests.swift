@@ -9,6 +9,7 @@ final class ExploreFlowTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["--explore-ui-checks"]
+        app.launchEnvironment["TZ"] = "UTC"
         app.launch()
         XCTAssertTrue(app.buttons["All hits"].waitForExistence(timeout: 10))
         return app

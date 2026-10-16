@@ -40,10 +40,11 @@ struct ExplorePreviewHarness: View {
     static let strangerID = UUID(uuidString: "00000000-0000-0000-0000-000000000102")!
     static let farID = UUID(uuidString: "00000000-0000-0000-0000-000000000103")!
     static var feed: PlayFeed {
-        let base = Calendar.current.startOfDay(for: Date.now).addingTimeInterval(86400)
+        let calendar = exampleHit.calendar
+        let base = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: .now))!
         func make(_ id: UUID, miles: Double, hour: Double, format: PlayFormat) -> Hit {
             let source = exampleHit
-            return Hit(id: id, host: source.host, court: source.court, startsAt: base.addingTimeInterval(hour * 3600),
+            return Hit(id: id, host: source.host, court: source.court, startsAt: calendar.date(bySettingHour: Int(hour), minute: Int((hour.truncatingRemainder(dividingBy: 1)) * 60), second: 0, of: base)!,
                        durationMin: 90, format: format, spotsTotal: 2, spotsOpen: 2, visibility: .anyone,
                        status: .open, chatId: nil, players: [], miles: miles, pendingRequestCount: 0,
                        unreadMessages: 0, viewer: .init(isHost: false, isPlayer: false))

@@ -10,6 +10,10 @@ struct RemainingFlowsHarness: View {
     var body: some View {
         NavigationStack {
             List {
+                NavigationLink("Explore check") {
+                    PlayView(onPlan: {})
+                        .environment(HitsStore(previewFeed: Self.exampleFeed))
+                }
                 NavigationLink("Settings check") { YouView() }
                 NavigationLink("People check") {
                     PeopleView(isActive: false)
@@ -45,6 +49,17 @@ struct RemainingFlowsHarness: View {
          Message(id: UUID(), chatId: Self.chatID, sender: Self.profile.card, type: .text,
                  body: "Yes! Let’s do 6 at Wellington.", clientId: nil, createdAt: .now, invite: nil)]
     }
+    private static var exampleFeed: PlayFeed {
+        var far = ExplorePreviewHarness.exampleHit
+        far.miles = 60
+        var joined = far
+        joined.viewer.isPlayer = true
+        let stale = NeedsReplyItem(kind: .invite, requestId: nil, inviteId: UUID(), player: nil,
+                                   host: far.host, hit: joined, createdAt: .now)
+        return PlayFeed(needsReply: [stale], fromFriends: [far], nearYou: [far],
+                        freeThisWeek: [], myUpcomingCount: 1, badge: 0)
+    }
+
     private static var exampleHits: MyHits {
         let upcoming = ExplorePreviewHarness.exampleHit
         var past = ExplorePreviewHarness.exampleHit

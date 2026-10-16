@@ -51,7 +51,7 @@ struct BlockedPlayersView: View {
         .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("Blocked players")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .task {
             do {

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 08 · Location and 09 · Location confirmed. Type-ahead search or device location, then travel radius.
+/// 08 · Location and 09 · Location confirmed. Type-ahead search or device location, then confirm your area.
 struct LocationView: View {
     @Bindable var draft: OnboardingDraft
     let onContinue: () -> Void
@@ -28,14 +28,6 @@ struct LocationView: View {
                     .font(CourtlyFont.caption)
                     .foregroundStyle(.white.opacity(0.85))
                     .padding(.top, 10)
-                SectionLabel(title: "How far will you travel for a hit?", color: .white)
-                    .padding(.top, 32)
-                    .padding(.bottom, 10)
-                HStack(spacing: 8) {
-                    ForEach(TravelRadius.allCases) { radius in
-                        radiusChip(radius)
-                    }
-                }
             } else {
                 searchField
                     .padding(.top, 28)
@@ -153,24 +145,6 @@ struct LocationView: View {
                 completer.clear()
             }
         }
-    }
-
-    private func radiusChip(_ radius: TravelRadius) -> some View {
-        let isSelected = draft.radius == radius
-        return Button {
-            draft.radius = radius
-        } label: {
-            Text(radius.title)
-                .font(CourtlyFont.secondarySemibold)
-                .foregroundStyle(CourtlyColor.ink)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(isSelected ? CourtlyColor.lime : .white)
-                )
-        }
-        .buttonStyle(PressableButtonStyle())
     }
 
     // MARK: - Actions

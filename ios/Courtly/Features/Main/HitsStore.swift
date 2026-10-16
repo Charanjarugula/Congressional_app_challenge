@@ -34,6 +34,7 @@ final class HitsStore {
     }
 
     #if DEBUG && targetEnvironment(simulator)
+    init(previewFeed: PlayFeed) { feed = previewFeed }
     init(previewMyHits: MyHits) { myHits = previewMyHits }
     #endif
 

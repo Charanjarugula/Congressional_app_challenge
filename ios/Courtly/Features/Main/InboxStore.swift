@@ -9,6 +9,7 @@ final class InboxStore {
     private(set) var requests: FriendRequests?
     private(set) var isLoading = false
     private(set) var lastError: String?
+    private(set) var requestsError: String?
 
     /// Paints from the signed-in player's own snapshot; nothing of another account's is ever read.
     init(account: UUID?) {
@@ -43,12 +44,16 @@ final class InboxStore {
         do {
             async let requestsCall = API.People.friendRequests()
             let fresh = try await API.Chats.inbox()
-            let freshRequests = try? await requestsCall
+            let freshRequests: FriendRequests?
+            var requestFailure: String?
+            do { freshRequests = try await requestsCall }
+            catch { freshRequests = nil; requestFailure = error.localizedDescription }
             // Same player (a sign-out mid-flight must not refill the list), then, with no await in
             // between, still the newest load; the file goes under the account that fetched it.
             let samePlayer = await SupabaseClient.shared.session?.userID == owner
             guard samePlayer, mine == generation, let owner else { return }
             chats = fresh
+            requestsError = requestFailure
             lastError = nil
             SnapshotCache.save(fresh, key: "inbox", account: owner)
             if let freshRequests {

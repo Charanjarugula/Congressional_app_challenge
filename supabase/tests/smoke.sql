@@ -18,6 +18,15 @@ begin
   select id into v_court from public.courts where name = 'Wellington Tennis Center';
   if v_court is null then raise exception 'seed missing: Wellington Tennis Center'; end if;
 
+  -- Full-name input matches the public initial without exposing or comparing the surname.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  if not exists (select 1 from jsonb_array_elements(public.search_players('  Maya   Reyes  ')) e where (e->>'id')::uuid = a) then
+    raise exception 'full-name search failed';
+  end if;
+  if not exists (select 1 from jsonb_array_elements(public.search_players('Maya R.')) e where (e->>'id')::uuid = a) then
+    raise exception 'public initial search failed';
+  end if;
+
   -- Maya posts a hit.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   v_hit := public.create_hit(v_court, now() + interval '2 days', 90, 'casual', 1, 'anyone');
@@ -28,6 +37,12 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   v_feed := public.get_play_feed();
   if jsonb_array_length(v_feed->'near_you') < 1 then raise exception 'feed empty for jordan: %', v_feed; end if;
+  -- Distance is selected in the app, never a hidden profile-level exclusion.
+  update public.profiles set home_point = extensions.st_setsrid(extensions.st_makepoint(-74.006, 40.7128), 4326), radius_mi = 5 where id = b;
+  if not exists (select 1 from jsonb_array_elements(public.get_play_feed()->'near_you') e where (e->>'id')::uuid = v_hit_id) then
+    raise exception 'far-away hit hidden by legacy radius';
+  end if;
+  update public.profiles set home_point = extensions.st_setsrid(extensions.st_makepoint(-80.2414, 26.6618), 4326), radius_mi = 10 where id = b;
   v_req := public.request_to_join(v_hit_id);
   v_req_id := (v_req->'viewer'->'request'->>'id')::uuid;
   if v_req_id is null then raise exception 'request id missing: %', v_req; end if;
@@ -139,12 +154,9 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', c, 'role', 'authenticated')::text, true);
   v_hit := public.claim_invite((v_invite->>'id')::uuid);
   if (v_hit->>'status') <> 'confirmed' then raise exception 'claim state: %', v_hit; end if;
-  begin
-    perform public.claim_invite((v_invite->>'id')::uuid);
-    raise exception 'second claim succeeded';
-  exception when others then
-    if sqlerrm not in ('invite_closed', 'spot_taken', 'already_in') then raise; end if;
-  end;
+  v_n := (v_hit->>'spots_open')::int;
+  v_hit := public.claim_invite((v_invite->>'id')::uuid);
+  if (v_hit->>'spots_open')::int <> v_n then raise exception 'repeat claim consumed another spot'; end if;
 
   -- Alex blocks Jordan: relationship flips, and a hit Jordan posts afterwards is invisible to Alex.
   perform public.block_user(b);
@@ -778,8 +790,19 @@ begin
   perform public.add_friend(b);
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   perform public.add_chat_members((v_group->>'id')::uuid, array[a]);
+  v_invite := public.send_hit_invite((v_hit->>'id')::uuid, (v_group->>'id')::uuid, a, null);
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   v_hit := public.claim_invite((v_invite->>'id')::uuid);
+  if exists (select 1 from jsonb_array_elements(public.get_play_feed()->'needs_reply') e where e->>'invite_id' = v_invite->>'id') then
+    raise exception 'joined invitation still needs a reply';
+  end if;
+  if (select status from public.hit_invites where id = (v_invite->>'id')::uuid) <> 'filled' then raise exception 'direct invite remained open'; end if;
+  update public.hit_invites set status = 'open' where id = (v_invite->>'id')::uuid;
+  if exists (select 1 from jsonb_array_elements(public.get_play_feed()->'needs_reply') e where e->>'invite_id' = v_invite->>'id') then raise exception 'legacy invitation still needs reply'; end if;
+  v_n := public.badge_count(a);
+  update public.hit_invites set status = 'cancelled' where id = (v_invite->>'id')::uuid;
+  if public.badge_count(a) <> v_n then raise exception 'joined invitation inflated badge'; end if;
+
   if (v_hit->>'chat_id')::uuid is distinct from (v_group->>'id')::uuid then raise exception 'group-born hit left the group: %', v_hit; end if;
   perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
   perform public.cancel_hit((v_hit->>'id')::uuid);
@@ -793,7 +816,6 @@ begin
   exception when others then
     if sqlerrm not in ('attendance_closed', 'not_a_player') then raise; end if;
   end;
-
 
   -- Friend requests: deleting one is silent, taking one back is clean, and the badge counts what waits.
   perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
@@ -895,7 +917,7 @@ begin
     if jsonb_array_length(public.search_players('Nia P')) <> 0 then raise exception 'search by own name should not list self'; end if;
     perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
     if jsonb_array_length(public.search_players('Nia P')) <> 1 then raise exception 'first name and last initial should match'; end if;
-    if jsonb_array_length(public.search_players('Nia Pa')) <> 0 then raise exception 'search revealed more than the last initial'; end if;
+    if public.search_players('Nia Pa') is distinct from public.search_players('Nia Pz') then raise exception 'search revealed more than the last initial'; end if;
     perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);
     -- Strangers don't see when someone is free or busy.
     if public.get_player(a) ? 'availability_mask' and public.get_player(a)->>'availability_mask' is not null then

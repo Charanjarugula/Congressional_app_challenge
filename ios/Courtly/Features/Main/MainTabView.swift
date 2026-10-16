@@ -28,7 +28,7 @@ struct MainTabView: View {
     private var feedPreferences: String? {
         guard let me = session.profile else { return nil }
         let home = me.homeArea.map { "\($0.latitude),\($0.longitude)" } ?? ""
-        return [home, String(me.radiusMi), String(me.availabilityMask), me.level?.rawValue ?? "", me.formats.map(\.rawValue).joined(separator: ",")]
+        return [home, String(me.availabilityMask), me.level?.rawValue ?? "", me.formats.map(\.rawValue).joined(separator: ",")]
             .joined(separator: "|")
     }
 
@@ -75,7 +75,7 @@ struct MainTabView: View {
         .preferredColorScheme(.light)
         .environment(hits)
         .environment(inbox)
-        // Near you and the "Fits your…" captions follow the player's area, radius, availability, level
+        // Near you and the "Fits your…" captions follow the player's area, availability, level
         // and formats, so a change on the You tab reloads the feed instead of waiting for a pull.
         .onChange(of: feedPreferences) { old, new in
             if old != nil, new != nil { Task { await hits.loadFeed() } }

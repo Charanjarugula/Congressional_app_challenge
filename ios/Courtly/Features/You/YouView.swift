@@ -34,7 +34,7 @@ struct YouView: View {
         }
         .background(CourtlyColor.surface.ignoresSafeArea())
         .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .refreshable { await session.refreshProfile() }
         .sheet(item: $sheet) { which in
             switch which {
@@ -193,7 +193,7 @@ struct YouView: View {
 
     private func areaValue(_ profile: Profile) -> String {
         guard let label = profile.areaLabel?.components(separatedBy: ",").first else { return "Not set" }
-        return "\(label) · \(profile.radius.title)"
+        return label
     }
 
     private static var version: String {

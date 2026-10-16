@@ -42,46 +42,49 @@ struct ChatThreadView: View {
             if let hit = chat?.hit {
                 PinnedHitBar(hit: hit) { navigate(.hit(hit.id)) }
             }
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 10) {
-                        if loadFailed && messages.isEmpty {
-                            QuietCard(title: "Couldn’t open this chat", detail: "Check your connection and try again.")
-                        }
-                        if hasEarlier {
-                            Button(isLoadingEarlier ? "Loading…" : "Load earlier messages") { loadEarlier() }
-                                .font(CourtlyFont.secondarySemibold)
-                                .foregroundStyle(CourtlyColor.blue)
-                                .disabled(isLoadingEarlier)
-                                .padding(.bottom, 6)
-                        }
-                        ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-                            if showsTimestamp(at: index) {
-                                Text(HitFormatting.conversational(message.createdAt))
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(CourtlyColor.secondary)
-                                    .padding(.top, index == 0 ? 0 : 6)
+            GeometryReader { geometry in
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 10) {
+                            if loadFailed && messages.isEmpty {
+                                QuietCard(title: "Couldn’t open this chat", detail: "Check your connection and try again.")
                             }
-                            MessageRow(
-                                message: message,
-                                isMine: message.sender?.id == me,
-                                showsAvatar: chat?.type != .dm,
-                                startsRun: startsRun(at: index),
-                                onOpenSender: { navigate(.player($0)) }
-                            ) { reporting = message }
+                            if hasEarlier {
+                                Button(isLoadingEarlier ? "Loading…" : "Load earlier messages") { loadEarlier() }
+                                    .font(CourtlyFont.secondarySemibold)
+                                    .foregroundStyle(CourtlyColor.blue)
+                                    .disabled(isLoadingEarlier)
+                                    .padding(.bottom, 6)
+                            }
+                            ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
+                                if showsTimestamp(at: index) {
+                                    Text(HitFormatting.conversational(message.createdAt))
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(CourtlyColor.secondary)
+                                        .padding(.top, index == 0 ? 0 : 6)
+                                }
+                                MessageRow(
+                                    message: message,
+                                    isMine: message.sender?.id == me,
+                                    showsAvatar: chat?.type != .dm,
+                                    startsRun: startsRun(at: index),
+                                    onOpenSender: { navigate(.player($0)) }
+                                ) { reporting = message }
+                            }
+                            Color.clear
+                                .frame(height: 1)
+                                .id("bottom")
                         }
-                        Color.clear
-                            .frame(height: 1)
-                            .id("bottom")
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
+                        .frame(minHeight: geometry.size.height, alignment: .top)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                }
-                .defaultScrollAnchor(.bottom)
-                .scrollDismissesKeyboard(.interactively)
-                .onChange(of: messages.last?.id) { _, _ in   // a page loaded above leaves the reader where they are
-                    withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    .defaultScrollAnchor(.bottom)
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: messages.last?.id) { _, _ in   // a page loaded above leaves the reader where they are
+                        withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+                    }
                 }
             }
             if chat?.leftAt != nil {

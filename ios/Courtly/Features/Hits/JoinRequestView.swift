@@ -71,7 +71,7 @@ struct JoinRequestView: View {
         .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("Request")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .task(id: requestID) {
             // From a push or a stale snapshot the request may not be in the cached feed yet.

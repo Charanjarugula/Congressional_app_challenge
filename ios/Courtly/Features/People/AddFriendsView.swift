@@ -68,7 +68,7 @@ struct AddFriendsView: View {
         .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("Add friends")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .onChange(of: query) { _, newValue in scheduleSearch(newValue) }
         .task { await loadSuggestions() }

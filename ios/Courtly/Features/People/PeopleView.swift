@@ -22,7 +22,7 @@ struct PeopleView: View {
         }
         .background(CourtlyColor.surface.ignoresSafeArea())
         .navigationTitle("People")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .refreshable { await inbox.load() }
         .task(id: isActive) {
             guard isActive else { return }
@@ -64,6 +64,10 @@ struct PeopleView: View {
 
     @ViewBuilder
     private var content: some View {
+        if let error = inbox.requestsError {
+            QuietCard(title: "Couldn’t load friend requests", detail: error)
+                .padding(.bottom, 12)
+        }
         if query.isEmpty, let requests = inbox.requests, !requests.incoming.isEmpty {
             requestsRow(requests.incoming)
                 .padding(.bottom, 12)

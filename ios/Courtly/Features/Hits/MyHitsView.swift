@@ -23,7 +23,7 @@ struct MyHitsView: View {
         }
         .background(CourtlyColor.surface.ignoresSafeArea())
         .navigationTitle("My Hits")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .refreshable { await hits.loadMyHits() }
     }
 

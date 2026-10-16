@@ -98,7 +98,7 @@ struct GroupInfoView: View {
         .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("Group")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .task(id: chatID) { await load() }
         .alert("Leave this group?", isPresented: $showsLeaveAlert) {

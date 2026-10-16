@@ -20,7 +20,8 @@ struct BirthdayView: View {
             case nil:
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.white.ignoresSafeArea())
+                    .tint(.white)
+                    .background(CourtlyColor.blue.ignoresSafeArea())
             case .minor?:
                 stopped(
                     title: "Courtly is for players 18 and over",
@@ -34,7 +35,7 @@ struct BirthdayView: View {
                     detail: "Where you live, apps confirm your age range with Apple. Courtly only learns whether you’re 18 or older."
                 ) {
                     VStack(spacing: 4) {
-                        PrimaryButton(title: "Try again", isLoading: isChecking) { Task { await runCheck() } }
+                        PrimaryButton(title: "Try again", style: .lime, compact: true, isLoading: isChecking) { Task { await runCheck() } }
                         LeaveSignUpButton(title: "Delete this account")
                     }
                 }
@@ -54,7 +55,7 @@ struct BirthdayView: View {
     }
 
     private func stopped<Footer: View>(title: String, detail: String, @ViewBuilder footer: @escaping () -> Footer) -> some View {
-        OnboardingStepView(progress: 0.3, title: title, subtitle: detail, scrolls: false) {
+        OnboardingStepView(progress: 0.3, title: title, subtitle: detail, appearance: .courtsideBlue) {
             EmptyView()
         } footer: {
             footer()
@@ -66,7 +67,7 @@ struct BirthdayView: View {
             progress: 0.3,
             title: "When’s your birthday?",
             subtitle: "Only used to confirm you’re 18 or older. Other players never see it.",
-            scrolls: false
+            appearance: .courtsideBlue
         ) {
             DatePicker("Birthday", selection: $draft.birthday, in: allowedRange, displayedComponents: .date)
                 .datePickerStyle(.wheel)
@@ -74,24 +75,24 @@ struct BirthdayView: View {
                 .labelsHidden()
                 .frame(maxWidth: .infinity)
                 .frame(height: 216)
-                .padding(.top, 32)
+                .background(.white, in: RoundedRectangle(cornerRadius: 22))
+                .environment(\.colorScheme, .light)
+                .padding(.top, 24)
 
             if !draft.birthdayChosen {
                 Text("Scroll to your birthday.")
                     .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.secondary)
+                    .foregroundStyle(.white.opacity(0.85))
                     .frame(maxWidth: .infinity)
                     .padding(.top, 12)
             } else if !draft.meetsMinimumAge {
-                Text("Courtly is for players \(OnboardingDraft.minimumAge) and over.")
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.red)
+                OnboardingErrorCaption(text: "Courtly is for players \(OnboardingDraft.minimumAge) and over.")
                     .frame(maxWidth: .infinity)
                     .padding(.top, 12)
             }
         } footer: {
             VStack(spacing: 4) {
-                PrimaryButton(title: "Continue", isEnabled: draft.birthdayChosen && draft.meetsMinimumAge, action: onContinue)
+                PrimaryButton(title: "Continue", style: .lime, compact: true, isEnabled: draft.birthdayChosen && draft.meetsMinimumAge, action: onContinue)
                 if draft.birthdayChosen && !draft.meetsMinimumAge {
                     LeaveSignUpButton(title: "Delete this account")
                 }

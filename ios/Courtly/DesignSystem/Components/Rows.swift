@@ -3,6 +3,7 @@ import SwiftUI
 /// Selectable row with a title, optional subtitle and a trailing selection mark.
 /// Single-line rows use 18pt padding; rows with a subtitle use 16pt vertical.
 struct ChoiceRow: View {
+    var courtside = false
     let title: String
     var subtitle: String? = nil
     let isSelected: Bool
@@ -17,7 +18,7 @@ struct ChoiceRow: View {
                         .foregroundStyle(CourtlyColor.ink)
                     if let subtitle {
                         Text(subtitle)
-                            .font(CourtlyFont.secondary)
+                            .font(courtside ? CourtlyFont.caption : CourtlyFont.secondary)
                             .foregroundStyle(CourtlyColor.secondary)
                     }
                 }
@@ -29,10 +30,11 @@ struct ChoiceRow: View {
             .padding(.horizontal, 18)
             .background(
                 RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
-                    .fill(isSelected ? CourtlyColor.blueTint : CourtlyColor.groupedBackground)
+                    .fill(isSelected ? CourtlyColor.blueTint : courtside ? .white : CourtlyColor.groupedBackground)
             )
         }
         .buttonStyle(PressableButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -40,17 +42,19 @@ struct ChoiceRow: View {
 struct FieldBox<Content: View>: View {
     var isHighlighted = false
     var fill: Color = CourtlyColor.groupedBackground   // white on the grey sheets
+    var cornerRadius: CGFloat = CourtlyMetrics.controlRadius
+    var horizontalPadding: CGFloat = 18
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         HStack(spacing: 12) {
             content()
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, horizontalPadding)
         .frame(height: CourtlyMetrics.fieldHeight)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(isHighlighted ? CourtlyColor.blueTint : fill)
         )
     }
@@ -109,10 +113,11 @@ struct HairlineSeparator: View {
 /// Section label above a list ("From your contacts", "How far will you travel for a hit?").
 struct SectionLabel: View {
     let title: String
+    var color: Color = CourtlyColor.secondary
 
     var body: some View {
         Text(title)
             .font(CourtlyFont.captionSemibold)
-            .foregroundStyle(CourtlyColor.secondary)
+            .foregroundStyle(color)
     }
 }

@@ -9,11 +9,12 @@ struct FormatsView: View {
         OnboardingStepView(
             progress: 0.6,
             title: "What do you want to play?",
-            subtitle: "Pick all that apply."
+            subtitle: "Pick all that apply.",
+            appearance: .courtsideBlue
         ) {
             VStack(spacing: 8) {
                 ForEach(PlayFormat.allCases) { option in
-                    ChoiceRow(title: option.title, subtitle: option.description, isSelected: draft.formats.contains(option)) {
+                    ChoiceRow(courtside: true, title: option.title, subtitle: option.description, isSelected: draft.formats.contains(option)) {
                         if draft.formats.contains(option) {
                             draft.formats.remove(option)
                         } else {
@@ -22,9 +23,9 @@ struct FormatsView: View {
                     }
                 }
             }
-            .padding(.top, 28)
+            .padding(.top, 24)
         } footer: {
-            PrimaryButton(title: "Continue", isEnabled: !draft.formats.isEmpty, action: onContinue)
+            PrimaryButton(title: "Continue", style: .lime, compact: true, isEnabled: !draft.formats.isEmpty, action: onContinue)
         }
     }
 }

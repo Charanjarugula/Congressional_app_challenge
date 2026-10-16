@@ -9,8 +9,18 @@ struct CourtlyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environment(session)
+            Group {
+                #if DEBUG && targetEnvironment(simulator)
+                if ProcessInfo.processInfo.arguments.contains("--onboarding-ui-checks") {
+                    OnboardingPreviewHarness()
+                } else {
+                    RootView()
+                }
+                #else
+                RootView()
+                #endif
+            }
+            .environment(session)
         }
     }
 }

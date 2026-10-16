@@ -22,12 +22,16 @@ struct EmailCodeView: View {
         OnboardingStepView(
             progress: 0.1,
             title: "Check your email",
-            subtitle: "We sent a code to \(email).",
-            scrolls: false
+            appearance: .courtsideBlue
         ) {
-            FieldBox {
+            Text("Code")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.top, 24)
+            FieldBox(fill: .white, cornerRadius: 16, horizontalPadding: 16) {
                 TextField("Code", text: $code)
-                    .font(CourtlyFont.rounded(28, weight: .bold))
+                    .font(CourtlyFont.bodySemibold)
+                    .tracking(4)
                     .foregroundStyle(CourtlyColor.ink)
                     .keyboardType(.numberPad)
                     .textContentType(.oneTimeCode)
@@ -38,12 +42,14 @@ struct EmailCodeView: View {
                         if trimmed.count == 8 { verify() }
                     }
             }
-            .padding(.top, 28)
+            .padding(.top, 16)
 
             if let message {
                 Text(message)
                     .font(CourtlyFont.caption)
                     .foregroundStyle(messageIsError ? CourtlyColor.red : CourtlyColor.secondary)
+                    .padding(12)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 12))
                     .padding(.top, 10)
             }
 
@@ -53,15 +59,23 @@ struct EmailCodeView: View {
                 Button(action: resend) {
                     Text(isResending ? "Sending…" : wait > 0 ? "Resend code in \(wait)s" : "Resend code")
                         .font(CourtlyFont.secondarySemibold)
-                        .foregroundStyle(wait > 0 ? CourtlyColor.secondary : CourtlyColor.blue)
+                        .foregroundStyle(CourtlyColor.blue)
                         .monospacedDigit()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(.white))
                 }
                 .buttonStyle(.plain)
                 .disabled(isResending || wait > 0)
             }
-            .padding(.top, 20)
+            .padding(.top, 16)
+            Text("We sent a code to \(email).")
+                .font(CourtlyFont.caption)
+                .foregroundStyle(.white.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 16)
         } footer: {
-            PrimaryButton(title: "Continue", isEnabled: canContinue, isLoading: isVerifying, action: verify)
+            PrimaryButton(title: "Continue", style: .lime, compact: true, isEnabled: canContinue, isLoading: isVerifying, action: verify)
         }
         .task {
             try? await Task.sleep(for: .milliseconds(400))

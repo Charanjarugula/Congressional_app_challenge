@@ -60,9 +60,9 @@ jobs:
           - name: Unit tests
             scheme: Courtly
             target: CourtlyTests
-          - name: Welcome navigation
+          - name: Onboarding navigation
             scheme: CourtlyUITests
-            target: CourtlyUITests/WelcomeTests
+            target: CourtlyUITests
     steps:
       - uses: actions/checkout@v4
 

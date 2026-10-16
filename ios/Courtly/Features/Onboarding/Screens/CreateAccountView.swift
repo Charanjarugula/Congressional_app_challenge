@@ -15,6 +15,10 @@ struct CreateAccountView: View {
     @State private var busy: Busy?
     @State private var errorMessage: String?
 
+    private var isBlue: Bool { true }
+    private var labelColor: Color { isBlue ? .white : CourtlyColor.ink }
+    private var supportingColor: Color { isBlue ? .white.opacity(0.85) : CourtlyColor.secondary }
+
     private var isValidEmail: Bool {
         let trimmed = email.trimmingCharacters(in: .whitespaces)
         return trimmed.range(of: #"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$"#, options: .regularExpression) != nil
@@ -25,8 +29,8 @@ struct CreateAccountView: View {
     }
 
     var body: some View {
-        OnboardingStepView(progress: 0.1, title: mode == .signUp ? "Create your account" : "Welcome back") {
-            VStack(spacing: 12) {
+        OnboardingStepView(progress: 0.1, title: mode == .signUp ? "Create your account" : "Welcome back", appearance: .courtsideBlue) {
+            VStack(spacing: 8) {
                 SocialSignInButton(kind: .google, isLoading: busy == .google) {
                     run(.google) { try await AppEnvironment.auth.signInWithGoogle(); await onSignedIn(nil) }
                 }
@@ -34,23 +38,20 @@ struct CreateAccountView: View {
                     run(.apple) { let name = try await AppEnvironment.auth.signInWithApple(); await onSignedIn(name) }
                 }
             }
-            .padding(.top, 32)
+            .padding(.top, 24)
 
-            HStack(spacing: 12) {
-                HairlineSeparator()
-                Text("or")
-                    .font(CourtlyFont.secondary)
-                    .foregroundStyle(CourtlyColor.secondary)
-                HairlineSeparator()
-            }
-            .padding(.vertical, 24)
+            Text("or use email")
+                .font(CourtlyFont.caption)
+                .foregroundStyle(supportingColor)
+                .padding(.vertical, 16)
 
             Text("Email")
-                .font(CourtlyFont.secondarySemibold)
-                .foregroundStyle(CourtlyColor.ink)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(labelColor)
 
-            FieldBox {
-                TextField("Email", text: $email)
+            FieldBox(fill: .white, cornerRadius: 16, horizontalPadding: 16) {
+                TextField("Email", text: $email, prompt: Text(verbatim: "you@example.com").foregroundStyle(CourtlyColor.secondary))
+                    .accessibilityLabel("Email")
                     .font(CourtlyFont.body)
                     .foregroundStyle(CourtlyColor.ink)
                     .keyboardType(.emailAddress)
@@ -60,20 +61,22 @@ struct CreateAccountView: View {
                     .submitLabel(.continue)
                     .onSubmit(continueWithEmail)
             }
-            .padding(.top, 8)
-
-            PrimaryButton(title: "Continue", isEnabled: isValidEmail, isLoading: busy == .email, action: continueWithEmail)
-                .padding(.top, 16)
+            .padding(.top, 16)
 
             if let errorMessage {
                 ErrorCaption(text: errorMessage)
+                    .padding(isBlue ? 12 : 0)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(isBlue ? Color.white : Color.clear, in: RoundedRectangle(cornerRadius: 12))
                     .padding(.top, 12)
             }
 
             termsText
-                .padding(.top, 20)
-                .padding(.horizontal, 12)
-                .frame(maxWidth: .infinity)
+                .padding(.top, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } footer: {
+            PrimaryButton(title: "Continue", style: .lime, compact: true,
+                          isEnabled: isValidEmail, isLoading: busy == .email, action: continueWithEmail)
         }
     }
 
@@ -81,9 +84,9 @@ struct CreateAccountView: View {
     private var termsText: some View {
         Text(termsMarkdown)
             .font(CourtlyFont.caption)
-            .foregroundStyle(CourtlyColor.secondary)
-            .tint(CourtlyColor.ink)
-            .multilineTextAlignment(.center)
+            .foregroundStyle(supportingColor)
+            .tint(labelColor)
+            .multilineTextAlignment(.leading)
             .lineSpacing(3)
     }
 
@@ -92,7 +95,7 @@ struct CreateAccountView: View {
         for run in text.runs where run.link != nil {
             text[run.range].font = CourtlyFont.captionSemibold
             text[run.range].underlineStyle = .single
-            text[run.range].foregroundColor = CourtlyColor.ink
+            text[run.range].foregroundColor = labelColor
         }
         return text
     }
@@ -123,7 +126,7 @@ struct CreateAccountView: View {
     }
 }
 
-/// White 52pt button with a 1.5pt border and a provider mark.
+/// Provider actions for account entry, retaining their existing marks and authentication callbacks.
 struct SocialSignInButton: View {
     enum Kind {
         case google, apple
@@ -140,29 +143,27 @@ struct SocialSignInButton: View {
     var isLoading = false
     let action: () -> Void
 
+    private var foreground: Color { kind == .apple ? .white : CourtlyColor.ink }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
                 mark
                 Text(kind.title)
-                    .font(CourtlyFont.bodySemibold)
-                    .foregroundStyle(CourtlyColor.ink)
+                    .font(CourtlyFont.secondarySemibold)
+                    .foregroundStyle(foreground)
             }
             .opacity(isLoading ? 0 : 1)
             .overlay {
                 if isLoading {
-                    ProgressView().tint(CourtlyColor.ink)
+                    ProgressView().tint(foreground)
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: CourtlyMetrics.primaryButtonHeight)
+            .frame(height: 48)
             .background(
-                RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
-                    .fill(Color.white)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
-                    .strokeBorder(CourtlyColor.separator, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(kind == .apple ? CourtlyColor.ink : .white)
             )
         }
         .buttonStyle(PressableButtonStyle())
@@ -195,7 +196,7 @@ struct SocialSignInButton: View {
         case .apple:
             Image(systemName: "apple.logo")
                 .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(CourtlyColor.ink)
+                .foregroundStyle(foreground)
         }
     }
 }

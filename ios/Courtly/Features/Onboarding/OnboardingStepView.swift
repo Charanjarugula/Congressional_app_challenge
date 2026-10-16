@@ -1,5 +1,7 @@
 import SwiftUI
 
+enum OnboardingAppearance { case original, courtside, courtsideBlue }
+
 /// Shared layout for every onboarding step: back chevron + progress bar, 30pt title,
 /// 15pt secondary subtitle, scrolling content, and a footer pinned above the home indicator.
 struct OnboardingStepView<Content: View, Footer: View>: View {
@@ -9,6 +11,11 @@ struct OnboardingStepView<Content: View, Footer: View>: View {
     let title: String
     let subtitle: String?
     let scrolls: Bool
+    let appearance: OnboardingAppearance
+    private var isCourtside: Bool { appearance != .original }
+    private var isBlue: Bool { appearance == .courtsideBlue }
+    private var background: Color { isBlue ? CourtlyColor.blue : isCourtside ? CourtlyColor.blueTint : .white }
+    private var horizontalPadding: CGFloat { isCourtside ? 24 : CourtlyMetrics.screenPadding }
     private let content: () -> Content
     private let footer: (() -> Footer)?
 
@@ -17,6 +24,7 @@ struct OnboardingStepView<Content: View, Footer: View>: View {
         title: String,
         subtitle: String? = nil,
         scrolls: Bool = true,
+        appearance: OnboardingAppearance = .original,
         @ViewBuilder content: @escaping () -> Content,
         @ViewBuilder footer: @escaping () -> Footer
     ) {
@@ -24,13 +32,38 @@ struct OnboardingStepView<Content: View, Footer: View>: View {
         self.title = title
         self.subtitle = subtitle
         self.scrolls = scrolls
+        self.appearance = appearance
         self.content = content
         self.footer = footer
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            ProgressHeader(progress: progress) { dismiss() }
+            if isCourtside {
+                VStack(alignment: .leading, spacing: 0) {
+                    Button(action: { dismiss() }) {
+                        Label("Back", systemImage: "chevron.left")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(isBlue ? .white : CourtlyColor.blue)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Back")
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(isBlue ? Color.white.opacity(0.25) : CourtlyColor.line)
+                            Capsule().fill(isBlue ? .white : CourtlyColor.blue)
+                                .frame(width: geometry.size.width * progress)
+                        }
+                    }
+                    .frame(height: 4)
+                    .accessibilityHidden(true)
+                }
+                .padding(.horizontal, horizontalPadding)
+            } else {
+                ProgressHeader(progress: progress) { dismiss() }
+            }
             if scrolls {
                 ScrollView {
                     stepContent
@@ -42,22 +75,22 @@ struct OnboardingStepView<Content: View, Footer: View>: View {
                 Spacer(minLength: 0)
             }
         }
-        .background(Color.white.ignoresSafeArea())
+        .background(background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let footer {
                 footer()
-                    .padding(.horizontal, CourtlyMetrics.screenPadding)
+                    .padding(.horizontal, horizontalPadding)
                     .padding(.top, 12)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, isCourtside ? 8 : 16)
                     .background {
                         VStack(spacing: 0) {
                             LinearGradient(
-                                colors: [Color.white.opacity(0), Color.white],
+                                colors: [background.opacity(0), background],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
                             .frame(height: 28)
-                            Color.white
+                            background
                         }
                         .padding(.top, -28)
                         .ignoresSafeArea()
@@ -71,24 +104,24 @@ struct OnboardingStepView<Content: View, Footer: View>: View {
     private var stepContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(CourtlyFont.screenTitle)
+                .font(isCourtside ? .system(size: 32, weight: .bold) : CourtlyFont.screenTitle)
                 .tracking(-0.6)
                 .lineSpacing(3)
-                .foregroundStyle(CourtlyColor.ink)
+                .foregroundStyle(isBlue ? .white : CourtlyColor.ink)
                 .fixedSize(horizontal: false, vertical: true)
             if let subtitle {
                 Text(subtitle)
                     .font(CourtlyFont.secondary)
                     .lineSpacing(3)
-                    .foregroundStyle(CourtlyColor.secondary)
+                    .foregroundStyle(isBlue ? .white.opacity(0.85) : CourtlyColor.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
             }
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, CourtlyMetrics.screenPadding)
-        .padding(.top, 20)
+        .padding(.horizontal, horizontalPadding)
+        .padding(.top, isCourtside ? 12 : 20)
         .padding(.bottom, 24)
     }
 }
@@ -99,12 +132,14 @@ extension OnboardingStepView where Footer == EmptyView {
         title: String,
         subtitle: String? = nil,
         scrolls: Bool = true,
+        appearance: OnboardingAppearance = .original,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.progress = progress
         self.title = title
         self.subtitle = subtitle
         self.scrolls = scrolls
+        self.appearance = appearance
         self.content = content
         self.footer = nil
     }
@@ -143,5 +178,16 @@ struct ProgressHeader: View {
         }
         .padding(.horizontal, CourtlyMetrics.screenPadding)
         .frame(height: 44)
+    }
+}
+
+/// Keep recovery messages readable against the blue onboarding surface.
+struct OnboardingErrorCaption: View {
+    let text: String
+    var body: some View {
+        ErrorCaption(text: text)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.white, in: RoundedRectangle(cornerRadius: 12))
     }
 }

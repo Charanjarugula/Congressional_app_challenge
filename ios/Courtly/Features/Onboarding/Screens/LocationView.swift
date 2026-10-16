@@ -18,16 +18,17 @@ struct LocationView: View {
         OnboardingStepView(
             progress: 0.7,
             title: "Where do you play?",
-            subtitle: "We’ll match you with players and courts nearby."
+            subtitle: "We’ll match you with players and courts nearby.",
+            appearance: .courtsideBlue
         ) {
             if let area = draft.homeArea {
                 confirmedField(area)
                     .padding(.top, 28)
                 Text("Other players see your area, never your exact location.")
                     .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.secondary)
+                    .foregroundStyle(.white.opacity(0.85))
                     .padding(.top, 10)
-                SectionLabel(title: "How far will you travel for a hit?")
+                SectionLabel(title: "How far will you travel for a hit?", color: .white)
                     .padding(.top, 32)
                     .padding(.bottom, 10)
                 HStack(spacing: 8) {
@@ -43,17 +44,17 @@ struct LocationView: View {
                         .padding(.top, 8)
                 }
                 if let errorMessage {
-                    ErrorCaption(text: errorMessage)
+                    OnboardingErrorCaption(text: errorMessage)
                         .padding(.top, 10)
                 }
             }
         } footer: {
             if draft.homeArea != nil {
-                PrimaryButton(title: "Continue", action: onContinue)
+                PrimaryButton(title: "Continue", style: .lime, compact: true, action: onContinue)
             } else {
                 VStack(spacing: 4) {
-                    PrimaryButton(title: "Use my location", isLoading: isLocating, action: useMyLocation)
-                    TextActionButton(title: "Enter it manually") { isEditing = true }
+                    PrimaryButton(title: "Use my location", style: .lime, compact: true, isLoading: isLocating, action: useMyLocation)
+                    TextActionButton(title: "Enter it manually", color: .white) { isEditing = true }
                 }
             }
         }
@@ -66,11 +67,11 @@ struct LocationView: View {
     // MARK: - Search
 
     private var searchField: some View {
-        FieldBox {
+        FieldBox(fill: .white, cornerRadius: 16) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(CourtlyColor.secondary)
-            TextField("City or ZIP code", text: $query)
+            TextField("City or ZIP code", text: $query, prompt: Text("City or ZIP code").foregroundStyle(CourtlyColor.secondary))
                 .font(CourtlyFont.body)
                 .foregroundStyle(CourtlyColor.ink)
                 .textContentType(.addressCity)
@@ -136,7 +137,7 @@ struct LocationView: View {
     }
 
     private func confirmedField(_ area: HomeArea) -> some View {
-        FieldBox(isHighlighted: true) {
+        FieldBox(fill: .white, cornerRadius: 16) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(CourtlyColor.blue)
@@ -161,12 +162,12 @@ struct LocationView: View {
         } label: {
             Text(radius.title)
                 .font(CourtlyFont.secondarySemibold)
-                .foregroundStyle(isSelected ? CourtlyColor.blue : CourtlyColor.ink)
+                .foregroundStyle(CourtlyColor.ink)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(isSelected ? CourtlyColor.blueTint : CourtlyColor.groupedBackground)
+                        .fill(isSelected ? CourtlyColor.lime : .white)
                 )
         }
         .buttonStyle(PressableButtonStyle())

@@ -11,7 +11,8 @@ struct NotificationsView: View {
         OnboardingStepView(
             progress: 1.0,
             title: "Know when they say yes.",
-            subtitle: "We’ll let you know when someone wants to hit."
+            subtitle: "We’ll let you know when someone wants to hit.",
+            appearance: .courtsideBlue
         ) {
             VStack(spacing: 10) {
                 NotificationPreviewCard(
@@ -27,11 +28,11 @@ struct NotificationsView: View {
                     isPrimary: false
                 )
             }
-            .padding(.top, 40)
+            .padding(.top, 24)
             .accessibilityHidden(true)
         } footer: {
             // One way forward: the system prompt, where the player can still choose Don't Allow.
-            PrimaryButton(title: "Continue", isLoading: isRequesting, action: turnOn)
+            PrimaryButton(title: "Continue", style: .lime, compact: true, isLoading: isRequesting, action: turnOn)
         }
     }
 
@@ -55,14 +56,11 @@ struct NotificationPreviewCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(CourtlyColor.blue)
-                Circle()
-                    .fill(CourtlyColor.lime)
-                    .frame(width: 10, height: 10)
-            }
-            .frame(width: 38, height: 38)
+            Image("OnboardingTennisBall")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 29, height: 29)
+                .frame(width: 36, height: 36)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(title)
@@ -83,9 +81,9 @@ struct NotificationPreviewCard: View {
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(CourtlyColor.groupedBackground)
+                .fill(.white)
                 .shadow(color: isPrimary ? CourtlyColor.ink.opacity(0.08) : .clear, radius: 12, y: 8)
         )
-        .opacity(isPrimary ? 1 : 0.55)
+        .opacity(1)
     }
 }

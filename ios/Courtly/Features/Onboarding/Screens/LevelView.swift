@@ -9,18 +9,19 @@ struct LevelView: View {
         OnboardingStepView(
             progress: 0.5,
             title: "Where are you in your tennis journey?",
-            subtitle: "You can change this anytime."
+            subtitle: "You can change this anytime.",
+            appearance: .courtsideBlue
         ) {
             VStack(spacing: 8) {
                 ForEach(PlayerLevel.allCases) { option in
-                    ChoiceRow(title: option.title, subtitle: option.description, isSelected: draft.level == option) {
+                    ChoiceRow(courtside: true, title: option.title, subtitle: option.description, isSelected: draft.level == option) {
                         draft.level = option
                     }
                 }
             }
-            .padding(.top, 28)
+            .padding(.top, 24)
         } footer: {
-            PrimaryButton(title: "Continue", isEnabled: draft.level != nil, action: onContinue)
+            PrimaryButton(title: "Continue", style: .lime, compact: true, isEnabled: draft.level != nil, action: onContinue)
         }
     }
 }

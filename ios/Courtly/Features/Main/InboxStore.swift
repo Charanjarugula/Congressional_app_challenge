@@ -17,6 +17,13 @@ final class InboxStore {
         requests = SnapshotCache.load(FriendRequests.self, key: "friend_requests", account: account)
     }
 
+    #if DEBUG && targetEnvironment(simulator)
+    init(previewRequests: FriendRequests, previewChats: [Chat] = []) {
+        chats = previewChats
+        requests = previewRequests
+    }
+    #endif
+
     var requestCount: Int { requests?.incoming.count ?? 0 }
 
     var unreadCount: Int {

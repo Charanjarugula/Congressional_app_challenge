@@ -13,6 +13,14 @@ struct CourtlyApp: App {
                 #if DEBUG && targetEnvironment(simulator)
                 if ProcessInfo.processInfo.arguments.contains("--onboarding-ui-checks") {
                     OnboardingPreviewHarness()
+                } else if ProcessInfo.processInfo.arguments.contains("--hits-ui-checks") {
+                    HitsPreviewHarness()
+                } else if ProcessInfo.processInfo.arguments.contains("--remaining-ui-checks") {
+                    RemainingFlowsHarness()
+                } else if ProcessInfo.processInfo.arguments.contains("--people-ui-checks") {
+                    PeoplePreviewHarness()
+                } else if ProcessInfo.processInfo.arguments.contains("--planning-ui-checks") {
+                    PlanningPreviewHarness()
                 } else if ProcessInfo.processInfo.arguments.contains("--explore-ui-checks") {
                     ExplorePreviewHarness()
                 } else {

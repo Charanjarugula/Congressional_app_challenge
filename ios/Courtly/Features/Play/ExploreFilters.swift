@@ -165,12 +165,12 @@ struct ExploreFiltersSheet: View {
         Button(action: action) {
             Text(title)
                 .font(CourtlyFont.captionSemibold)
-                .foregroundStyle(on ? .white : CourtlyColor.ink)
+                .foregroundStyle(on ? .white : CourtlyColor.blue)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 44)
                 .background(RoundedRectangle(cornerRadius: 13).fill(on ? CourtlyColor.blue : CourtlyColor.card))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SelectionButtonStyle())
         .accessibilityAddTraits(on ? [.isSelected] : [])
     }
 

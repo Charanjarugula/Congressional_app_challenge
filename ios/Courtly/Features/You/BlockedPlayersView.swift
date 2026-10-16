@@ -15,7 +15,7 @@ struct BlockedPlayersView: View {
                     if players.isEmpty {
                         QuietCard(title: "No blocked players", detail: "Players you block won’t see your hits or messages, and you won’t see theirs.")
                     } else {
-                        CardRows(items: players) { card in
+                        CardRows(items: players, radius: 22) { card in
                             HStack(spacing: 14) {
                                 PlayerAvatar(card: card, size: 44)
                                 VStack(alignment: .leading, spacing: 1) {
@@ -44,14 +44,14 @@ struct BlockedPlayersView: View {
                         .padding(.top, 80)
                 }
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.top, 8)
             .padding(.bottom, 24)
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("Blocked players")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .task {
             do {

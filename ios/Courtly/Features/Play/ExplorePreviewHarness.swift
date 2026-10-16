@@ -31,7 +31,7 @@ struct ExplorePreviewHarness: View {
         .preferredColorScheme(.light)
     }
 
-    private static var exampleHit: Hit {
+    static var exampleHit: Hit {
         let host = PlayerCard(id: UUID(), firstName: "Jordan", lastInitial: "R", photoPath: nil,
                               level: .intermediate, areaLabel: "Wellington, FL", hitsPlayed: 4,
                               formats: [.casual], availabilityMask: nil, busyMaskWeek: nil)

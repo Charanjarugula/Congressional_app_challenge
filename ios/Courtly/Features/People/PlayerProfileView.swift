@@ -22,6 +22,18 @@ struct PlayerProfileView: View {
     @State private var showsMutuals = false
     @State private var errorMessage: String?
 
+    init(playerID: UUID, hitID: UUID? = nil) {
+        self.playerID = playerID
+        self.hitID = hitID
+    }
+
+    #if DEBUG && targetEnvironment(simulator)
+    init(preview: PlayerProfile) {
+        playerID = preview.card.id
+        _profile = State(initialValue: preview)
+    }
+    #endif
+
     var body: some View {
         ScrollView {
             if let profile {
@@ -29,25 +41,27 @@ struct PlayerProfileView: View {
                     heading(profile)
                     if !profile.openHits.isEmpty {
                         SectionHeader(title: "Open hits", top: 24)
-                        CardRows(items: profile.openHits) { hit in
-                            OpenHitRow(hit: hit)
+                        VStack(spacing: 16) {
+                            ForEach(profile.openHits) { hit in
+                                Card(padding: 18, radius: 22) { OpenHitRow(hit: hit) }
+                            }
                         }
                     }
                 }
-                .padding(.horizontal, CourtlyMetrics.screenPadding)
+                .padding(.horizontal, 24)
                 .padding(.bottom, 24)
             } else if loadFailed {
                 QuietCard(title: "This player isn’t available", detail: "They may have left Courtly.")
-                    .padding(CourtlyMetrics.screenPadding)
+                    .padding(24)
             } else {
                 ProgressView()
                     .padding(.top, 80)
             }
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle(profile?.card.firstName ?? "")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             if profile != nil {
@@ -110,7 +124,7 @@ struct PlayerProfileView: View {
     private func heading(_ profile: PlayerProfile) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 18) {
-                PlayerAvatar(card: profile.card, size: 92)
+                PlayerAvatar(card: profile.card, size: 64)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(profile.card.displayName)
                         .font(.system(size: 22, weight: .bold))
@@ -121,18 +135,19 @@ struct PlayerProfileView: View {
                             .font(CourtlyFont.secondary)
                             .foregroundStyle(CourtlyColor.secondary)
                     }
-                    Text(stats(profile))
-                        .font(CourtlyFont.secondary)
-                        .foregroundStyle(CourtlyColor.ink)
-                        .padding(.top, 2)
+                    if let area = profile.card.areaLabel {
+                        Text(area).font(.footnote).foregroundStyle(CourtlyColor.secondary)
+                    }
                 }
                 .padding(.top, 6)
                 Spacer(minLength: 0)
             }
-            if let area = profile.card.areaLabel?.components(separatedBy: ",").first {
-                Text(area)
-                    .font(CourtlyFont.secondary)
-                    .foregroundStyle(CourtlyColor.ink)
+            .padding(20)
+            .background(.white, in: RoundedRectangle(cornerRadius: 22))
+            HStack(spacing: 10) {
+                statistic(profile.card.hitsPlayed, label: "hits")
+                statistic(profile.friendCount, label: "friends")
+                statistic(profile.hitsTogether, label: "together")
             }
             if !profile.mutualCards.isEmpty {
                 Button {
@@ -142,7 +157,7 @@ struct PlayerProfileView: View {
                         HStack(spacing: -9) {
                             ForEach(profile.mutualCards.prefix(3)) { friend in
                                 PlayerAvatar(card: friend, size: 26)
-                                    .overlay(Circle().stroke(CourtlyColor.groupedBackground, lineWidth: 2))
+                                    .overlay(Circle().stroke(CourtlyColor.surface, lineWidth: 2))
                             }
                         }
                         Text(mutualLine(profile))
@@ -160,16 +175,14 @@ struct PlayerProfileView: View {
         .padding(.top, 4)
     }
 
-    /// "4 hits · 12 friends · 1 together", numbers in bold.
-    private func stats(_ profile: PlayerProfile) -> AttributedString {
-        func part(_ n: Int, _ label: String) -> AttributedString {
-            var number = AttributedString("\(n)")
-            number.font = .system(size: 15, weight: .semibold)
-            return number + AttributedString(" " + label)
+    private func statistic(_ value: Int, label: String) -> some View {
+        Card(padding: 14, radius: 22) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(value.formatted()).font(.title.bold()).foregroundStyle(CourtlyColor.blue)
+                Text(label).font(.caption).foregroundStyle(CourtlyColor.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        return part(profile.card.hitsPlayed, profile.card.hitsPlayed == 1 ? "hit" : "hits") + AttributedString("   ")
-            + part(profile.friendCount, profile.friendCount == 1 ? "friend" : "friends") + AttributedString("   ")
-            + part(profile.hitsTogether, "together")
     }
 
     /// "Friends with Ana, Luis + 3 more", the names in bold.
@@ -189,7 +202,7 @@ struct PlayerProfileView: View {
         HStack(spacing: 8) {
             switch profile.relationship {
             case .friend:
-                ActionButton(title: "Invite to hit") { showsInviteToHit = true }
+                ActionButton(title: "Invite to hit", style: .lime, height: 48, radius: 16) { showsInviteToHit = true }
                 ActionButton(title: "Message", style: .card, isEnabled: profile.dmChatId != nil) {
                     if let chatID = profile.dmChatId { navigate(.chat(chatID)) }
                 }
@@ -199,10 +212,10 @@ struct PlayerProfileView: View {
                 }
                 ActionButton(title: "Message", style: .card, isEnabled: false) {}
             case .requestedMe:
-                ActionButton(title: "Confirm", isLoading: isWorking) { respond(accept: true) }
+                ActionButton(title: "Confirm", style: .lime, isLoading: isWorking) { respond(accept: true) }
                 ActionButton(title: "Delete", style: .card, isLoading: isWorking) { respond(accept: false) }
             case .none, .blocked:
-                ActionButton(title: "Add friend", isLoading: isWorking) { addFriend() }
+                ActionButton(title: "Add friend", style: .lime, isLoading: isWorking) { addFriend() }
                 ActionButton(title: "Message", style: .card, isEnabled: false) {}
             }
         }
@@ -312,30 +325,10 @@ private struct OpenHitRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            Button {
-                navigate(.hit(hit.id))
-            } label: {
-                HStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(hit.dayText)
-                        Text(hit.clockText)
-                    }
-                    .font(CourtlyFont.rounded(17))
-                    .foregroundStyle(CourtlyColor.ink)
-                    .frame(width: 76, alignment: .leading)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(hit.format.title)
-                            .font(CourtlyFont.bodySemibold)
-                            .foregroundStyle(CourtlyColor.ink)
-                        Text([hit.court.shortName, hit.milesLabel].compactMap { $0 }.joined(separator: " · "))
-                            .font(CourtlyFont.secondary)
-                            .foregroundStyle(CourtlyColor.secondary)
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
+        VStack(alignment: .leading, spacing: 16) {
+            Button { navigate(.hit(hit.id)) } label: {
+                HitSummary(hit: hit, showsHost: false)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
@@ -349,14 +342,12 @@ private struct OpenHitRow: View {
                     .foregroundStyle(CourtlyColor.secondary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .background(Capsule().fill(CourtlyColor.groupedBackground))
+                    .background(Capsule().fill(CourtlyColor.surface))
             } else {
                 PillButton(title: isJoining ? "Asking…" : "Ask to join", style: .filled) { join() }
                     .disabled(isJoining)
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 16)
         .errorAlert($errorMessage, title: "Couldn’t ask to join")
     }
 

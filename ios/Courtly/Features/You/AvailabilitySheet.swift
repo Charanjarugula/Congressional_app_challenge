@@ -31,7 +31,7 @@ struct AvailabilitySheet: View {
                 .padding(.horizontal, 4)
 
             SectionHeader(title: "Calendar", top: 28)
-            Card {
+            Card(radius: 22) {
                 HStack(spacing: 14) {
                     CalendarIcon(size: 36)
                     VStack(alignment: .leading, spacing: 1) {
@@ -52,7 +52,8 @@ struct AvailabilitySheet: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .frame(height: 60)
+                .padding(.vertical, 12)
+                .frame(minHeight: 60)
             }
         }
         .onAppear {

@@ -15,15 +15,15 @@ struct MyHitsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Color.clear.frame(height: 16)
-                SegmentedControl(options: ["Upcoming", "Past"], selectedIndex: $segment)
+                SegmentedControl(options: ["Upcoming", "Past"], selectedIndex: $segment, courtside: true)
                 content
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "My Hits", art: .myHits) }
+        .background(CourtlyColor.surface.ignoresSafeArea())
+        .navigationTitle("My Hits")
+        .navigationBarTitleDisplayMode(.large)
         .refreshable { await hits.loadMyHits() }
     }
 
@@ -46,7 +46,7 @@ struct MyHitsView: View {
             let groups = segment == 0 ? Self.groupUpcoming(list) : Self.groupPast(list)
             ForEach(groups) { group in
                 SectionHeader(title: group.title, top: 24)
-                CardRows(items: group.hits) { hit in
+                CardRows(items: group.hits, radius: 22) { hit in
                     row(hit)
                 }
             }
@@ -59,17 +59,17 @@ struct MyHitsView: View {
                 .font(.system(size: 20, weight: .bold))
                 .tracking(-0.3)
                 .foregroundStyle(CourtlyColor.ink)
-            Text("Join a hit on Play or post your own.")
+            Text("Join a hit on Explore or post your own.")
                 .font(CourtlyFont.secondary)
                 .foregroundStyle(CourtlyColor.secondary)
                 .multilineTextAlignment(.center)
             Button(action: onPlan) {
                 Text("Plan a hit")
                     .font(CourtlyFont.secondarySemibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(CourtlyColor.ink)
                     .padding(.horizontal, 20)
                     .frame(height: 44)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.blue))
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.lime))
             }
             .buttonStyle(PressableButtonStyle())
             .padding(.top, 8)
@@ -101,31 +101,21 @@ struct MyHitsView: View {
             navigate(.hit(hit.id))
         } label: {
             HStack(spacing: 16) {
-                VStack(spacing: 0) {
-                    Text(hit.dayText.uppercased())
-                        .font(.system(size: 12, weight: .bold))
-                    Text(hit.clockText)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                }
-                .foregroundStyle(CourtlyColor.ink)
-                .frame(width: 62, height: 46)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(CourtlyColor.lime))
-
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(hit.counterpart(for: me)?.displayName ?? "Your hit") · \(hit.format.shortTitle)")
+                    Text("\(hit.dayText.uppercased()) \(hit.clockText) · \(hit.counterpart(for: me)?.displayName ?? "Your hit") · \(hit.format.shortTitle)")
                         .font(CourtlyFont.bodySemibold)
                         .foregroundStyle(CourtlyColor.ink)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(status.text)
                         .font(CourtlyFont.captionSemibold)
                         .foregroundStyle(status.color)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
                 // The whole row opens the hit, where Invite lives; no pill that looks like its own button.
                 ChevronMark()
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 14)
             .padding(.horizontal, 16)
             .contentShape(Rectangle())
         }

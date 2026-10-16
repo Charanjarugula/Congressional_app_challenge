@@ -5,6 +5,15 @@ import SwiftUI
 struct HitDetailView: View {
     let hitID: UUID
 
+    init(hitID: UUID) { self.hitID = hitID }
+
+    #if DEBUG && targetEnvironment(simulator)
+    init(preview hit: Hit) {
+        hitID = hit.id
+        _hit = State(initialValue: hit)
+    }
+    #endif
+
     @Environment(HitsStore.self) private var hits
     @Environment(AppSession.self) private var session
     @Environment(\.navigate) private var navigate
@@ -38,20 +47,20 @@ struct HitDetailView: View {
                     }
                     footer(hit)
                 }
-                .padding(.horizontal, CourtlyMetrics.screenPadding)
+                .padding(.horizontal, 24)
                 .padding(.bottom, 24)
             } else if loadFailed {
                 QuietCard(title: "This hit isn’t available", detail: "It may have been cancelled, or it has filled up.")
-                    .padding(CourtlyMetrics.screenPadding)
+                    .padding(24)
             } else {
                 ProgressView()
                     .padding(.top, 80)
             }
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
-        .navigationTitle(hit?.format.shortTitle ?? "Hit")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(hit?.viewer.isHost == true ? "Your hit" : "Hit")
+        .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             if let hit, hit.viewer.isHost, hit.isLive {
@@ -120,41 +129,46 @@ struct HitDetailView: View {
     // MARK: - Sections
 
     private func summaryCard(_ hit: Hit) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(hit.timeLabel)
-                    .font(CourtlyFont.rounded(28))
-                    .tracking(-0.5)
-                    .foregroundStyle(CourtlyColor.ink)
-                Spacer()
-                StatusPill(kind: hit.statusKind)
+        VStack(alignment: .leading, spacing: 16) {
+            Card(padding: 18, radius: 22) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HitSummary(hit: hit)
+                    if let note = hit.yourTimeNote {
+                        Text(note).font(.footnote).foregroundStyle(CourtlyColor.secondary)
+                    }
+                }
             }
-            if let note = hit.yourTimeNote {
-                Text(note)
-                    .font(CourtlyFont.secondary)
-                    .foregroundStyle(CourtlyColor.secondary)
-                    .padding(.top, -8)
+            if hit.hasPendingRequest {
+                QuietCard(title: "You’ve asked to join", detail: "\(hit.host.firstName) can accept your request until the hit starts.")
+            } else if hit.openInvite != nil && !hit.isMember {
+                QuietCard(title: "\(hit.host.firstName) invited you", detail: "First to accept takes the spot.")
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(headline(hit))
-                    .font(CourtlyFont.bodySemibold)
-                    .foregroundStyle(CourtlyColor.ink)
-                Text(hit.courtLine)
-                    .font(CourtlyFont.secondary)
-                    .foregroundStyle(CourtlyColor.secondary)
+            Text("Who’s playing")
+                .font(.headline).foregroundStyle(CourtlyColor.ink)
+                .accessibilityAddTraits(.isHeader)
+            HitPlayerRows(hit: hit, me: me)
+            Card(padding: 16, radius: 22) {
+                VStack(alignment: .leading, spacing: 10) {
+                    CourtMap(court: hit.court, height: 126)
+                    Text(hit.court.name).font(.headline).foregroundStyle(CourtlyColor.ink)
+                    if let address = hit.court.address {
+                        Text(address).font(.footnote).foregroundStyle(CourtlyColor.secondary)
+                    }
+                    if let detail = hit.court.detailLine {
+                        Text(detail).font(.footnote).foregroundStyle(CourtlyColor.secondary)
+                    }
+                }
             }
-            PlayerTiles(hit: hit, me: me)
-            CourtMap(court: hit.court)
             // The chat outlives the start time (running late, a thank-you after); inviting and the calendar don't.
             let chatStaysOpen = hit.chatId != nil && hit.status != .cancelled && hit.status != .expired
             if hit.isMember && (hit.isLive || chatStaysOpen) {
                 HStack(spacing: 8) {
                     if let chatID = hit.chatId {
-                        ActionButton(title: hit.unreadMessages > 0 ? "Chat · \(hit.unreadMessages)" : "Chat") {
+                        ActionButton(title: hit.unreadMessages > 0 ? "Chat · \(hit.unreadMessages)" : "Chat", style: .lime, height: 48, radius: 16) {
                             navigate(.chat(chatID))
                         }
                     } else if hit.isLive && hit.viewer.isHost {
-                        ActionButton(title: "Invite") { showsInvite = true }
+                        ActionButton(title: "Invite", style: .lime, height: 48, radius: 16) { showsInvite = true }
                     }
                     if hit.isLive {
                         ActionButton(title: "Add to calendar", style: .grouped) { showsCalendar = true }
@@ -162,8 +176,7 @@ struct HitDetailView: View {
                 }
             }
         }
-        .padding(20)
-        .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(CourtlyColor.card))
+
     }
 
     private func headline(_ hit: Hit) -> String {
@@ -177,7 +190,7 @@ struct HitDetailView: View {
     private func detailsSection(_ hit: Hit) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             SectionHeader(title: "Details", top: 24)
-            Card {
+            Card(radius: 22) {
                 VStack(spacing: 0) {
                     DetailRow(title: "Court", value: hit.court.detailLine ?? hit.court.name)
                     HairlineSeparator()
@@ -192,7 +205,7 @@ struct HitDetailView: View {
     private func hostSection(_ hit: Hit) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             SectionHeader(title: "Host", top: 24)
-            Card {
+            Card(radius: 22) {
                 Button {
                     navigate(.player(hit.host.id, hitID: hit.id))
                 } label: {
@@ -262,7 +275,7 @@ struct HitDetailView: View {
     private func footer(_ hit: Hit) -> some View {
         if hit.isLive {
             if hit.viewer.isHost && hit.spotsOpen > 0 {   // only the host can send invites
-                ActionButton(title: "Invite friends", style: .grouped) { showsInvite = true }
+                ActionButton(title: "Invite friends", style: .lime, height: 48, radius: 16) { showsInvite = true }
                     .padding(.top, 20)
             }
             if hit.viewer.isHost {
@@ -299,26 +312,25 @@ struct HitDetailView: View {
                 .foregroundStyle(CourtlyColor.secondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(CourtlyColor.groupedBackground)
+                .background(CourtlyColor.surface)
         } else if hit.isLive && !hit.isMember && !hit.hasPendingRequest {
             Group {
                 if let invite = hit.openInvite {
-                    PrimaryButton(title: "I’m in", isLoading: isWorking) {
+                    PrimaryButton(title: "I’m in", style: .lime, compact: true, isLoading: isWorking) {
                         Task { await perform { try await hits.claimInvite(invite.id) } }
                     }
                 } else {
                     VStack(spacing: 8) {
-                        SafetyNote()
-                        PrimaryButton(title: hit.isFull ? "Full" : "Ask to join", isEnabled: !hit.isFull, isLoading: isWorking) {
+                        PrimaryButton(title: hit.isFull ? "Full" : "Ask to join", style: .lime, compact: true, isEnabled: !hit.isFull, isLoading: isWorking) {
                             Task { await perform { try await hits.requestToJoin(hit.id) } }
                         }
                     }
                 }
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.top, 8)
             .padding(.bottom, 16)
-            .background(CourtlyColor.groupedBackground)
+            .background(CourtlyColor.surface)
         }
     }
 

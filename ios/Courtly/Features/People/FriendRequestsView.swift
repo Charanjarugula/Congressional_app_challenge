@@ -32,29 +32,33 @@ struct FriendRequestsView: View {
                 } else {
                     if !requests.incoming.isEmpty {
                         SectionHeader(title: requests.incoming.count == 1 ? "1 request" : "\(requests.incoming.count) requests", top: 8)
-                        CardRows(items: requests.incoming) { request in
-                            VStack(spacing: 12) {
-                                row(request) { EmptyView() }
-                                HStack(spacing: 8) {
-                                    ActionButton(title: "Confirm", isLoading: working[request.id] == true) { respond(request, accept: true) }
-                                    ActionButton(title: "Delete", style: .grouped, isLoading: working[request.id] == false) { respond(request, accept: false) }
+                        VStack(spacing: 16) {
+                            ForEach(requests.incoming) { request in
+                                Card(radius: 20) {
+                                    VStack(spacing: 0) {
+                                        row(request) { EmptyView() }
+                                        HStack(spacing: 8) {
+                                            ActionButton(title: "Confirm", style: .lime, isLoading: working[request.id] == true) { respond(request, accept: true) }
+                                            ActionButton(title: "Delete", style: .grouped, isLoading: working[request.id] == false) { respond(request, accept: false) }
+                                        }
+                                        .disabled(working[request.id] != nil)
+                                        .padding(.horizontal, 16)
+                                        .padding(.bottom, 16)
+                                    }
                                 }
-                                .disabled(working[request.id] != nil)
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 14)
                             }
                         }
                     }
                     if !requests.outgoing.isEmpty {
                         SectionHeader(title: "Sent", top: 24)
-                        CardRows(items: requests.outgoing) { request in
+                        CardRows(items: requests.outgoing, radius: 22) { request in
                             row(request) {
                                 PillButton(title: working[request.id] != nil ? "Cancelling…" : "Cancel", style: .tint) { cancel(request) }
                                     .fixedSize()
                                     .disabled(working[request.id] != nil)
                             }
                         }
-                        Text("Waiting for them to confirm. Cancel takes the request back.")
+                        Text("Waiting for them to confirm.")
                             .font(CourtlyFont.caption)
                             .foregroundStyle(CourtlyColor.secondary)
                             .padding(.top, 8)
@@ -62,13 +66,13 @@ struct FriendRequestsView: View {
                     }
                 }
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("Friend requests")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .refreshable { await inbox.load() }
         .task { await inbox.load() }
@@ -114,11 +118,11 @@ struct FriendRequestsView: View {
                         Text(request.card.displayName)
                             .font(CourtlyFont.bodySemibold)
                             .foregroundStyle(CourtlyColor.ink)
-                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(subtitle(request))
                             .font(CourtlyFont.caption)
                             .foregroundStyle(CourtlyColor.secondary)
-                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
                 }

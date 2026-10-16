@@ -17,6 +17,16 @@ struct GroupInfoView: View {
     @State private var isLeaving = false
     @State private var errorMessage: String?
 
+    init(chatID: UUID) { self.chatID = chatID }
+
+    #if DEBUG && targetEnvironment(simulator)
+    init(preview: Chat) {
+        chatID = preview.id
+        _chat = State(initialValue: preview)
+        _isMuted = State(initialValue: preview.muted ?? false)
+    }
+    #endif
+
     private var me: UUID? { session.profile?.id }
 
     var body: some View {
@@ -42,7 +52,7 @@ struct GroupInfoView: View {
                     } else {
                         SectionHeader(title: "Members", top: 24)
                     }
-                    CardRows(items: chat.members ?? []) { member in
+                    CardRows(items: chat.members ?? [], radius: 22) { member in
                         memberRow(member)
                     }
 
@@ -54,7 +64,7 @@ struct GroupInfoView: View {
                             .padding(.horizontal, 4)
                     } else {
                     SectionHeader(title: "Settings", top: 24)
-                    Card {
+                    Card(radius: 22) {
                         VStack(spacing: 0) {
                             HStack {
                                 Text("Mute notifications")
@@ -66,7 +76,7 @@ struct GroupInfoView: View {
                                     .tint(CourtlyColor.blue)
                             }
                             .padding(.horizontal, 16)
-                            .frame(height: 50)
+                            .frame(minHeight: 50)
                             HairlineSeparator()
                             SettingsRow(title: isLeaving ? "Leaving…" : "Leave group", titleColor: CourtlyColor.red, showsChevron: false) {
                                 showsLeaveAlert = true
@@ -82,13 +92,13 @@ struct GroupInfoView: View {
                         .padding(.top, 80)
                 }
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("Group")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .task(id: chatID) { await load() }
         .alert("Leave this group?", isPresented: $showsLeaveAlert) {
@@ -213,7 +223,7 @@ private struct AddMembersSheet: View {
             } else if friends.isEmpty {
                 QuietCard(title: "Everyone’s already here", detail: "All your friends are in this group.")
             } else {
-                CardRows(items: friends) { friend in
+                CardRows(items: friends, radius: 22) { friend in
                     Button {
                         if selected.contains(friend.id) { selected.remove(friend.id) } else { selected.insert(friend.id) }
                     } label: {

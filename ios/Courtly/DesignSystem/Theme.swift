@@ -21,16 +21,16 @@ enum CourtlyColor {
 }
 
 enum CourtlyFont {
-    static let largeTitle = Font.system(size: 34, weight: .bold)
+    static let largeTitle = Font.largeTitle.bold()
     static let screenTitle = Font.system(size: 30, weight: .bold)
-    static let sheetTitle = Font.system(size: 22, weight: .bold)
-    static let sectionHeader = Font.system(size: 17, weight: .semibold)
-    static let body = Font.system(size: 17)
-    static let bodySemibold = Font.system(size: 17, weight: .semibold)
-    static let secondary = Font.system(size: 15)
-    static let secondarySemibold = Font.system(size: 15, weight: .semibold)
-    static let caption = Font.system(size: 13)
-    static let captionSemibold = Font.system(size: 13, weight: .semibold)
+    static let sheetTitle = Font.title2.bold()
+    static let sectionHeader = Font.body.weight(.semibold)
+    static let body = Font.body
+    static let bodySemibold = Font.body.weight(.semibold)
+    static let secondary = Font.subheadline
+    static let secondarySemibold = Font.subheadline.weight(.semibold)
+    static let caption = Font.footnote
+    static let captionSemibold = Font.footnote.weight(.semibold)
 
     /// Times and levels use SF Pro Rounded.
     static func rounded(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {

@@ -33,6 +33,10 @@ final class HitsStore {
         myHits = SnapshotCache.load(MyHits.self, key: "my_hits", account: account)
     }
 
+    #if DEBUG && targetEnvironment(simulator)
+    init(previewMyHits: MyHits) { myHits = previewMyHits }
+    #endif
+
     // MARK: - Loading
 
     @MainActor

@@ -29,12 +29,12 @@ struct YouView: View {
                         .padding(.top, 80)
                 }
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "Settings", art: .you) }
+        .background(CourtlyColor.surface.ignoresSafeArea())
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.large)
         .refreshable { await session.refreshProfile() }
         .sheet(item: $sheet) { which in
             switch which {
@@ -80,10 +80,21 @@ struct YouView: View {
 
     @ViewBuilder
     private func content(_ profile: Profile) -> some View {
-        ProfilePhotoButton(card: profile.card)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 24)
-            .padding(.bottom, 8)
+        Card(padding: 18, radius: 22) {
+            HStack(spacing: 16) {
+                ProfilePhotoButton(card: profile.card, size: 64)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(profile.firstName) \(profile.lastName)")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(CourtlyColor.ink)
+                    Text(profile.card.levelAndArea)
+                        .font(CourtlyFont.secondary)
+                        .foregroundStyle(CourtlyColor.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.top, 8)
 
         group {
             SettingsRow(title: "Name", value: profile.displayName.isEmpty ? "Add" : "\(profile.firstName) \(profile.lastName)") { sheet = .name }
@@ -114,7 +125,7 @@ struct YouView: View {
                     .allowsHitTesting(false)   // the row takes the tap, so one tap never flips it twice
             }
             .padding(.horizontal, 16)
-            .frame(height: 50)
+            .frame(minHeight: 50)
             .contentShape(Rectangle())
             .onTapGesture { setNotifications(!notificationsOn) }   // the whole row flips it, not only the switch
             .accessibilityElement(children: .combine)
@@ -134,7 +145,7 @@ struct YouView: View {
                     ChevronMark()
                 }
                 .padding(.horizontal, 16)
-                .frame(height: 50)
+                .frame(minHeight: 50)
                 .contentShape(Rectangle())
             }
             HairlineSeparator()
@@ -174,7 +185,7 @@ struct YouView: View {
                 .padding(.top, 22)
                 .padding(.bottom, 8)
         }
-        Card {
+        Card(radius: 22) {
             VStack(spacing: 0) { built }
         }
         .padding(.top, label == nil ? 16 : 0)

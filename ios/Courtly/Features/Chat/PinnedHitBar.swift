@@ -14,12 +14,12 @@ struct PinnedHitBar: View {
                 }
                 .font(CourtlyFont.rounded(15))
                 .foregroundStyle(CourtlyColor.ink)
-                .frame(width: 62, alignment: .leading)
+                .fixedSize(horizontal: true, vertical: false)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("\(hit.format.shortTitle) · \(hit.court.shortName)")
                         .font(CourtlyFont.secondarySemibold)
                         .foregroundStyle(CourtlyColor.ink)
-                        .lineLimit(1)
+                        .lineLimit(2)
                     Text(hit.statusKind.title)
                         .font(CourtlyFont.captionSemibold)
                         .foregroundStyle(hit.statusKind == .confirmed ? CourtlyColor.green : CourtlyColor.secondary)
@@ -29,7 +29,7 @@ struct PinnedHitBar: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 14)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(CourtlyColor.groupedBackground))
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

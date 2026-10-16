@@ -6,6 +6,13 @@ struct HitSummary: View {
     var showsHost = true
     @ScaledMetric(relativeTo: .title) private var timeSize = 30
 
+    private var availabilityLabel: String {
+        if hit.status == .cancelled { return "This hit is no longer happening" }
+        if hit.status == .expired { return "This hit has expired" }
+        if hit.status == .played { return "\(hit.durationMin) min · \(hit.format.shortTitle)" }
+        return hit.spotsOpen > 0 ? "\(hit.durationMin) min · \(hit.spotsLabel) open" : "\(hit.durationMin) min · All set"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 8) {
@@ -33,7 +40,7 @@ struct HitSummary: View {
                     .foregroundStyle(CourtlyColor.blue)
                     .frame(width: 20, height: 20)
                     .accessibilityHidden(true)
-                Text("\(hit.durationMin) min · \(hit.spotsLabel) open")
+                Text(availabilityLabel)
                     .font(.footnote)
                     .foregroundStyle(CourtlyColor.secondary)
             }

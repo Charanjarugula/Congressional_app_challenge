@@ -22,7 +22,7 @@ struct CourtPickerView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    FieldBox(isHighlighted: !query.isEmpty) {
+                    FieldBox(fill: .white, cornerRadius: 22) {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(CourtlyColor.secondary)
                         TextField("Search courts or parks", text: $query)
@@ -48,12 +48,12 @@ struct CourtPickerView: View {
                         resultsSection
                     }
                 }
-                .padding(.horizontal, CourtlyMetrics.screenPadding)
+                .padding(.horizontal, 24)
                 .padding(.bottom, 24)
             }
-            .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+            .background(CourtlyColor.surface.ignoresSafeArea())
             .navigationTitle("Where")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -75,7 +75,7 @@ struct CourtPickerView: View {
         if courts.isEmpty {
             QuietCard(title: "No courts near you yet", detail: "Search for a park or tennis center above to add one.")
         } else {
-            CardRows(items: courts) { court in
+            CardRows(items: courts, radius: 22) { court in
                 Button {
                     onPick(court)
                     dismiss()
@@ -85,11 +85,11 @@ struct CourtPickerView: View {
                             Text(court.name)
                                 .font(CourtlyFont.bodySemibold)
                                 .foregroundStyle(CourtlyColor.ink)
-                                .lineLimit(1)
+                                .fixedSize(horizontal: false, vertical: true)
                             Text(courtDetail(court))
                                 .font(CourtlyFont.secondary)
                                 .foregroundStyle(CourtlyColor.secondary)
-                                .lineLimit(1)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 8)
                         SelectionMark(isSelected: court.id == selected?.id)
@@ -115,7 +115,7 @@ struct CourtPickerView: View {
                 QuietCard(title: "No places found", detail: "Try the park or tennis center’s name.")
             }
         } else {
-            CardRows(items: results) { place in
+            CardRows(items: results, radius: 22) { place in
                 Button {
                     add(place)
                 } label: {
@@ -127,12 +127,12 @@ struct CourtPickerView: View {
                             Text(place.name)
                                 .font(CourtlyFont.bodySemibold)
                                 .foregroundStyle(CourtlyColor.ink)
-                                .lineLimit(1)
+                                .fixedSize(horizontal: false, vertical: true)
                             if let detail = place.detail {
                                 Text(detail)
                                     .font(CourtlyFont.secondary)
                                     .foregroundStyle(CourtlyColor.secondary)
-                                    .lineLimit(1)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                         }
                         Spacer(minLength: 8)

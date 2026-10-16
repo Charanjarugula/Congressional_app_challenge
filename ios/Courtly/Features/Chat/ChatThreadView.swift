@@ -21,6 +21,16 @@ struct ChatThreadView: View {
     @State private var reporting: Message?
     @FocusState private var composerFocused: Bool
 
+    init(chatID: UUID) { self.chatID = chatID }
+
+    #if DEBUG && targetEnvironment(simulator)
+    init(preview: Chat, messages: [Message]) {
+        chatID = preview.id
+        _chat = State(initialValue: preview)
+        _messages = State(initialValue: messages)
+    }
+    #endif
+
     private var me: UUID? { session.profile?.id }
 
     private var canSend: Bool {
@@ -87,7 +97,7 @@ struct ChatThreadView: View {
                 composer
             }
         }
-        .background(Color.white.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .toolbar {
             ToolbarItem(placement: .principal) { header }
@@ -216,7 +226,7 @@ struct ChatThreadView: View {
                     .padding(.vertical, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(CourtlyColor.separator, lineWidth: 1)
+                            .fill(Color.white)
                     )
                 if canRequestHit {
                     Button {
@@ -226,14 +236,15 @@ struct ChatThreadView: View {
                             .font(CourtlyFont.secondarySemibold)
                             .foregroundStyle(CourtlyColor.blue)
                             .padding(.horizontal, 14)
-                            .frame(height: 36)
-                            .background(Capsule().fill(CourtlyColor.blueTint))
+                            .frame(minHeight: 44)
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
                     }
                     .buttonStyle(PressableButtonStyle())
                 } else {
                     Button(action: send) {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 30))
+                            .font(.system(size: 32))
+                            .frame(width: 44, height: 44)
                             .foregroundStyle(canSend ? CourtlyColor.blue : CourtlyColor.placeholder)
                     }
                     .buttonStyle(.plain)
@@ -245,7 +256,7 @@ struct ChatThreadView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
-        .background(Color.white)
+        .background(CourtlyColor.surface)
     }
 
     /// A time label before the first message and whenever more than 30 minutes pass.

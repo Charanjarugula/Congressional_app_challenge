@@ -10,6 +10,15 @@ struct PressableButtonStyle: ButtonStyle {
     }
 }
 
+/// Selection controls keep their exact fill and label colors while pressed.
+struct SelectionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .transaction { $0.animation = nil }
+    }
+}
+
 /// 52pt tall, 14pt radius. Explicit styles keep screen-specific accents local.
 struct PrimaryButton: View {
     enum Style {

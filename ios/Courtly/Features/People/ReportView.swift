@@ -29,7 +29,7 @@ struct ReportView: View {
                 }
             }
             .frame(height: 52)
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
 
             ScrollView {
                 VStack(spacing: 8) {
@@ -44,24 +44,7 @@ struct ReportView: View {
                             .padding(.bottom, 8)
                     }
                     ForEach(ReportReason.allCases) { option in
-                        Button {
-                            reason = option
-                        } label: {
-                            HStack {
-                                Text(option.title)
-                                    .font(CourtlyFont.bodySemibold)
-                                    .foregroundStyle(CourtlyColor.ink)
-                                Spacer()
-                                SelectionMark(isSelected: reason == option)
-                            }
-                            .padding(.horizontal, 18)
-                            .frame(height: 52)
-                            .background(
-                                RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
-                                    .fill(reason == option ? CourtlyColor.blueTint : CourtlyColor.card)
-                            )
-                        }
-                        .buttonStyle(PressableButtonStyle())
+                        OptionRow(title: option.title, isSelected: reason == option) { reason = option }
                     }
                     HStack {
                         Text("Also block \(player.firstName)")
@@ -77,18 +60,18 @@ struct ReportView: View {
                     .background(RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous).fill(CourtlyColor.card))
                     .padding(.top, 16)
                 }
-                .padding(.horizontal, CourtlyMetrics.screenPadding)
+                .padding(.horizontal, 24)
                 .padding(.top, 8)
                 .padding(.bottom, 24)
             }
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             PrimaryButton(title: "Send report", isEnabled: reason != nil, isLoading: isSending, action: send)
-                .padding(.horizontal, CourtlyMetrics.screenPadding)
+                .padding(.horizontal, 24)
                 .padding(.top, 8)
                 .padding(.bottom, 16)
-                .background(CourtlyColor.groupedBackground)
+                .background(CourtlyColor.surface)
         }
         .preferredColorScheme(.light)
         .errorAlert($errorMessage, title: "Couldn’t send the report")

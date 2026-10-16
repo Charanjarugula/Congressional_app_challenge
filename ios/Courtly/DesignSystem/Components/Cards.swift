@@ -42,10 +42,11 @@ struct Card<Content: View>: View {
 /// A white card whose rows are separated by hairlines.
 struct CardRows<Data: RandomAccessCollection, Row: View>: View where Data.Element: Identifiable {
     let items: Data
+    var radius: CGFloat = CourtlyMetrics.cardRadius
     @ViewBuilder let row: (Data.Element) -> Row
 
     var body: some View {
-        Card {
+        Card(radius: radius) {
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     if index > 0 { HairlineSeparator() }
@@ -117,7 +118,8 @@ struct SettingsRow: View {
                 }
             }
             .padding(.horizontal, 16)
-            .frame(height: 50)
+            .padding(.vertical, 10)
+            .frame(minHeight: 50)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -142,7 +144,8 @@ struct ValueRow: View {
                 .truncationMode(.middle)
         }
         .padding(.horizontal, 16)
-        .frame(height: 50)
+        .padding(.vertical, 10)
+            .frame(minHeight: 50)
     }
 }
 
@@ -197,11 +200,11 @@ struct ActionButton: View {
             case .blue: CourtlyColor.blue
             case .lime: CourtlyColor.lime
             case .quiet: CourtlyColor.blueTint
-            case .grouped: CourtlyColor.groupedBackground
+            case .grouped: CourtlyColor.card
             case .card: CourtlyColor.card
             }
         }
-        var foreground: Color { self == .blue ? .white : self == .quiet ? CourtlyColor.blue : CourtlyColor.ink }
+        var foreground: Color { self == .blue ? .white : self == .lime ? CourtlyColor.ink : CourtlyColor.blue }
     }
 
     let title: String
@@ -265,15 +268,16 @@ struct Chip: View {
                 .font(CourtlyFont.secondarySemibold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-                .foregroundStyle(isSelected ? .white : CourtlyColor.ink)
+                .foregroundStyle(isSelected ? .white : CourtlyColor.blue)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(isSelected ? CourtlyColor.blue : CourtlyColor.card)
                 )
+
         }
-        .buttonStyle(PressableButtonStyle())
+        .buttonStyle(SelectionButtonStyle())
     }
 }
 
@@ -321,21 +325,5 @@ extension View {
         } message: {
             Text(message.wrappedValue ?? "")
         }
-    }
-}
-
-/// One quiet line where players arrange to meet someone: public courts, tell someone, report problems.
-struct SafetyNote: View {
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: "shield.lefthalf.filled")
-                .font(.system(size: 11, weight: .semibold))
-            Text("Meet at the court, tell someone where you’re going, and report anyone who makes you uneasy.")
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .font(CourtlyFont.caption)
-        .foregroundStyle(CourtlyColor.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
     }
 }

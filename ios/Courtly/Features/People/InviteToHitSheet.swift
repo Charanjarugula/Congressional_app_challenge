@@ -24,7 +24,7 @@ struct InviteToHitSheet: View {
                 .padding(.top, 10)
                 .padding(.bottom, 18)
             Text("Invite \(player.firstName)")
-                .font(CourtlyFont.sheetTitle)
+                .font(.largeTitle.bold())
                 .tracking(-0.4)
                 .foregroundStyle(CourtlyColor.ink)
             Text("Pick one of your hits with an open spot.")
@@ -34,47 +34,30 @@ struct InviteToHitSheet: View {
             ScrollView {
                 VStack(spacing: 0) {
                     if openHits.isEmpty {
-                        QuietCard(title: "No open hits", detail: "Plan a hit from Play, then invite \(player.firstName) from here.")
+                        QuietCard(title: "No open hits", detail: "Plan a hit from Explore, then invite \(player.firstName) from here.")
                     } else {
-                        CardRows(items: openHits) { hit in
-                            HStack(spacing: 14) {
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text(hit.dayText)
-                                    Text(hit.clockText)
+                        VStack(spacing: 16) {
+                            ForEach(openHits) { hit in
+                                VStack(spacing: 12) {
+                                    Card(padding: 18, radius: 22) { HitSummary(hit: hit, showsHost: false) }
+                                    ActionButton(title: sent.contains(hit.id) ? "Sent" : "Send",
+                                                 style: sent.contains(hit.id) ? .quiet : .lime,
+                                                 height: 48, radius: 16,
+                                                 isEnabled: !sent.contains(hit.id) && sending == nil,
+                                                 isLoading: sending == hit.id) { send(hit) }
                                 }
-                                .font(CourtlyFont.rounded(17))
-                                .foregroundStyle(CourtlyColor.ink)
-                                .frame(width: 76, alignment: .leading)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text("\(hit.format.shortTitle) · \(hit.spotsLabel)")
-                                        .font(CourtlyFont.bodySemibold)
-                                        .foregroundStyle(CourtlyColor.ink)
-                                    Text(hit.court.shortName)
-                                        .font(CourtlyFont.caption)
-                                        .foregroundStyle(CourtlyColor.secondary)
-                                }
-                                Spacer(minLength: 8)
-                                PillButton(
-                                    title: sent.contains(hit.id) ? "Sent" : (sending == hit.id ? "Sending…" : "Send"),
-                                    style: sent.contains(hit.id) ? .tint : .filled,
-                                    showsCheck: sent.contains(hit.id)
-                                ) {
-                                    send(hit)
-                                }
-                                .disabled(sent.contains(hit.id) || sending != nil)
                             }
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 16)
                         }
                     }
                 }
                 .padding(.top, 16)
             }
-            TextActionButton(title: "Done") { dismiss() }
+            PrimaryButton(title: "Done", style: .lime, compact: true) { dismiss() }
+                .padding(.vertical, 16)
         }
-        .padding(.horizontal, CourtlyMetrics.screenPadding)
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
-        .presentationDetents([.medium, .large])
+        .padding(.horizontal, 24)
+        .background(CourtlyColor.surface.ignoresSafeArea())
+        .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(20)
         .errorAlert($errorMessage, title: "Couldn’t send the invite")

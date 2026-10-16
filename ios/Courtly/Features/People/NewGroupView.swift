@@ -22,7 +22,7 @@ struct NewGroupView: View {
                 SectionLabel(title: "Name")
                     .padding(.top, 8)
                     .padding(.bottom, 8)
-                FieldBox {
+                FieldBox(fill: .white, cornerRadius: 16) {
                     TextField("Wellington Weekend Crew", text: $name)
                         .font(CourtlyFont.body)
                 }
@@ -48,7 +48,7 @@ struct NewGroupView: View {
                             .foregroundStyle(CourtlyColor.blue)
                     }
                 } else {
-                    CardRows(items: friends) { friend in
+                    CardRows(items: friends, radius: 22) { friend in
                         Button {
                             if selected.contains(friend.id) { selected.remove(friend.id) } else { selected.insert(friend.id) }
                         } label: {
@@ -75,20 +75,20 @@ struct NewGroupView: View {
                     }
                 }
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("New group")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom) {
-            PrimaryButton(title: "Create group", isEnabled: canCreate, isLoading: isCreating, action: create)
-                .padding(.horizontal, CourtlyMetrics.screenPadding)
+            PrimaryButton(title: "Create group", style: .lime, compact: true, isEnabled: canCreate, isLoading: isCreating, action: create)
+                .padding(.horizontal, 24)
                 .padding(.top, 8)
                 .padding(.bottom, 16)
-                .background(CourtlyColor.groupedBackground)
+                .background(CourtlyColor.surface)
         }
         .task { await load() }
         .errorAlert($errorMessage, title: "Couldn’t create the group")

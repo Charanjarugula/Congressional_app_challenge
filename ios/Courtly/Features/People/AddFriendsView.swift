@@ -36,7 +36,7 @@ struct AddFriendsView: View {
                             QuietCard(title: "No one named “\(trimmedQuery)”", detail: "Players show up by first name once they’ve joined Courtly.")
                         }
                     } else {
-                        CardRows(items: results) { result in
+                        CardRows(items: results, radius: 22) { result in
                             personRow(result.card, subtitle: subtitle(for: result), relationship: relationship(for: result.card.id, fallback: result.relationship))
                         }
                     }
@@ -45,7 +45,7 @@ struct AddFriendsView: View {
                     contactsPrompt
                 } else if !contactMatches.isEmpty {
                     SectionHeader(title: "From your contacts", top: 24)
-                    CardRows(items: contactMatches.map(\.player)) { card in
+                    CardRows(items: contactMatches.map(\.player), radius: 22) { card in
                         personRow(card, subtitle: card.levelAndArea.isEmpty ? "In your contacts" : card.levelAndArea, relationship: relationship(for: card.id, fallback: contactRelationship(card.id)))
                     }
                 }
@@ -57,18 +57,18 @@ struct AddFriendsView: View {
                 } else if suggestions.isEmpty {
                     QuietCard(title: "No suggestions yet", detail: "Add a friend or join a hit and people you cross paths with show up here.")
                 } else {
-                    CardRows(items: suggestions) { suggestion in
+                    CardRows(items: suggestions, radius: 22) { suggestion in
                         personRow(suggestion.card, subtitle: suggestion.mutualFriends.mutualLabel ?? suggestion.reason ?? suggestion.card.levelAndArea, relationship: relationship(for: suggestion.id, fallback: .none))
                     }
                 }
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("Add friends")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .onChange(of: query) { _, newValue in scheduleSearch(newValue) }
         .task { await loadSuggestions() }
@@ -90,12 +90,8 @@ struct AddFriendsView: View {
                     .focused($searchFocused)
             }
             .padding(.horizontal, 12)
-            .frame(height: 40)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.separator))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(CourtlyColor.blue, lineWidth: searchFocused ? 2 : 0)
-            )
+            .frame(height: 56)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(CourtlyColor.card))
             if searchFocused || !query.isEmpty {
                 Button("Cancel") {
                     query = ""
@@ -105,14 +101,14 @@ struct AddFriendsView: View {
                 .foregroundStyle(CourtlyColor.blue)
             }
         }
-        .frame(height: 52)
+        .frame(minHeight: 56)
         .animation(.easeInOut(duration: 0.15), value: searchFocused)
     }
 
     private var contactsPrompt: some View {
         VStack(alignment: .leading, spacing: 0) {
             SectionHeader(title: "From your contacts", top: 24)
-            Card(padding: 16) {
+            Card(padding: 16, radius: 22) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Find friends who are already here. Only hashed email addresses are checked; your address book is never uploaded.")
                         .font(CourtlyFont.secondary)

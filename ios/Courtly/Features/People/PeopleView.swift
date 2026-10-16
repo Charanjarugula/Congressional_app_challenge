@@ -17,12 +17,12 @@ struct PeopleView: View {
                 searchField
                 content
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
-        .safeAreaInset(edge: .top, spacing: 0) { TabHeader(title: "People", art: .people) }
+        .background(CourtlyColor.surface.ignoresSafeArea())
+        .navigationTitle("People")
+        .navigationBarTitleDisplayMode(.large)
         .refreshable { await inbox.load() }
         .task(id: isActive) {
             guard isActive else { return }
@@ -41,7 +41,7 @@ struct PeopleView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(CourtlyColor.secondary)
-            TextField("Search", text: $query)
+            TextField("Search chat names", text: $query)
                 .font(CourtlyFont.body)
                 .autocorrectionDisabled()
             if !query.isEmpty {
@@ -56,8 +56,8 @@ struct PeopleView: View {
             }
         }
         .padding(.horizontal, 12)
-        .frame(height: 40)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.card))
+        .frame(height: 56)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(CourtlyColor.card))
         .padding(.top, 16)
         .padding(.bottom, 12)
     }
@@ -75,7 +75,8 @@ struct PeopleView: View {
             } else if shown.isEmpty {
                 QuietCard(title: "No matches", detail: "Search looks through chat names.")
             } else {
-                CardRows(items: shown) { chat in
+                SectionHeader(title: "Chats")
+                CardRows(items: shown, radius: 22) { chat in
                     Button {
                         inbox.markRead(chat.id)
                         navigate(.chat(chat.id))
@@ -129,7 +130,7 @@ struct PeopleView: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
-            .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(CourtlyColor.card))
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(CourtlyColor.card))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -162,7 +163,7 @@ struct PeopleView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .frame(height: 44)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.blue))
+                    .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(CourtlyColor.blue))
             }
             .buttonStyle(PressableButtonStyle())
             .padding(.top, 8)

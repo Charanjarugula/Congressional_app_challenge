@@ -22,12 +22,14 @@ Charan Jarugula confirmed on October 16, 2026 that he can access courtly.support
 
 1. Open the support inbox and read new "Courtly report" emails.
 2. Decide:
-   - Clear abuse, threats, sexual content, hate, or a second report for the same thing: suspend.
+   - Substantiated abuse, threats, sexual content, or hate: consider suspension based on the evidence and severity. Repeated reports warrant investigation, not automatic punishment.
    - A one-off no-show or a misunderstanding: no action; it stays on record.
 3. To suspend, run the line from the email in the Supabase SQL editor (prod project):
    `select private.suspend_user('<player id>', true);`
    This cancels their upcoming hits, withdraws their requests, and hides them everywhere. To lift it:
    `select private.suspend_user('<player id>', false);`
-4. Reply to the reporter from the inbox if they left a way to reach them.
+4. Record the decision on the specific report: set `status` to `reviewed` if no enforcement is warranted, or `actioned` after an enforcement action. Keep the report itself; do not delete evidence to clear the queue. For example:
+   `update public.reports set status = 'reviewed' where id = '<report id>' and status = 'open';`
+5. Reply to the reporter from the inbox if follow-up is needed and they left a way to reach them. Never disclose another player's private information.
 
 Reports are kept 90 days, then removed by the `courtly-purge-reports` job.

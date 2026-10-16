@@ -1,6 +1,6 @@
-<p align="center">
-  <img src="ios/Courtly/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="96" alt="Courtly app icon">
-</p>
+   <p align="center">
+     <img src="docs/assets/readme/courtly-banner.png" width="100%" alt="Courtly">
+   </p>
 
 # Courtly
 

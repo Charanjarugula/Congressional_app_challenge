@@ -27,10 +27,6 @@ struct AvailabilityView: View {
                 CalendarConnectedRow(connection: connection) { showsCalendarSheet = true }
                     .padding(.top, 28)
             } else {
-                Text(draft.availability.summary)
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(.white.opacity(0.85))
-                    .padding(.top, 12)
                 CalendarConnectRow { showsCalendarSheet = true }
                     .padding(.top, 28)
             }

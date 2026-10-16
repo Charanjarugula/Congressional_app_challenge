@@ -11,7 +11,6 @@ struct MainTabView: View {
     @State private var selected: MainTab = .play
     @State private var paths: [MainTab: [AppRoute]] = [:]
     @State private var isPlanning = false
-    @State private var coachStep: Int?
     @State private var liveUpdates: [RealtimeHub.Subscription] = []
     @State private var refreshDebounce: Task<Void, Never>?
     @State private var openGeneration = 0   // the newest deep link is the one that lands
@@ -51,24 +50,12 @@ struct MainTabView: View {
                 } label: {
                     PlusButton.face
                 }
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(0.35), lineWidth: 4)
-                        .opacity(coachStep == 2 ? 1 : 0)
-                )
-                .anchorPreference(key: CoachAnchorKey.self, value: .bounds) { ["pill": $0] }
                 .accessibilityLabel("Add friends or start a group")
                 .padding(.trailing, 20)
                 .padding(.bottom, 16)
             }
             if isAtRoot && (selected == .play || selected == .myHits) {
                 PlusButton(label: "Plan a hit") { isPlanning = true }
-                    .overlay(
-                        Circle()
-                            .stroke(Color.white.opacity(0.35), lineWidth: 4)
-                            .opacity(coachStep == 3 ? 1 : 0)
-                    )
-                    .anchorPreference(key: CoachAnchorKey.self, value: .bounds) { ["pill": $0] }
                     .padding(.trailing, 20)
                     .padding(.bottom, 16)
             }
@@ -76,19 +63,6 @@ struct MainTabView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if isAtRoot {
                 GlassTabBar(selected: $selected, dots: dots)
-            }
-        }
-        .overlayPreferenceValue(CoachAnchorKey.self) { anchors in
-            if let coachStep {
-                GeometryReader { proxy in
-                    CoachMarksOverlay(
-                        step: coachStep,
-                        pillFrame: anchors["pill"].map { proxy[$0] },
-                        containerHeight: proxy.size.height,
-                        onNext: advanceCoachMarks
-                    )
-                }
-                .zIndex(1)
             }
         }
         .sheet(isPresented: $isPlanning) {
@@ -112,7 +86,6 @@ struct MainTabView: View {
                 await open(link)   // loads what the screen needs; the lists refresh behind it
             } else {
                 await hits.refreshAll()
-                startCoachMarksIfNeeded()
             }
             await NotificationPermission.registerIfAuthorized()
             startLiveUpdates()
@@ -195,7 +168,6 @@ struct MainTabView: View {
     private func open(_ link: DeepLink) async {
         deepLinks.pending = nil
         isPlanning = false
-        coachStep = nil
         openGeneration += 1
         let generation = openGeneration
         switch link {
@@ -226,47 +198,6 @@ struct MainTabView: View {
             Task { await inbox.load() }
         }
     }
-
-    // MARK: - Coach marks
-
-    /// Remembered on the device as well, under the player's own account, so tips finished offline stay
-    /// finished for that player and no one else; the server hears next time.
-    static func coachMarksDoneKey(for account: UUID) -> String { "coach_marks_done_local.\(account.uuidString)" }
-
-    /// Only over the Play root: a pushed screen or another tab is not where the tips point.
-    private func startCoachMarksIfNeeded() {
-        guard let profile = session.profile, !profile.coachMarksDone, coachStep == nil else { return }
-        if UserDefaults.standard.bool(forKey: Self.coachMarksDoneKey(for: profile.id)) {
-            Task { try? await session.updateProfile(["coach_marks_done": true]) }   // finished before; the save hadn't landed
-            return
-        }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(700))
-            guard coachStep == nil, session.profile?.coachMarksDone == false, isAtRoot, selected == .play, deepLinks.pending == nil else { return }
-            withAnimation(.easeInOut(duration: 0.25)) { coachStep = 1 }
-        }
-    }
-
-    private func advanceCoachMarks() {
-        guard let step = coachStep else { return }
-        withAnimation(.easeInOut(duration: 0.25)) {
-            switch step {
-            case 1:
-                selected = .people
-                coachStep = 2
-            case 2:
-                selected = .play
-                coachStep = 3
-            default:
-                coachStep = nil
-            }
-        }
-        if step >= 3 {
-            if let account = session.profile?.id { UserDefaults.standard.set(true, forKey: Self.coachMarksDoneKey(for: account)) }
-            Task { try? await session.updateProfile(["coach_marks_done": true]) }
-        }
-    }
-
 
     private var dots: Set<MainTab> {
         var tabs = Set<MainTab>()

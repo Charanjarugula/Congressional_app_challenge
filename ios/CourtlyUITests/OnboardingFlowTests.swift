@@ -72,7 +72,7 @@ final class OnboardingFlowTests: XCTestCase {
         for screen in ["Birthday", "Location", "Players", "Notifications", "Done"] {
             let app = open(screen)
             let next = app.buttons[screen == "Done" ? "Let’s hit" : screen == "Location" ? "Use my location" : "Continue"]
-            XCTAssertTrue(next.waitForExistence(timeout: 15))
+            XCTAssertTrue(next.waitForExistence(timeout: 15), "Missing primary action on \(screen)")
             XCTAssertTrue(next.isHittable)
             capture(app, screen)
             if screen == "Birthday" { XCTAssertFalse(next.isEnabled) }

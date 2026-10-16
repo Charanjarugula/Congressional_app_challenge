@@ -9,6 +9,20 @@ struct BirthdayView: View {
     @State private var ageCheck: AgeAssurance.Result?
     @State private var isChecking = false
 
+    init(draft: OnboardingDraft, onContinue: @escaping () -> Void) {
+        self.draft = draft
+        self.onContinue = onContinue
+    }
+
+    #if DEBUG && targetEnvironment(simulator)
+    /// Layout tests exercise the birthday gate without depending on Apple's account/region service.
+    init(previewDraft: OnboardingDraft, onContinue: @escaping () -> Void) {
+        self.draft = previewDraft
+        self.onContinue = onContinue
+        _ageCheck = State(initialValue: .useBirthdayGate)
+    }
+    #endif
+
     private var allowedRange: ClosedRange<Date> {
         let earliest = Calendar.current.date(byAdding: .year, value: -100, to: .now) ?? .distantPast
         return earliest...Date.now

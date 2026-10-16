@@ -33,7 +33,7 @@ struct OnboardingPreviewHarness: View {
     @ViewBuilder private func destination(_ screen: String) -> some View {
         switch screen {
         case "Name": NameView(draft: draft) { advanced = true }
-        case "Birthday": BirthdayView(draft: draft) { advanced = true }
+        case "Birthday": BirthdayView(previewDraft: draft) { advanced = true }
         case "Level": LevelView(draft: draft) { advanced = true }
         case "Formats": FormatsView(draft: draft) { advanced = true }
         case "Location": LocationView(draft: draft) { advanced = true }

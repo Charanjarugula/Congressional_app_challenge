@@ -25,7 +25,7 @@ struct InviteSheet: View {
                 .padding(.top, 10)
                 .padding(.bottom, 18)
             Text("Invite")
-                .font(CourtlyFont.sheetTitle)
+                .font(.largeTitle.bold())
                 .tracking(-0.4)
                 .foregroundStyle(CourtlyColor.ink)
             Text("Friends or a group chat. First to accept takes the spot.")
@@ -34,7 +34,9 @@ struct InviteSheet: View {
                 .padding(.top, 4)
 
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Card(padding: 18, radius: 22) { HitSummary(hit: hit, showsHost: false) }
+                        .padding(.bottom, 16)
                     if isLoading {
                         ProgressView()
                             .frame(maxWidth: .infinity)
@@ -49,28 +51,25 @@ struct InviteSheet: View {
                     } else if groups.isEmpty && friends.isEmpty {
                         QuietCard(title: "No one to invite yet", detail: "Add friends from People and they’ll show up here.")
                     } else {
-                        Card {
-                            VStack(spacing: 0) {
-                                ForEach(groups) { group in
-                                    groupRow(group)
-                                    HairlineSeparator()
-                                }
-                                ForEach(Array(friends.enumerated()), id: \.element.id) { index, friend in
-                                    if index > 0 { HairlineSeparator() }
-                                    friendRow(friend)
-                                }
-                            }
+                        if !groups.isEmpty {
+                            SectionHeader(title: "Groups")
+                            CardRows(items: groups, radius: 22) { group in groupRow(group) }
+                        }
+                        if !friends.isEmpty {
+                            SectionHeader(title: "Friends")
+                            CardRows(items: friends, radius: 22) { friend in friendRow(friend) }
                         }
                     }
                 }
                 .padding(.top, 16)
             }
 
-            TextActionButton(title: "Done") { dismiss() }
+            PrimaryButton(title: "Done", style: .lime, compact: true) { dismiss() }
+                .padding(.vertical, 16)
         }
-        .padding(.horizontal, CourtlyMetrics.screenPadding)
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
-        .presentationDetents([.medium, .large])
+        .padding(.horizontal, 24)
+        .background(CourtlyColor.surface.ignoresSafeArea())
+        .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(20)
         .task { await load() }

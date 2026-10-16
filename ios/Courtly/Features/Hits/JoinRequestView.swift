@@ -18,7 +18,7 @@ struct JoinRequestView: View {
                 if let item, let player = item.player {
                     hitCard(item.hit)
                     SectionHeader(title: "Wants to join", top: 24)
-                    Card {
+                    Card(radius: 22) {
                         Button {
                             navigate(.player(player.id))
                         } label: {
@@ -48,8 +48,8 @@ struct JoinRequestView: View {
                         .buttonStyle(.plain)
                     }
                     HStack(spacing: 8) {
-                        ActionButton(title: "Decline", style: .grouped, isLoading: working == false) { respond(accept: false) }
-                        ActionButton(title: "Accept", isLoading: working == true) { respond(accept: true) }
+                        ActionButton(title: "Decline", style: .grouped, height: 48, radius: 16, isLoading: working == false) { respond(accept: false) }
+                        ActionButton(title: "Accept", style: .lime, height: 48, radius: 16, isLoading: working == true) { respond(accept: true) }
                     }
                     .disabled(working != nil)   // one answer at a time
                     .padding(.top, 16)
@@ -65,13 +65,13 @@ struct JoinRequestView: View {
                     QuietCard(title: "This request was already answered", detail: "Nothing left to do here.")
                 }
             }
-            .padding(.horizontal, CourtlyMetrics.screenPadding)
+            .padding(.horizontal, 24)
             .padding(.bottom, 24)
         }
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("Request")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .task(id: requestID) {
             // From a push or a stale snapshot the request may not be in the cached feed yet.
@@ -82,25 +82,8 @@ struct JoinRequestView: View {
     }
 
     private func hitCard(_ hit: Hit) -> some View {
-        Card(padding: 20) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text(hit.timeLabel)
-                        .font(CourtlyFont.rounded(28))
-                        .tracking(-0.5)
-                        .foregroundStyle(CourtlyColor.ink)
-                    Spacer()
-                    StatusPill(kind: hit.statusKind)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(hit.formatLine)
-                        .font(CourtlyFont.bodySemibold)
-                        .foregroundStyle(CourtlyColor.ink)
-                    Text(hit.courtLine)
-                        .font(CourtlyFont.secondary)
-                        .foregroundStyle(CourtlyColor.secondary)
-                }
-            }
+        Card(padding: 18, radius: 22) {
+            HitSummary(hit: hit)
         }
     }
 

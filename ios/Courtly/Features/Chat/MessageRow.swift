@@ -70,7 +70,7 @@ struct MessageRow: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(isMine ? CourtlyColor.blue : CourtlyColor.groupedBackground)
+                    .fill(isMine ? CourtlyColor.blue : Color.white)
             )
             .frame(maxWidth: 260, alignment: isMine ? .trailing : .leading)
     }

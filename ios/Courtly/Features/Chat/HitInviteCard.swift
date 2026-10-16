@@ -66,10 +66,9 @@ struct HitInviteCard: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
         }
-        .frame(width: 290)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.white))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(CourtlyColor.separator, lineWidth: 1))
-        .shadow(color: CourtlyColor.ink.opacity(0.08), radius: 7, y: 4)
+        .frame(maxWidth: 330)
+        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color.white))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(CourtlyColor.separator, lineWidth: 1))
         .errorAlert($errorMessage)
     }
 
@@ -84,7 +83,7 @@ struct HitInviteCard: View {
         } else if !invite.isOpen {
             ActionButton(title: "Closed", style: .grouped, isEnabled: false) {}
         } else {
-            ActionButton(title: "I’m in", isLoading: isClaiming) { claim() }
+            ActionButton(title: "I’m in", style: .lime, isLoading: isClaiming) { claim() }
         }
     }
 

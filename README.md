@@ -4,7 +4,7 @@
 
 # Courtly
 
-**Find a tennis partner for this week, at a public court near you.** Courtly is an iOS app for recreational players in Palm Beach County, Florida.
+**Find a tennis partner for this week, at a public court near you.** Courtly is an iOS app that helps tennis players of all levels find hitting partners based of location and time built.
 
 In development; not yet in the App Store. The privacy policy, terms and support contact live at [courtly-sage.vercel.app](https://courtly-sage.vercel.app).
 
@@ -128,7 +128,7 @@ Limitations today: courts are the 25 seeded Palm Beach County public courts plus
 
 ## Credits
 
-Built by Charan Jarugula. Thanks to [Supabase](https://supabase.com) for the backend platform, Apple for SwiftUI and the device frameworks, and the Nunito typeface, used on the website under the SIL Open Font License (`site/fonts/OFL.txt`).
+Built by Charan Jarugula and Maddox Tse. Thanks to [Supabase](https://supabase.com) for the backend platform, Apple for SwiftUI and the device frameworks, and the Nunito typeface, used on the website under the SIL Open Font License (`site/fonts/OFL.txt`).
 
 ## Working in this repo
 

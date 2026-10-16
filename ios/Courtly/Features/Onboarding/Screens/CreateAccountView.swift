@@ -116,7 +116,7 @@ struct CreateAccountView: View {
             } catch AuthError.cancelled {
                 // The player closed the sheet; nothing to say.
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = AuthError.message(for: error)
             }
             busy = nil
         }

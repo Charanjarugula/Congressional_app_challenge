@@ -57,12 +57,24 @@ jobs:
           path: screenshots/*.png
           if-no-files-found: error
 
-      - name: Keep the log and result bundle when the walk fails
+      # XCTest logs typed text ("Type '…' into TextField"), so the review code is in the log and the
+      # result bundle. Artifacts of a public repo are downloadable, so the code is cut from the log
+      # and the result bundle stays on the runner.
+      - name: Remove the review code from the log
+        if: failure()
+        env:
+          REVIEW_CODE: ${{ secrets.REVIEWER_PASSWORD }}
+        run: |
+          if [ -f test.log ] && [ -n "$REVIEW_CODE" ]; then
+            LC_ALL=C sed -i '' "s/${REVIEW_CODE}/[review code]/g" test.log
+            ! grep -q "$REVIEW_CODE" test.log
+          fi
+
+      - name: Keep the log and any screens captured when the walk fails
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: screenshot-run-diagnostics
           path: |
             test.log
-            screenshots.xcresult
             screenshots

@@ -201,9 +201,7 @@ struct PlanHitView: View {
                         .foregroundStyle(CourtlyColor.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                if editing == nil {
-                    SafetyNote()
-                } else if hasChanges, playersIn > 0 || (editing?.pendingRequestCount ?? 0) > 0 {
+                if editing != nil, hasChanges, playersIn > 0 || (editing?.pendingRequestCount ?? 0) > 0 {
                     Text("Players in the hit get a notification if the time or court changes.")
                         .font(CourtlyFont.caption)
                         .foregroundStyle(CourtlyColor.secondary)

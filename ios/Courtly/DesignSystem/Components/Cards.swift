@@ -327,19 +327,3 @@ extension View {
         }
     }
 }
-
-/// One quiet line where players arrange to meet someone: public courts, tell someone, report problems.
-struct SafetyNote: View {
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: "shield.lefthalf.filled")
-                .font(.system(size: 11, weight: .semibold))
-            Text("Meet at the court, tell someone where you’re going, and report anyone who makes you uneasy.")
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .font(CourtlyFont.caption)
-        .foregroundStyle(CourtlyColor.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-}

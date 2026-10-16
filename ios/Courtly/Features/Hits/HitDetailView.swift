@@ -321,7 +321,6 @@ struct HitDetailView: View {
                     }
                 } else {
                     VStack(spacing: 8) {
-                        SafetyNote()
                         PrimaryButton(title: hit.isFull ? "Full" : "Ask to join", style: .lime, compact: true, isEnabled: !hit.isFull, isLoading: isWorking) {
                             Task { await perform { try await hits.requestToJoin(hit.id) } }
                         }

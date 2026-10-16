@@ -10,7 +10,7 @@ struct NeedsReplyCard: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        Card(padding: 16) {
+        Card(padding: 16, radius: 22) {
             switch item.kind {
             case .joinRequest: joinRequest
             case .invite: invite
@@ -35,8 +35,8 @@ struct NeedsReplyCard: View {
             }
             .buttonStyle(.plain)
             HStack(spacing: 8) {
-                ActionButton(title: "Accept", height: 40, isLoading: working == "accept") { respond(accept: true) }
-                ActionButton(title: "Decline", style: .grouped, height: 40, isLoading: working == "decline") { respond(accept: false) }
+                ActionButton(title: "Accept", style: .lime, height: 48, radius: 16, isLoading: working == "accept") { respond(accept: true) }
+                ActionButton(title: "Decline", style: .quiet, height: 48, radius: 16, isLoading: working == "decline") { respond(accept: false) }
             }
             .disabled(working != nil)
         }
@@ -55,8 +55,8 @@ struct NeedsReplyCard: View {
             }
             .buttonStyle(.plain)
             HStack(spacing: 8) {
-                ActionButton(title: "I’m in", height: 40, isLoading: working == "claim") { claim() }
-                ActionButton(title: "Not now", style: .grouped, height: 40, isLoading: working == "decline") { declineInvite() }
+                ActionButton(title: "I’m in", style: .lime, height: 48, radius: 16, isLoading: working == "claim") { claim() }
+                ActionButton(title: "Not now", style: .quiet, height: 48, radius: 16, isLoading: working == "decline") { declineInvite() }
             }
             .disabled(working != nil)
         }
@@ -96,7 +96,7 @@ struct NeedsReplyCard: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(CourtlyColor.secondary)
-                    .frame(width: 24, height: 32)
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

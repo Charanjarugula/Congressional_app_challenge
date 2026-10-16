@@ -87,20 +87,20 @@ struct ExploreFiltersSheet: View {
                 .frame(width: 36, height: 5)
                 .padding(.top, 10)
                 .padding(.bottom, 14)
-            ZStack {
-                Text("Filters")
-                    .font(CourtlyFont.bodySemibold)
-                    .foregroundStyle(CourtlyColor.ink)
-                HStack {
-                    Button("Cancel") { dismiss() }
-                    Spacer()
-                    Button("Reset") { draft = ExploreFilters(); radius = session.profile?.radius ?? .ten }
-                        .disabled(draft == ExploreFilters() && radius == session.profile?.radius)
-                }
-                .font(CourtlyFont.body)
-                .foregroundStyle(CourtlyColor.blue)
+            HStack {
+                Button("Cancel") { dismiss() }
+                Spacer()
+                Button("Reset") { draft = ExploreFilters(); radius = session.profile?.radius ?? .ten }
+                    .disabled(draft == ExploreFilters() && radius == session.profile?.radius)
             }
-            .frame(height: 36)
+            .font(.subheadline)
+            .foregroundStyle(CourtlyColor.blue)
+            .frame(minHeight: 44)
+            Text("Filters")
+                .font(.largeTitle.bold())
+                .foregroundStyle(CourtlyColor.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 12)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     group("When") {
@@ -110,7 +110,7 @@ struct ExploreFiltersSheet: View {
                     }
                     group("Time of day") {
                         ForEach(AvailabilityMask.Block.allCases) { block in
-                            chip("\(block.title) \(block.hoursLabel)", on: draft.times.contains(block)) { toggle(&draft.times, block) }
+                            chip("\(block.title) · \(block.hoursLabel)", on: draft.times.contains(block)) { toggle(&draft.times, block) }
                         }
                     }
                     group("Format") {
@@ -133,15 +133,18 @@ struct ExploreFiltersSheet: View {
                             chip(option.title, on: draft.sort == option) { draft.sort = option }
                         }
                     }
+                    Text("Distance also updates your travel radius in Settings.")
+                        .font(.footnote).foregroundStyle(CourtlyColor.secondary)
+                        .padding(.top, 18)
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 16)
             }
-            PrimaryButton(title: "Show hits", isLoading: isSaving, action: apply)
+            PrimaryButton(title: "Show hits", style: .lime, compact: true, isLoading: isSaving, action: apply)
                 .padding(.bottom, 16)
         }
-        .padding(.horizontal, CourtlyMetrics.screenPadding)
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .padding(.horizontal, 24)
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(20)
@@ -164,10 +167,11 @@ struct ExploreFiltersSheet: View {
                 .font(CourtlyFont.captionSemibold)
                 .foregroundStyle(on ? .white : CourtlyColor.ink)
                 .padding(.horizontal, 14)
-                .frame(height: 34)
-                .background(Capsule().fill(on ? CourtlyColor.ink : CourtlyColor.card))
+                .frame(minHeight: 44)
+                .background(RoundedRectangle(cornerRadius: 13).fill(on ? CourtlyColor.blue : CourtlyColor.card))
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? [.isSelected] : [])
     }
 
     private func toggle<T: Hashable>(_ set: inout Set<T>, _ value: T) {

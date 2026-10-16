@@ -13,25 +13,19 @@ struct SuggestedPlayersRow: View {
     @State private var pendingRequest: PendingFriendRequest?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Suggested for you")
-                    .font(CourtlyFont.sectionHeader)
-                    .foregroundStyle(CourtlyColor.ink)
-                Spacer()
-                Button("See all", action: onSeeAll)
-                    .font(CourtlyFont.captionSemibold)
-                    .foregroundStyle(CourtlyColor.blue)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(players) { player in
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Players you might know")
+                .font(.headline)
+                .foregroundStyle(CourtlyColor.ink)
+            Card(radius: 22) {
+                VStack(spacing: 0) {
+                    ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
+                        if index > 0 { HairlineSeparator() }
                         card(player)
                     }
                 }
-                .padding(.horizontal, CourtlyMetrics.screenPadding)
             }
-            .padding(.horizontal, -CourtlyMetrics.screenPadding)   // cards run to the screen edges
+            PrimaryButton(title: "Add friends", style: .lime, compact: true, action: onSeeAll)
         }
         .takeBackRequestDialog($pendingRequest) { toggle($0) }
         .errorAlert($errorMessage, title: "Couldn’t send the request")
@@ -39,19 +33,20 @@ struct SuggestedPlayersRow: View {
 
     private func card(_ player: SuggestedPlayer) -> some View {
         let isRequested = requested.contains(player.id)
-        return VStack(spacing: 8) {
+        return HStack(spacing: 10) {
             Button { navigate(.player(player.id)) } label: {
-                VStack(spacing: 6) {
-                    PlayerAvatar(card: player.card, size: 64)
-                    Text(player.card.displayName)
-                        .font(CourtlyFont.secondarySemibold)
-                        .foregroundStyle(CourtlyColor.ink)
-                        .lineLimit(1)
-                    Text(player.mutualFriends.mutualLabel ?? player.reason ?? player.card.levelAndArea)
-                        .font(CourtlyFont.caption)
-                        .foregroundStyle(CourtlyColor.secondary)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2, reservesSpace: true)
+                HStack(spacing: 10) {
+                    PlayerAvatar(card: player.card, size: 44)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(player.card.displayName)
+                            .font(.headline)
+                            .foregroundStyle(CourtlyColor.ink)
+                        Text(player.mutualFriends.mutualLabel ?? player.reason ?? player.card.levelAndArea)
+                            .font(.footnote)
+                            .foregroundStyle(CourtlyColor.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
             }
@@ -63,22 +58,19 @@ struct SuggestedPlayersRow: View {
                     toggle(player.id)
                 }
             } label: {
-                Text(isRequested ? "Requested" : "Add")
-                    .font(CourtlyFont.captionSemibold)
-                    .foregroundStyle(isRequested ? CourtlyColor.ink : .white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(isRequested ? CourtlyColor.groupedBackground : CourtlyColor.blue)
-                    )
-                    .contentShape(Rectangle())
+                Group {
+                    if busy.contains(player.id) { ProgressView() }
+                    else { Text(isRequested ? "Requested" : "Add").font(.footnote.weight(.semibold)) }
+                }
+                .foregroundStyle(CourtlyColor.blue)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
             }
-            .buttonStyle(PressableButtonStyle())
+            .buttonStyle(.plain)
+            .disabled(busy.contains(player.id))
+            .accessibilityLabel("\(isRequested ? "Cancel request to" : "Add") \(player.card.displayName)")
         }
-        .padding(12)
-        .frame(width: 148)
-        .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(CourtlyColor.card))
+        .padding(14)
     }
 
     private func toggle(_ id: UUID) {

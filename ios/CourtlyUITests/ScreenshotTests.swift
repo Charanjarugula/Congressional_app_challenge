@@ -79,7 +79,7 @@ final class ScreenshotTests: XCTestCase {
         goBack()
 
         // You.
-        app.buttons["You"].firstMatch.tap()
+        app.buttons["Settings"].firstMatch.tap()
         settle(3)
         save("you")
     }

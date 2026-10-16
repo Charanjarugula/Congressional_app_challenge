@@ -12,15 +12,16 @@ struct GlassTabBar: View {
                     selected = tab
                 } label: {
                     VStack(spacing: 3) {
-                        Image(systemName: tab.symbol)
-                            .font(.system(size: 21, weight: .medium))
+                        Image(asset(for: tab))
+                            .renderingMode(.template)
                             .frame(height: 26)
                         Text(tab.title)
                             .font(.system(size: 11, weight: .semibold))
                     }
-                    .foregroundStyle(selected == tab ? CourtlyColor.lime : Color.white.opacity(0.65))
+                    .foregroundStyle(selected == tab ? CourtlyColor.blue : CourtlyColor.secondary)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 64)
+                    .frame(minHeight: 54)
+                    .background(selected == tab ? CourtlyColor.blueTint : .clear, in: RoundedRectangle(cornerRadius: 22))
                     .overlay(alignment: .topTrailing) {
                         if dots.contains(tab) {
                             Circle()
@@ -36,14 +37,24 @@ struct GlassTabBar: View {
                 .accessibilityAddTraits(selected == tab ? [.isSelected] : [])
             }
         }
+        .padding(6)
         .background {
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(CourtlyColor.ink)
-                .shadow(color: CourtlyColor.ink.opacity(0.25), radius: 12, y: 6)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(.white)
+                .overlay(RoundedRectangle(cornerRadius: 28).stroke(CourtlyColor.line, lineWidth: 1))
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 6)
     }
+    private func asset(for tab: MainTab) -> String {
+        switch tab {
+        case .play: "CourtsideExplore"
+        case .myHits: "CourtsideCalendar"
+        case .people: "CourtsideChat"
+        case .you: "CourtsideProfile"
+        }
+    }
+
 }
 
 /// "Plan a hit", floating above the tab bar on Play.
@@ -58,9 +69,8 @@ struct PlusButton: View {
             .foregroundStyle(CourtlyColor.ink)
             .frame(width: 56, height: 56)
             .background(
-                Circle()
+                RoundedRectangle(cornerRadius: 18)
                     .fill(CourtlyColor.lime)
-                    .shadow(color: CourtlyColor.ink.opacity(0.2), radius: 12, y: 8)
             )
     }
 

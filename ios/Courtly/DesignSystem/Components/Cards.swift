@@ -28,13 +28,14 @@ struct SectionHeader: View {
 /// White 16pt-radius card.
 struct Card<Content: View>: View {
     var padding: CGFloat = 0
+    var radius: CGFloat = CourtlyMetrics.cardRadius
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         content()
             .padding(padding)
-            .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(CourtlyColor.card))
-            .clipShape(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous))
+            .background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(CourtlyColor.card))
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
     }
 }
 
@@ -187,23 +188,26 @@ struct StatusPill: View {
 /// 44pt, 12pt radius. Blue for the main action, grouped grey for the other one.
 struct ActionButton: View {
     enum Style {
-        case blue, grouped
+        case blue, grouped, lime, quiet
         /// White, for a button that sits on the grouped background itself rather than in a card.
         case card
 
         var background: Color {
             switch self {
             case .blue: CourtlyColor.blue
+            case .lime: CourtlyColor.lime
+            case .quiet: CourtlyColor.blueTint
             case .grouped: CourtlyColor.groupedBackground
             case .card: CourtlyColor.card
             }
         }
-        var foreground: Color { self == .blue ? .white : CourtlyColor.ink }
+        var foreground: Color { self == .blue ? .white : self == .quiet ? CourtlyColor.blue : CourtlyColor.ink }
     }
 
     let title: String
     var style: Style = .blue
     var height: CGFloat = 44
+    var radius: CGFloat = 12
     var isEnabled = true
     var isLoading = false
     let action: () -> Void
@@ -224,7 +228,7 @@ struct ActionButton: View {
             .frame(maxWidth: .infinity)
             .frame(height: height)
             .foregroundStyle(style.foreground)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(style.background))
+            .background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(style.background))
             .opacity(isEnabled ? 1 : 0.45)
         }
         .buttonStyle(PressableButtonStyle())
@@ -277,6 +281,7 @@ struct Chip: View {
 struct SegmentedControl: View {
     let options: [String]
     @Binding var selectedIndex: Int
+    var courtside = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -285,14 +290,14 @@ struct SegmentedControl: View {
                     withAnimation(.easeInOut(duration: 0.15)) { selectedIndex = index }
                 } label: {
                     Text(option)
-                        .font(CourtlyFont.captionSemibold)
+                        .font(courtside ? .subheadline.weight(.semibold) : CourtlyFont.captionSemibold)
                         .foregroundStyle(selectedIndex == index ? .white : CourtlyColor.secondary)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 32)
+                        .frame(minHeight: courtside ? 44 : 32)
                         .background {
                             if selectedIndex == index {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(CourtlyColor.ink)
+                                RoundedRectangle(cornerRadius: courtside ? 11 : 8, style: .continuous)
+                                    .fill(courtside ? CourtlyColor.blue : CourtlyColor.ink)
                             }
                         }
                         // The whole segment takes the tap, not just the letters: an unselected
@@ -303,8 +308,8 @@ struct SegmentedControl: View {
                 .accessibilityAddTraits(selectedIndex == index ? [.isSelected] : [])
             }
         }
-        .padding(2)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(CourtlyColor.card))
+        .padding(courtside ? 4 : 2)
+        .background(RoundedRectangle(cornerRadius: courtside ? 22 : 10, style: .continuous).fill(CourtlyColor.card))
     }
 }
 

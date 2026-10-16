@@ -81,7 +81,7 @@ struct NewGroupView: View {
         .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("New group")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom) {
             PrimaryButton(title: "Create group", style: .lime, compact: true, isEnabled: canCreate, isLoading: isCreating, action: create)

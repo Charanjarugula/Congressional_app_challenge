@@ -32,6 +32,9 @@ final class RemainingFlowsTests: XCTestCase {
         app.navigationBars.buttons.firstMatch.tap()
         app.buttons["Chat check"].tap()
         XCTAssertTrue(app.buttons["Request a hit"].waitForExistence(timeout: 5))
+        let firstMessage = app.staticTexts["Want to hit tomorrow evening?"]
+        XCTAssertTrue(firstMessage.waitForExistence(timeout: 5))
+        XCTAssertLessThan(firstMessage.frame.minY, app.frame.height * 0.4, "Short conversations must start near the top")
         capture(app, "Chat")
         let composer = app.textFields["Message"].exists ? app.textFields["Message"] : app.textViews.firstMatch
         composer.tap()
@@ -76,6 +79,15 @@ final class RemainingFlowsTests: XCTestCase {
             row.tap()
             XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
             XCTAssertTrue(app.buttons["Save"].isHittable)
+            if title == "Area" {
+                XCTAssertFalse(app.staticTexts["Show hits within"].exists)
+                let field = app.textFields["City, state or ZIP code"]
+                XCTAssertTrue(field.exists)
+                field.tap()
+                field.typeText(" Wellington, FL")
+                XCTAssertTrue((field.value as? String ?? "").contains("Wellington"))
+                XCTAssertFalse(app.buttons["Save"].isEnabled)
+            }
             capture(app, "Settings - " + title)
             app.buttons["Cancel"].tap()
         }

@@ -61,7 +61,7 @@ struct PlayerProfileView: View {
         .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle(profile?.card.firstName ?? "")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             if profile != nil {

@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// What Explore narrows the open hits by. Distance is the player's radius, so changing it here
-/// changes it everywhere.
+/// Local feed filters shared by Friends and Discover; never change profile preferences.
 struct ExploreFilters: Equatable {
     enum When: String, CaseIterable, Identifiable {
         case any, today, tomorrow, weekend, week
@@ -23,6 +22,16 @@ struct ExploreFilters: Equatable {
         var title: String { rawValue.capitalized }
     }
 
+    enum Distance: Int, CaseIterable, Identifiable {
+        case any = 0, five = 5, ten = 10, twentyFive = 25, fifty = 50, hundred = 100
+        var id: Int { rawValue }
+        var title: String { self == .any ? "Any distance" : "\(rawValue) mi" }
+        func includes(_ miles: Double?) -> Bool {
+            self == .any || miles.map { $0 <= Double(rawValue) } == true
+        }
+    }
+
+    var distance: Distance = .any
     var when: When = .any
     var times: Set<AvailabilityMask.Block> = []
     var formats: Set<PlayFormat> = []
@@ -31,12 +40,12 @@ struct ExploreFilters: Equatable {
 
     /// How many groups are narrowed, for the badge on the button.
     var activeCount: Int {
-        [when != .any, !times.isEmpty, !formats.isEmpty, !levels.isEmpty, sort != .soonest].filter { $0 }.count
+        [when != .any, !times.isEmpty, !formats.isEmpty, !levels.isEmpty, sort != .soonest, distance != .any].filter { $0 }.count
     }
 
     func apply(to hits: [Hit], calendar: Calendar = .current) -> [Hit] {
         let kept = hits.filter { hit in
-            matchesDay(hit.startsAt, calendar: calendar)
+            distance.includes(hit.miles) && matchesDay(hit.startsAt, calendar: calendar)
                 && (times.isEmpty || AvailabilityMask.slot(for: hit.startsAt, calendar: hit.calendar).map { times.contains($0.block) } == true)
                 && (formats.isEmpty || formats.contains(hit.format))
                 && (levels.isEmpty || hit.host.level.map { levels.contains($0) } == true)
@@ -67,17 +76,12 @@ struct ExploreFilters: Equatable {
 /// The sheet behind the Filters button.
 struct ExploreFiltersSheet: View {
     @Binding var filters: ExploreFilters
-    @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
     @State private var draft: ExploreFilters
-    @State private var radius: TravelRadius
-    @State private var isSaving = false
-    @State private var errorMessage: String?
 
-    init(filters: Binding<ExploreFilters>, radius: TravelRadius) {
+    init(filters: Binding<ExploreFilters>) {
         _filters = filters
         _draft = State(initialValue: filters.wrappedValue)
-        _radius = State(initialValue: radius)
     }
 
     var body: some View {
@@ -90,8 +94,8 @@ struct ExploreFiltersSheet: View {
             HStack {
                 Button("Cancel") { dismiss() }
                 Spacer()
-                Button("Reset") { draft = ExploreFilters(); radius = session.profile?.radius ?? .ten }
-                    .disabled(draft == ExploreFilters() && radius == session.profile?.radius)
+                Button("Reset") { draft = ExploreFilters() }
+                    .disabled(draft == ExploreFilters())
             }
             .font(.subheadline)
             .foregroundStyle(CourtlyColor.blue)
@@ -124,8 +128,8 @@ struct ExploreFiltersSheet: View {
                         }
                     }
                     group("Distance") {
-                        ForEach(TravelRadius.allCases) { option in
-                            chip(option.title, on: radius == option) { radius = option }
+                        ForEach(ExploreFilters.Distance.allCases) { option in
+                            chip(option.title, on: draft.distance == option) { draft.distance = option }
                         }
                     }
                     group("Sort by") {
@@ -133,14 +137,11 @@ struct ExploreFiltersSheet: View {
                             chip(option.title, on: draft.sort == option) { draft.sort = option }
                         }
                     }
-                    Text("Distance also updates your travel radius in Settings.")
-                        .font(.footnote).foregroundStyle(CourtlyColor.secondary)
-                        .padding(.top, 18)
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 16)
             }
-            PrimaryButton(title: "Show hits", style: .lime, compact: true, isLoading: isSaving, action: apply)
+            PrimaryButton(title: "Show hits", style: .lime, compact: true, action: apply)
                 .padding(.bottom, 16)
         }
         .padding(.horizontal, 24)
@@ -148,7 +149,6 @@ struct ExploreFiltersSheet: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(20)
-        .errorAlert($errorMessage)
     }
 
     private func group<Content: View>(_ title: String, @ViewBuilder chips: () -> Content) -> some View {
@@ -180,18 +180,9 @@ struct ExploreFiltersSheet: View {
 
     private func apply() {
         filters = draft
-        guard radius != session.profile?.radius else { dismiss(); return }
-        isSaving = true
-        Task { @MainActor in
-            do {
-                try await session.updateProfile(["radius_mi": radius.rawValue])
-                dismiss()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            isSaving = false
-        }
+        dismiss()
     }
+
 }
 
 /// Chips that wrap onto the next line when the row is full.

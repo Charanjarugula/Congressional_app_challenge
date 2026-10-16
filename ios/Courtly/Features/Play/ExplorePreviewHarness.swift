@@ -25,7 +25,7 @@ struct ExplorePreviewHarness: View {
             .navigationTitle(selected.title)
             .background(CourtlyColor.surface)
             .safeAreaInset(edge: .bottom) { GlassTabBar(selected: $selected, dots: [.people]) }
-            .sheet(isPresented: $showsFilters) { ExploreFiltersSheet(filters: $filters, radius: .ten) }
+            .sheet(isPresented: $showsFilters) { ExploreFiltersSheet(filters: $filters) }
         }
         .environment(hits)
         .preferredColorScheme(.light)

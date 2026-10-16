@@ -53,7 +53,7 @@ struct CourtPickerView: View {
             }
             .background(CourtlyColor.surface.ignoresSafeArea())
             .navigationTitle("Where")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

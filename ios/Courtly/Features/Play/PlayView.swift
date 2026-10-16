@@ -37,7 +37,7 @@ struct PlayView: View {
         }
         .background(CourtlyColor.surface.ignoresSafeArea())
         .navigationTitle("Explore")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(CourtlyColor.surface, for: .navigationBar)
         .refreshable {
             await hits.loadFeed(userInitiated: true)
@@ -75,20 +75,28 @@ struct PlayView: View {
             .background(CourtlyColor.blue, in: RoundedRectangle(cornerRadius: 22))
             .padding(.top, 12)
         }
-        if !feed.needsReply.isEmpty {
+        let replies = feed.needsReply.filter { $0.kind != .invite || !$0.hit.isMember }
+        if !replies.isEmpty {
             SectionHeader(title: "Needs your reply")
             VStack(spacing: 10) {
-                ForEach(feed.needsReply) { item in
+                ForEach(replies) { item in
                     NeedsReplyCard(item: item)
                 }
             }
         }
 
         SegmentedControl(options: ["Friends", "Discover"], selectedIndex: $tab, courtside: true)
-            .padding(.top, feed.needsReply.isEmpty ? 4 : 22)
+            .padding(.top, replies.isEmpty ? 4 : 22)
+
+        filterControls
 
         if tab == 0 {
-            friends(feed.fromFriends)
+            let shown = filters.apply(to: feed.fromFriends)
+            if !feed.fromFriends.isEmpty && shown.isEmpty {
+                QuietCard(title: "Nothing matches", detail: "Loosen a filter to see more.")
+            } else {
+                friends(shown)
+            }
         } else {
             explore(feed.nearYou)
         }
@@ -136,7 +144,7 @@ struct PlayView: View {
     // MARK: - Explore
 
     @ViewBuilder
-    private func explore(_ nearby: [Hit]) -> some View {
+    private var filterControls: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button { showsFilters = true } label: {
                 HStack(spacing: 6) {
@@ -151,18 +159,22 @@ struct PlayView: View {
                 .background(CourtlyColor.lime, in: RoundedRectangle(cornerRadius: 16))
             }
             .buttonStyle(.plain)
-            Text("Within \(session.profile?.radius.title ?? "") of \(session.profile?.areaLabel?.components(separatedBy: ",").first ?? "you")")
+            Text(filters.distance == .any ? "Any distance" : "Within \(filters.distance.title) of \(session.profile?.areaLabel?.components(separatedBy: ",").first ?? "your area")")
                 .font(CourtlyFont.caption)
                 .foregroundStyle(CourtlyColor.secondary)
                 .lineLimit(1)
         }
         .padding(.vertical, 16)
         .sheet(isPresented: $showsFilters) {
-            ExploreFiltersSheet(filters: $filters, radius: session.profile?.radius ?? .ten)
+            ExploreFiltersSheet(filters: $filters)
         }
+    }
+
+    @ViewBuilder
+    private func explore(_ nearby: [Hit]) -> some View {
         let shown = filters.apply(to: nearby)
         if nearby.isEmpty {
-            QuietCard(title: "No open hits near you", detail: emptyExploreDetail)
+            QuietCard(title: "No open hits yet", detail: emptyExploreDetail)
             Button("Plan a hit", action: onPlan)
                 .font(CourtlyFont.secondarySemibold)
                 .foregroundStyle(CourtlyColor.blue)
@@ -181,7 +193,7 @@ struct PlayView: View {
             let area = pulse.town.map { "around \($0)" } ?? "in your area"
             return "\(who) \(area). Post a time and they can ask to join."
         }
-        return "Widen the distance in Filters, or post a time and players nearby can ask to join."
+        return "Post a time and players can ask to join."
     }
 
     private func rows(_ list: [Hit]) -> some View {

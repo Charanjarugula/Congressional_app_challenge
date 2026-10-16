@@ -9,3 +9,7 @@ The SwiftUI app (iOS 17+). Open `Courtly.xcodeproj` in Xcode 26 or newer (the ap
 - TestFlight: `scripts/testflight.sh` archives and uploads with an App Store Connect API key (`ASC_KEY_ID`, `ASC_ISSUER_ID`, optional `ASC_KEY_PATH`).
 
 How the app talks to the backend, and the folder layout, are in the [root README](../README.md).
+
+### Testing with TestFlight users
+
+The default **Courtly** scheme runs Debug against the development Supabase project. Development accounts and hits are separate from TestFlight's production data. To use the same accounts and listings as TestFlight in the simulator, select **Courtly Production** (Release) in Xcode. Use a separate simulator for production and sign in there; do not copy development sessions. Actions in this scheme affect real production data.

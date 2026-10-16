@@ -60,7 +60,7 @@ struct HitDetailView: View {
         .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle(hit?.viewer.isHost == true ? "Your hit" : "Hit")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             if let hit, hit.viewer.isHost, hit.isLive {

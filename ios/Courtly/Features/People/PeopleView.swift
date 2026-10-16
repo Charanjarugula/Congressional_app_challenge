@@ -22,7 +22,7 @@ struct PeopleView: View {
         }
         .background(CourtlyColor.surface.ignoresSafeArea())
         .navigationTitle("People")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .refreshable { await inbox.load() }
         .task(id: isActive) {
             guard isActive else { return }

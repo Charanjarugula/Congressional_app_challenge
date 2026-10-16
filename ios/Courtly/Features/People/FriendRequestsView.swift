@@ -72,7 +72,7 @@ struct FriendRequestsView: View {
         .background(CourtlyColor.surface.ignoresSafeArea())
         .plainBackButton()
         .navigationTitle("Friend requests")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .refreshable { await inbox.load() }
         .task { await inbox.load() }

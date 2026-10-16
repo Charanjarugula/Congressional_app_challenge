@@ -224,7 +224,7 @@ private struct ExploreSessionRow: View {
                 }
             }
             Text(hit.court.name).font(.footnote).foregroundStyle(CourtlyColor.secondary)
-            Text([hit.host.level?.title, "\(hit.durationMin) min"].compactMap { $0 }.joined(separator: " · "))
+            Text([hit.host.level?.title, hit.durationLabel].compactMap { $0 }.joined(separator: " · "))
                 .font(.footnote).foregroundStyle(CourtlyColor.secondary)
             HStack(spacing: 7) {
                 PlayerAvatar(card: hit.host, size: 24).accessibilityHidden(true)

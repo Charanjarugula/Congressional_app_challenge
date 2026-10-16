@@ -27,7 +27,6 @@ struct PlanHitView: View {
         let local = Calendar.current.date(from: parts) ?? hit.startsAt
         _day = State(initialValue: Calendar.current.startOfDay(for: local))
         _time = State(initialValue: local)
-        _duration = State(initialValue: hit.durationMin)
         _format = State(initialValue: hit.format)
         _spots = State(initialValue: hit.spotsTotal)
         _visibility = State(initialValue: hit.visibility)
@@ -36,7 +35,6 @@ struct PlanHitView: View {
 
     @State private var day = Calendar.current.startOfDay(for: Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now)
     @State private var time = Calendar.current.date(bySettingHour: 18, minute: 30, second: 0, of: .now) ?? .now
-    @State private var duration = 90
     @State private var format: PlayFormat = .casual
     @State private var spots = 1
     @State private var visibility: HitVisibility = .anyone
@@ -87,7 +85,7 @@ struct PlanHitView: View {
 
     private var hasChanges: Bool {
         guard let editing else { return true }
-        return court?.id != editing.court.id || startsAt != editing.startsAt || duration != editing.durationMin
+        return court?.id != editing.court.id || startsAt != editing.startsAt
             || format != editing.format || spots != editing.spotsTotal || visibility != editing.visibility
     }
 
@@ -264,32 +262,12 @@ struct PlanHitView: View {
                 .padding(.horizontal, 8)
             }
             HairlineSeparator()
-            FormRow(title: "Time", value: "\(HitFormatting.clock.string(from: time)) · \(duration) min") { toggle(.time) }
+            FormRow(title: "Start time", value: HitFormatting.clock.string(from: time)) { toggle(.time) }
             if expanded == .time {
                 DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
                     .datePickerStyle(.wheel)
                     .labelsHidden()
                     .frame(maxWidth: .infinity)
-                HStack(spacing: 8) {
-                    ForEach([60, 90, 120], id: \.self) { minutes in
-                        Button {
-                            duration = minutes
-                        } label: {
-                            Text("\(minutes) min")
-                                .font(CourtlyFont.secondarySemibold)
-                                .foregroundStyle(duration == minutes ? .white : CourtlyColor.ink)
-                                .frame(maxWidth: .infinity)
-                                .frame(minHeight: 44)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(duration == minutes ? CourtlyColor.blue : CourtlyColor.surface)
-                                )
-                        }
-                        .buttonStyle(PressableButtonStyle())
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 14)
             }
         }
         .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(CourtlyColor.card))
@@ -305,8 +283,8 @@ struct PlanHitView: View {
                     Text(court?.name ?? "Choose a court")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(court == nil ? CourtlyColor.blue : CourtlyColor.ink)
-                    if let city = court?.city {
-                        Text(city)
+                    if let address = court?.address ?? court?.city {
+                        Text(address)
                             .font(.caption)
                             .foregroundStyle(CourtlyColor.secondary)
                     }
@@ -419,7 +397,7 @@ struct PlanHitView: View {
             courtsError = nil
             if court == nil {
                 let lastID = UserDefaults.standard.string(forKey: Self.lastCourtKey).flatMap { UUID(uuidString: $0) }
-                court = list.first { $0.id == lastID } ?? list.first
+                court = list.first { $0.id == lastID }
             }
         } catch {
             courtsError = "Couldn’t load nearby courts. \(error.localizedDescription)"
@@ -434,7 +412,7 @@ struct PlanHitView: View {
                 let hit: Hit
                 if let editing {
                     hit = try await hits.update(
-                        editing.id, courtID: court.id, startsAt: startsAt, durationMin: duration,
+                        editing.id, courtID: court.id, startsAt: startsAt, durationMin: nil,
                         format: format, spots: spots, visibility: visibility
                     )
                     isPosting = false
@@ -443,7 +421,7 @@ struct PlanHitView: View {
                     return
                 }
                 hit = try await hits.create(
-                    courtID: court.id, startsAt: startsAt, durationMin: duration,
+                    courtID: court.id, startsAt: startsAt, durationMin: nil,
                     format: format, spots: spots, visibility: visibility,
                     inviteChatID: inviteChat?.id, inviteExpiresAt: inviteChat == nil ? nil : chosenExpiry
                 )

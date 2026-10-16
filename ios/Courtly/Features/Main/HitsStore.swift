@@ -151,7 +151,7 @@ final class HitsStore {
     // MARK: - Actions
 
     @MainActor
-    func create(courtID: UUID, startsAt: Date, durationMin: Int, format: PlayFormat, spots: Int, visibility: HitVisibility,
+    func create(courtID: UUID, startsAt: Date, durationMin: Int?, format: PlayFormat, spots: Int, visibility: HitVisibility,
                 inviteChatID: UUID? = nil, inviteExpiresAt: Date? = nil) async throws -> Hit {
         var hit = try await API.Hits.create(courtID: courtID, startsAt: startsAt, durationMin: durationMin, format: format, spots: spots,
                                             visibility: visibility, inviteChatID: inviteChatID, inviteExpiresAt: inviteExpiresAt)
@@ -166,7 +166,7 @@ final class HitsStore {
     }
 
     @MainActor
-    func update(_ hitID: UUID, courtID: UUID, startsAt: Date, durationMin: Int, format: PlayFormat, spots: Int,
+    func update(_ hitID: UUID, courtID: UUID, startsAt: Date, durationMin: Int?, format: PlayFormat, spots: Int,
                 visibility: HitVisibility) async throws -> Hit {
         let hit = try await API.Hits.update(hitID, courtID: courtID, startsAt: startsAt, durationMin: durationMin,
                                             format: format, spots: spots, visibility: visibility)

@@ -133,6 +133,15 @@ struct Hit: Codable, Identifiable, Equatable {
     var inviteId: UUID?
     var needsAttendance: Bool?
 
+    // Older servers omit this field; older fixed-length hits remain readable.
+    var startTimeOnly: Bool? = nil
+    var durationLabel: String? { startTimeOnly == true ? nil : "\(durationMin) min" }
+
+    func overlaps(_ other: Hit) -> Bool {
+        if startTimeOnly == true || other.startTimeOnly == true { return startsAt == other.startsAt }
+        return startsAt < other.endsAt && endsAt > other.startsAt
+    }
+
     var rowState: RowState? { state.flatMap(RowState.init(rawValue:)) }
     var endsAt: Date { startsAt.addingTimeInterval(TimeInterval(durationMin * 60)) }
     var isLive: Bool { (status == .open || status == .confirmed) && startsAt > .now }
@@ -207,7 +216,7 @@ struct Hit: Codable, Identifiable, Equatable {
     var shortTimeLabel: String { "\(dayText) \(clockText)" }
 
     /// "Casual hitting · 90 min"
-    var formatLine: String { "\(format.title) · \(durationMin) min" }
+    var formatLine: String { [format.title, durationLabel].compactMap { $0 }.joined(separator: " · ") }
 
     var milesLabel: String? { miles.map(HitFormatting.miles) }
 

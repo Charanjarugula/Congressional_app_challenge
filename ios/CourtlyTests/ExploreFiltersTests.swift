@@ -105,3 +105,26 @@ extension ExploreFiltersTests {
         XCTAssertEqual(source.nearYou[0].miles, 200)
     }
 }
+
+extension ExploreFiltersTests {
+    func testStartOnlyHitHasNoDurationAndOnlyConflictsAtSameStart() {
+        var startOnly = hit()
+        startOnly.startTimeOnly = true
+        XCTAssertNil(startOnly.durationLabel)
+        XCTAssertEqual(startOnly.formatLine, startOnly.format.title)
+        XCTAssertTrue(startOnly.overlaps(hit()))
+        XCTAssertFalse(startOnly.overlaps(hit(hours: 1.5)))
+        XCTAssertFalse(hit(hours: 1.5).overlaps(startOnly))
+        XCTAssertTrue(hit().overlaps(hit(hours: 1.5)))
+        XCTAssertFalse(hit().overlaps(hit(hours: 2)))
+    }
+    func testStartOnlyFlagSurvivesCodingWhileLegacyHitsKeepDuration() throws {
+        var original = hit()
+        XCTAssertEqual(original.durationLabel, "60 min")
+        original.startTimeOnly = true
+        let encoded = try JSONCoding.encoder.encode(original)
+        let decoded = try JSONCoding.decoder.decode(Hit.self, from: encoded)
+        XCTAssertTrue(decoded.startTimeOnly == true)
+        XCTAssertNil(decoded.durationLabel)
+    }
+}

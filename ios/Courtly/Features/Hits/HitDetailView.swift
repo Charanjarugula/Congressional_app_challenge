@@ -170,7 +170,7 @@ struct HitDetailView: View {
                     } else if hit.isLive && hit.viewer.isHost {
                         ActionButton(title: "Invite", style: .lime, height: 48, radius: 16) { showsInvite = true }
                     }
-                    if hit.isLive {
+                    if hit.isLive && hit.startTimeOnly != true {
                         ActionButton(title: "Add to calendar", style: .grouped) { showsCalendar = true }
                     }
                 }

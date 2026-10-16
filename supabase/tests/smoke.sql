@@ -18,6 +18,15 @@ begin
   select id into v_court from public.courts where name = 'Wellington Tennis Center';
   if v_court is null then raise exception 'seed missing: Wellington Tennis Center'; end if;
 
+  -- Full-name input matches the public initial without exposing or comparing the surname.
+  perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+  if not exists (select 1 from jsonb_array_elements(public.search_players('  Maya   Reyes  ')) e where (e->>'id')::uuid = a) then
+    raise exception 'full-name search failed';
+  end if;
+  if not exists (select 1 from jsonb_array_elements(public.search_players('Maya R.')) e where (e->>'id')::uuid = a) then
+    raise exception 'public initial search failed';
+  end if;
+
   -- Maya posts a hit.
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   v_hit := public.create_hit(v_court, now() + interval '2 days', 90, 'casual', 1, 'anyone');
@@ -908,7 +917,7 @@ begin
     if jsonb_array_length(public.search_players('Nia P')) <> 0 then raise exception 'search by own name should not list self'; end if;
     perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
     if jsonb_array_length(public.search_players('Nia P')) <> 1 then raise exception 'first name and last initial should match'; end if;
-    if jsonb_array_length(public.search_players('Nia Pa')) <> 0 then raise exception 'search revealed more than the last initial'; end if;
+    if public.search_players('Nia Pa') is distinct from public.search_players('Nia Pz') then raise exception 'search revealed more than the last initial'; end if;
     perform set_config('request.jwt.claims', json_build_object('sub', v_new, 'role', 'authenticated')::text, true);
     -- Strangers don't see when someone is free or busy.
     if public.get_player(a) ? 'availability_mask' and public.get_player(a)->>'availability_mask' is not null then

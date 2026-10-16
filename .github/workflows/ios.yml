@@ -50,9 +50,19 @@ jobs:
         run: grep -E "error:" build.log | head -100 || tail -100 build.log
 
   test:
-    name: Unit tests on iOS Simulator
+    name: ${{ matrix.name }} on iOS Simulator
     runs-on: macos-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit tests
+            scheme: Courtly
+            target: CourtlyTests
+          - name: Welcome navigation
+            scheme: CourtlyUITests
+            target: CourtlyUITests/WelcomeTests
     steps:
       - uses: actions/checkout@v4
 
@@ -74,12 +84,13 @@ jobs:
           set -o pipefail
           xcodebuild test \
             -project ios/Courtly.xcodeproj \
-            -scheme Courtly \
+            -scheme "${{ matrix.scheme }}" \
+            -only-testing:"${{ matrix.target }}" \
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
             CODE_SIGNING_ALLOWED=NO \
             | tee test.log | grep -E "^(Test Suite|Test Case .* (passed|failed)|Executed|\*\*|error:|.*: error:)" || true
           grep -q "TEST SUCCEEDED" test.log
-          grep -E "Executed [0-9]+ tests" test.log | tail -1
+          grep -E "Executed [0-9]+ tests?" test.log | tail -1
 
       - name: Show failures
         if: failure()

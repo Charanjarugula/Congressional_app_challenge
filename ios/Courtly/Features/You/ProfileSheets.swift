@@ -14,7 +14,7 @@ struct SheetScaffold<Content: View>: View {
     var saveTitle = "Save"
     var canSave = true
     var isSaving = false
-    var detents: Set<PresentationDetent> = [.medium, .large]
+    var detents: Set<PresentationDetent> = [.large]
     let onSave: () -> Void
     @ViewBuilder let content: () -> Content
 
@@ -27,19 +27,16 @@ struct SheetScaffold<Content: View>: View {
                 .frame(width: 36, height: 5)
                 .padding(.top, 10)
                 .padding(.bottom, 14)
-            ZStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Button("Cancel") { dismiss() }
+                    .font(CourtlyFont.body)
+                    .foregroundStyle(CourtlyColor.blue)
+                    .disabled(isSaving)
                 Text(title)
-                    .font(CourtlyFont.bodySemibold)
+                    .font(.largeTitle.weight(.bold))
                     .foregroundStyle(CourtlyColor.ink)
-                HStack {
-                    Button("Cancel") { dismiss() }
-                        .font(CourtlyFont.body)
-                        .foregroundStyle(CourtlyColor.blue)
-                        .disabled(isSaving)   // a save already under way lands either way, so the sheet stays until it finishes
-                    Spacer()
-                }
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: 36)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     content()
@@ -47,11 +44,11 @@ struct SheetScaffold<Content: View>: View {
                 .padding(.top, 16)
                 .padding(.bottom, 16)
             }
-            PrimaryButton(title: saveTitle, isEnabled: canSave, isLoading: isSaving, action: onSave)
+            PrimaryButton(title: saveTitle, style: .lime, compact: true, isEnabled: canSave, isLoading: isSaving, action: onSave)
                 .padding(.bottom, 16)
         }
-        .padding(.horizontal, CourtlyMetrics.screenPadding)
-        .background(CourtlyColor.groupedBackground.ignoresSafeArea())
+        .padding(.horizontal, 24)
+        .background(CourtlyColor.surface.ignoresSafeArea())
         .presentationDetents(detents)
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(20)
@@ -59,7 +56,7 @@ struct SheetScaffold<Content: View>: View {
     }
 }
 
-/// 52pt white row that turns blue-tinted when picked.
+/// White choice; selected choices use the approved solid blue.
 struct OptionRow: View {
     let title: String
     var subtitle: String? = nil
@@ -72,26 +69,29 @@ struct OptionRow: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(CourtlyFont.bodySemibold)
-                        .foregroundStyle(CourtlyColor.ink)
+                        .foregroundStyle(isSelected ? Color.white : CourtlyColor.blue)
                     if let subtitle {
                         Text(subtitle)
                             .font(CourtlyFont.caption)
-                            .foregroundStyle(CourtlyColor.secondary)
+                            .foregroundStyle(isSelected ? Color.white : CourtlyColor.secondary)
                     }
                 }
                 .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
-                SelectionMark(isSelected: isSelected)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 24))
+                    .foregroundStyle(isSelected ? Color.white : CourtlyColor.blue)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, subtitle == nil ? 0 : 10)
             .frame(minHeight: 52)
             .background(
                 RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
-                    .fill(isSelected ? CourtlyColor.blueTint : CourtlyColor.card)
+                    .fill(isSelected ? CourtlyColor.blue : CourtlyColor.card)
             )
         }
-        .buttonStyle(PressableButtonStyle())
+        .buttonStyle(SelectionButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

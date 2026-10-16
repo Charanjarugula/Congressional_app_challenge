@@ -35,7 +35,7 @@ struct AreaSheet: View {
             }
             .padding(.horizontal, 18)
             .frame(height: 52)
-            .background(RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous).fill(CourtlyColor.card))
+            .background(RoundedRectangle(cornerRadius: 16).fill(CourtlyColor.card))
             LinkButton(title: "Use my location") { useLocation() }
                 .padding(.top, 10)
                 .padding(.leading, 4)
@@ -50,15 +50,16 @@ struct AreaSheet: View {
                     } label: {
                         Text(option.title)
                             .font(CourtlyFont.secondarySemibold)
-                            .foregroundStyle(radius == option ? CourtlyColor.blue : CourtlyColor.ink)
+                            .foregroundStyle(radius == option ? Color.white : CourtlyColor.blue)
                             .frame(maxWidth: .infinity)
                             .frame(height: 44)
                             .background(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(radius == option ? CourtlyColor.blueTint : CourtlyColor.card)
+                                    .fill(radius == option ? CourtlyColor.blue : CourtlyColor.card)
                             )
                     }
-                    .buttonStyle(PressableButtonStyle())
+                    .buttonStyle(SelectionButtonStyle())
+                    .accessibilityAddTraits(radius == option ? .isSelected : [])
                 }
             }
         }

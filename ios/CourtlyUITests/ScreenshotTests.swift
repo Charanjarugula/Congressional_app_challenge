@@ -42,10 +42,9 @@ final class ScreenshotTests: XCTestCase {
         codeField.tap()
         codeField.typeText(code)   // eight digits verify on their own
 
-        // Play, with the first-run tips dismissed.
+        // Play is directly usable after sign-in, without first-run tips.
         let myHitsTab = app.buttons["My Hits"]
         XCTAssertTrue(myHitsTab.waitForExistence(timeout: 60), "Signing in did not reach the main tabs")
-        dismissCoachMarks()
         settle(5)
         save("play")
 
@@ -86,23 +85,6 @@ final class ScreenshotTests: XCTestCase {
     }
 
     // MARK: - Helpers
-
-    /// Taps through "Next", "Next", "Got it" when the first-run tips are showing.
-    private func dismissCoachMarks() {
-        for _ in 0..<3 {
-            let next = app.buttons["Next"]
-            let gotIt = app.buttons["Got it"]
-            if next.waitForExistence(timeout: 3) {
-                next.tap()
-            } else if gotIt.exists {
-                gotIt.tap()
-                return
-            } else {
-                return
-            }
-        }
-        if app.buttons["Got it"].waitForExistence(timeout: 3) { app.buttons["Got it"].tap() }
-    }
 
     /// The other tabs stay in the hierarchy at zero opacity, so a label match alone can land on a
     /// card that is not on screen; the first one that can be tapped is the one on the visible tab.

@@ -10,7 +10,7 @@ struct LeaveSignUpButton: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        TextActionButton(title: isDeleting ? "Deleting…" : title, color: CourtlyColor.secondary) { confirming = true }
+        TextActionButton(title: isDeleting ? "Deleting…" : title, color: .white) { confirming = true }
             .disabled(isDeleting)
             .alert("Delete this account?", isPresented: $confirming) {
                 Button("Delete", role: .destructive, action: delete)

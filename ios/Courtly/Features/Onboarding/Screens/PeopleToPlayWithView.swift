@@ -30,11 +30,12 @@ struct PeopleToPlayWithView: View {
         OnboardingStepView(
             progress: 0.9,
             title: "Players near you",
-            subtitle: subtitle
+            subtitle: subtitle,
+            appearance: .courtsideBlue
         ) {
             if isLoading {
                 ProgressView()
-                    .tint(CourtlyColor.secondary)
+                    .tint(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 48)
             } else {
@@ -63,7 +64,7 @@ struct PeopleToPlayWithView: View {
                             if isCheckingContacts { ProgressView().tint(CourtlyColor.secondary) }
                         }
                         .padding(16)
-                        .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(CourtlyColor.groupedBackground))
+                        .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(.white))
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -72,7 +73,7 @@ struct PeopleToPlayWithView: View {
                 }
 
                 if !contacts.isEmpty {
-                    SectionLabel(title: "From your contacts")
+                    SectionLabel(title: "From your contacts", color: .white)
                         .padding(.top, 24)
                         .padding(.bottom, 4)
                     playerList(contacts)
@@ -80,7 +81,7 @@ struct PeopleToPlayWithView: View {
 
                 if !nearby.isEmpty {
                     HStack(alignment: .firstTextBaseline) {
-                        SectionLabel(title: contacts.isEmpty ? "Say hi to a few" : "Also near you")
+                        SectionLabel(title: contacts.isEmpty ? "Say hi to a few" : "Also near you", color: .white)
                         Spacer()
                         inviteLink
                     }
@@ -96,12 +97,12 @@ struct PeopleToPlayWithView: View {
                 }
 
                 if let errorMessage {
-                    ErrorCaption(text: errorMessage)
+                    OnboardingErrorCaption(text: errorMessage)
                         .padding(.top, 12)
                 }
             }
         } footer: {
-            PrimaryButton(title: requestedCount == 0 ? "Continue" : "Continue · \(requestedCount) requested", action: onContinue)
+            PrimaryButton(title: requestedCount == 0 ? "Continue" : "Continue · \(requestedCount) requested", style: .lime, compact: true, action: onContinue)
         }
         .task { await load() }
         .takeBackRequestDialog($pendingRequest) { toggle($0) }
@@ -134,7 +135,7 @@ struct PeopleToPlayWithView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(CourtlyColor.groupedBackground))
+        .background(RoundedRectangle(cornerRadius: CourtlyMetrics.cardRadius, style: .continuous).fill(.white))
     }
 
     private var inviteText: String {
@@ -145,7 +146,7 @@ struct PeopleToPlayWithView: View {
         ShareLink(item: inviteText) {
             Text("Invite more")
                 .font(CourtlyFont.captionSemibold)
-                .foregroundStyle(CourtlyColor.blue)
+                .foregroundStyle(.white)
         }
     }
 
@@ -169,6 +170,8 @@ struct PeopleToPlayWithView: View {
                 }
             }
         }
+        .padding(.horizontal, 14)
+        .background(.white, in: RoundedRectangle(cornerRadius: 22))
     }
 
     private func load() async {
@@ -255,7 +258,7 @@ struct PulseTiles: View {
             }
             Text(pulse.town.map { "Around \($0)" } ?? "In your area")
                 .font(CourtlyFont.caption)
-                .foregroundStyle(CourtlyColor.secondary)
+                .foregroundStyle(.white.opacity(0.85))
                 .padding(.horizontal, 2)
         }
         .accessibilityElement(children: .combine)
@@ -282,7 +285,7 @@ struct PulseTiles: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(CourtlyColor.groupedBackground))
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white))
     }
 }
 

@@ -31,18 +31,18 @@ struct YoureInView: View {
             Text(greeting)
                 .font(CourtlyFont.largeTitle)
                 .tracking(-0.7)
-                .foregroundStyle(CourtlyColor.ink)
+                .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
                 .padding(.top, 28)
             Text("Welcome to Courtly. Time to find someone to play with.")
                 .font(CourtlyFont.body)
                 .lineSpacing(4)
-                .foregroundStyle(CourtlyColor.secondary)
+                .foregroundStyle(.white.opacity(0.85))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 280)
                 .padding(.top, 10)
             if let errorMessage {
-                ErrorCaption(text: errorMessage)
+                OnboardingErrorCaption(text: errorMessage)
                     .multilineTextAlignment(.center)
                     .padding(.top, 16)
             }
@@ -51,12 +51,12 @@ struct YoureInView: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, CourtlyMetrics.screenPadding)
         .padding(.bottom, 70)
-        .background(Color.white.ignoresSafeArea())
+        .background(CourtlyColor.blue.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            PrimaryButton(title: "Let’s hit", isLoading: isSaving, action: finish)
+            PrimaryButton(title: "Let’s hit", style: .lime, compact: true, isLoading: isSaving, action: finish)
                 .padding(.horizontal, CourtlyMetrics.screenPadding)
                 .padding(.bottom, 16)
-                .background(Color.white.ignoresSafeArea())
+                .background(CourtlyColor.blue.ignoresSafeArea())
         }
         .toolbar(.hidden, for: .navigationBar)
     }

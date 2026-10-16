@@ -25,14 +25,12 @@ struct OnboardingFlow: View {
     @Environment(AppSession.self) private var session
     @State private var draft = OnboardingDraft()
     @State private var path: [OnboardingRoute]
-    @State private var showsWelcomeScheme: Bool
 
     private let resumeProfile: Bool
 
     init(resumeProfile: Bool) {
         self.resumeProfile = resumeProfile
         _path = State(initialValue: resumeProfile ? [.name] : [])
-        _showsWelcomeScheme = State(initialValue: !resumeProfile)
     }
 
     /// Pushes once, however fast Continue is tapped.
@@ -55,22 +53,11 @@ struct OnboardingFlow: View {
             )
             .navigationDestination(for: OnboardingRoute.self) { route in
                 destination(for: route)
+                    .environment(\.colorScheme, .light)
             }
         }
-        // Welcome is blue with white status-bar text; every other screen is light. The root
-        // view's preference wins inside a NavigationStack, so it follows the path, switching
-        // once the push animation has carried Welcome off screen.
-        .preferredColorScheme(showsWelcomeScheme ? .dark : .light)
-        .onChange(of: path.isEmpty) { _, atWelcome in
-            if atWelcome {
-                showsWelcomeScheme = true
-            } else {
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(350))
-                    if !path.isEmpty { showsWelcomeScheme = false }
-                }
-            }
-        }
+        // Blue onboarding uses white system chrome; controls retain their native light appearance.
+        .preferredColorScheme(.dark)
         .onAppear {
             if resumeProfile, let profile = session.profile { draft.load(from: profile) }
         }

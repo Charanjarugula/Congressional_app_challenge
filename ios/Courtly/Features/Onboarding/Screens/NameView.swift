@@ -19,27 +19,22 @@ struct NameView: View {
         OnboardingStepView(
             progress: 0.2,
             title: "What’s your name?",
-            subtitle: "This is how your friends will find you."
+            subtitle: "This is how your friends will find you.",
+            appearance: .courtsideBlue
         ) {
-            VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("First name").font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
                 nameField("First name", text: $draft.firstName, field: .first, contentType: .givenName)
                     .submitLabel(.next)
                     .onSubmit { focusedField = .last }
-                HairlineSeparator()
+                Text("Last name").font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
                 nameField("Last name", text: $draft.lastName, field: .last, contentType: .familyName)
                     .submitLabel(.done)
                     .onSubmit { if canContinue { onContinue() } }
             }
-            .background(
-                RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
-                    .fill(CourtlyColor.groupedBackground)
-            )
-            .padding(.top, 28)
+            .padding(.top, 24)
         } footer: {
-            VStack(spacing: 4) {
-                PrimaryButton(title: "Continue", isEnabled: canContinue, action: onContinue)
-                LeaveSignUpButton()
-            }
+            PrimaryButton(title: "Continue", style: .lime, compact: true, isEnabled: canContinue, action: onContinue)
         }
         .task {
             try? await Task.sleep(for: .milliseconds(400))
@@ -53,7 +48,7 @@ struct NameView: View {
         field: Field,
         contentType: UITextContentType
     ) -> some View {
-        TextField(placeholder, text: text)
+        TextField(placeholder, text: text, prompt: Text(placeholder).foregroundStyle(CourtlyColor.secondary))
             .font(CourtlyFont.bodySemibold)
             .foregroundStyle(CourtlyColor.ink)
             .textContentType(contentType)
@@ -62,5 +57,6 @@ struct NameView: View {
             .focused($focusedField, equals: field)
             .padding(.horizontal, 18)
             .frame(height: CourtlyMetrics.fieldHeight)
+            .background(.white, in: RoundedRectangle(cornerRadius: 16))
     }
 }

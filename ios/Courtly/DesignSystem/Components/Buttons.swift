@@ -33,6 +33,7 @@ struct PrimaryButton: View {
 
     let title: String
     var style: Style = .blue
+    var compact = false
     var isEnabled = true
     var isLoading = false
     let action: () -> Void
@@ -41,7 +42,7 @@ struct PrimaryButton: View {
         Button(action: action) {
             ZStack {
                 Text(title)
-                    .font(CourtlyFont.bodySemibold)
+                    .font(compact ? CourtlyFont.secondarySemibold : CourtlyFont.bodySemibold)
                     .opacity(isLoading ? 0 : 1)
                 if isLoading {
                     ProgressView()
@@ -49,13 +50,13 @@ struct PrimaryButton: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: CourtlyMetrics.primaryButtonHeight)
+            .frame(height: compact ? 48 : CourtlyMetrics.primaryButtonHeight)
             .foregroundStyle(style.foreground)
             .background(
-                RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
-                    .fill(style.background)
+                RoundedRectangle(cornerRadius: compact ? 16 : CourtlyMetrics.controlRadius, style: .continuous)
+                    .fill(!isEnabled && compact && style == .lime ? Color(hex: 0xC4D89B) : style.background)
             )
-            .opacity(isEnabled ? 1 : 0.4)
+            .opacity(isEnabled || (compact && style == .lime) ? 1 : 0.4)
         }
         .buttonStyle(PressableButtonStyle())
         .disabled(!isEnabled || isLoading)

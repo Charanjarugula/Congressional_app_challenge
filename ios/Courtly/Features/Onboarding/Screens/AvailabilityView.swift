@@ -15,8 +15,10 @@ struct AvailabilityView: View {
     }
 
     var body: some View {
-        OnboardingStepView(progress: 0.8, title: "When do you usually play?", subtitle: subtitle) {
+        OnboardingStepView(progress: 0.8, title: "When do you usually play?", subtitle: subtitle, appearance: .courtsideBlue) {
             AvailabilityGrid(selected: $draft.availability, busy: draft.busyThisWeek)
+                .padding(12)
+                .background(.white, in: RoundedRectangle(cornerRadius: 22))
                 .padding(.top, 28)
 
             if let connection = draft.calendar {
@@ -25,18 +27,15 @@ struct AvailabilityView: View {
                 CalendarConnectedRow(connection: connection) { showsCalendarSheet = true }
                     .padding(.top, 28)
             } else {
-                Text(draft.availability.summary)
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.secondary)
-                    .padding(.top, 12)
                 CalendarConnectRow { showsCalendarSheet = true }
                     .padding(.top, 28)
             }
         } footer: {
-            PrimaryButton(title: "Continue", action: onContinue)
+            PrimaryButton(title: "Continue", style: .lime, compact: true, action: onContinue)
         }
         .sheet(isPresented: $showsCalendarSheet) {
             ConnectCalendarSheet(draft: draft)
+                .preferredColorScheme(.light)
                 .presentationDetents([.height(draft.calendar == nil ? 330 : 300)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(20)
@@ -47,7 +46,7 @@ struct AvailabilityView: View {
         HStack(spacing: 14) {
             HStack(spacing: 6) {
                 RoundedRectangle(cornerRadius: 3, style: .continuous)
-                    .fill(CourtlyColor.blue)
+                    .fill(CourtlyColor.lime)
                     .frame(width: 12, height: 12)
                 Text("Free to play")
             }
@@ -64,7 +63,7 @@ struct AvailabilityView: View {
             }
         }
         .font(CourtlyFont.caption)
-        .foregroundStyle(CourtlyColor.secondary)
+        .foregroundStyle(.white.opacity(0.85))
     }
 }
 
@@ -176,7 +175,7 @@ struct CalendarConnectRow: View {
             .padding(.horizontal, 18)
             .background(
                 RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
-                    .fill(CourtlyColor.groupedBackground)
+                    .fill(.white)
             )
         }
         .buttonStyle(PressableButtonStyle())
@@ -209,7 +208,7 @@ struct CalendarConnectedRow: View {
         .padding(.horizontal, 18)
         .background(
             RoundedRectangle(cornerRadius: CourtlyMetrics.controlRadius, style: .continuous)
-                .fill(CourtlyColor.groupedBackground)
+                .fill(.white)
         )
     }
 }

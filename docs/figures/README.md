@@ -20,3 +20,14 @@ node docs/figures/everyone-hears-it/build.mjs    # and --light, the same way
 ```
 
 The build checks that the story ends where the caption says it does and fails otherwise. `<name>.png` is the light page captured at 2× for the README.
+
+## Rendering a clip
+
+`render.mjs` plays a figure's story frame by frame in headless Chromium and writes an MP4 (1920×1080, 30 fps, the card centred on the page's own background), so the same drawing can go into a video. It needs [Playwright](https://playwright.dev) with its Chromium and `ffmpeg` on the PATH.
+
+```
+npm install -g playwright && npx playwright install chromium
+PLAYWRIGHT_PATH="$(npm root -g)/playwright" node docs/figures/render.mjs docs/figures/last-spot/index.html out/last-spot.mp4
+```
+
+`--fps`, `--hold` (seconds of the last frame to append, default 1.5), `--width` and `--height` adjust the output. The page's `window.__story.seek(t)` places every frame, so a render is deterministic.

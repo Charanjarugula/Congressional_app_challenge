@@ -103,6 +103,12 @@ Some source folders retain earlier names: `Features/Play` implements Explore and
 </p>
 
 <p align="center">
+  <a href="docs/figures/opening-the-app/index-light.html"><img src="docs/figures/opening-the-app/opening-the-app.png" width="620" alt="An isometric bench joined by pipes: a phone in a cradle, a keychain safe with a dial, a rack of four snapshot trays, a tabs board with four tiles and a timer, a database cabinet with a platter and a bell, and a second phone."></a>
+</p>
+
+*Opening the app.* The session tokens in the keychain are checked, and every tab paints from the copy of its data saved on the phone before the network answers; the fresh copies replace them and are saved back, so the app opens in one frame and works offline; a burst of Realtime changes starts one 400 ms timer and ends in one refresh.
+
+<p align="center">
   <a href="docs/figures/posting-a-hit/index-light.html"><img src="docs/figures/posting-a-hit/posting-a-hit.png" width="620" alt="An isometric bench joined by pipes: a host's phone, an API door, a database cabinet with four lift gates and a platter, a gearbox, a sorter rail with viewer cards, a distance dial, a busy mask and a friends flap, three trays, and two phones with the Play tab open."></a>
 </p>
 

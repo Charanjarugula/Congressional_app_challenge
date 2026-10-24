@@ -116,14 +116,26 @@ final class SupabaseAuthService: AuthService {
 
     // MARK: Email
 
+    /// Recording accounts use real password authentication on the development backend only.
+    /// Release builds retain their existing App Review/email-code behavior.
+    private func usesFixedCode(_ email: String) -> Bool {
+        if email == AppConfig.reviewerEmail { return true }
+        #if DEBUG
+        return AppConfig.supabaseURL.host == "letuvtazmtjkvivattfy.supabase.co"
+            && ["recording.ana@courtly.app", "recording.luis@courtly.app"].contains(email)
+        #else
+        return false
+        #endif
+    }
+
     func sendEmailCode(to email: String) async throws {
-        if email == AppConfig.reviewerEmail { return } // the reviewer's code is a password, nothing to send
+        if usesFixedCode(email) { return } // These accounts authenticate with a password entered in the code field.
         try await client.sendEmailCode(email: email)
     }
 
     func verifyEmailCode(email: String, code: String) async throws {
         do {
-            if email == AppConfig.reviewerEmail {
+            if usesFixedCode(email) {
                 _ = try await client.signInWithPassword(email: email, password: code)
             } else {
                 _ = try await client.verifyEmailCode(email: email, code: code)

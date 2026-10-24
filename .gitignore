@@ -30,3 +30,6 @@ node_modules/
 .vscode/
 .idea/
 
+
+# Local recording credentials and build artifacts
+.recording/

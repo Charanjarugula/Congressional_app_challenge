@@ -98,6 +98,12 @@ Some source folders retain earlier names: `Features/Play` implements Explore and
 
 *The last spot.* Accepting a player locks the hit's row first, so two accepts at the same moment take turns; the first player confirms the hit and opens its chat in the same transaction; a full hit turns the rest away; the scheduler ticks every five minutes and sends each reminder once.
 
+<p align="center">
+  <a href="docs/figures/everyone-hears-it/index-light.html"><img src="docs/figures/everyone-hears-it/everyone-hears-it.png" width="620" alt="An isometric bench of stations joined by wires: a sender's phone and tray, an API door, a database cabinet with four lift gates, a stamp press and a platter, a Realtime board with three bells, four member phones with lit screens, a poll clock, a push booth with a mast, and one phone marked away."></a>
+</p>
+
+*Everyone hears it.* The sender's phone shows a message at once as a hollow card tagged with a client id and calls `send_message`; the database checks membership, blocks, words and the rate limit in that order, stores the row and stamps its id; the insert reaches every phone allowed to see it over one socket each, a phone whose socket is down polls instead, a phone that is away gets a push, and the same tag sent twice returns the stored row.
+
 ## Contributing and releases
 
 Branch from `main` and open a focused pull request. Describe the behavior change and how it was tested. Keep database migrations append-only, and add regression coverage for changes to application rules.

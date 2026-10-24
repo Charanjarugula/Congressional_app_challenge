@@ -102,6 +102,12 @@ Some source folders retain earlier names: `Features/Play` implements Explore and
   <a href="docs/figures/everyone-hears-it/index-light.html"><img src="docs/figures/everyone-hears-it/everyone-hears-it.png" width="620" alt="An isometric bench of stations joined by wires: a sender's phone and tray, an API door, a database cabinet with four lift gates, a stamp press and a platter, a Realtime board with three bells, four member phones with lit screens, a poll clock, a push booth with a mast, and one phone marked away."></a>
 </p>
 
+<p align="center">
+  <a href="docs/figures/posting-a-hit/index-light.html"><img src="docs/figures/posting-a-hit/posting-a-hit.png" width="620" alt="An isometric bench joined by pipes: a host's phone, an API door, a database cabinet with four lift gates and a platter, a gearbox, a sorter rail with viewer cards, a distance dial, a busy mask and a friends flap, three trays, and two phones with the Play tab open."></a>
+</p>
+
+*Posting a hit.* `create_hit` refuses a start under 15 minutes away or over 30 days out, more than 7 spots or a 21st hit in a day, then stores the row; `get_play_feed` builds each player's list on request from friendship, the distance from the court to their home point over a spatial index, and the hours they marked busy; phones with Play open hear the insert and refresh once.
+
 *Everyone hears it.* The sender's phone shows a message at once as a hollow card tagged with a client id and calls `send_message`; the database checks membership, blocks, words and the rate limit in that order, stores the row and stamps its id; the insert reaches every phone allowed to see it over one socket each, a phone whose socket is down polls instead, a phone that is away gets a push, and the same tag sent twice returns the stored row.
 
 ## Contributing and releases

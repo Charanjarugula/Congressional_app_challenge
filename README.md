@@ -93,6 +93,12 @@ Some source folders retain earlier names: `Features/Play` implements Explore and
 [`docs/figures`](docs/figures/README.md) holds interactive figures of the mechanisms that are hardest to see from the screens. Each is a small machine whose motion is the mechanism, with every number taken from the code it names.
 
 <p align="center">
+  <a href="docs/figures/whole-machine/index-light.html"><img src="docs/figures/whole-machine/whole-machine.png" width="620" alt="An isometric bench joined by pipes: a phone, an API door with a gate, a database cabinet with a fence, two gears and a platter, a Realtime board with a bell, a pg_cron clock, four Edge Function booths with gears, an APNs mast, and a phone that is closed."></a>
+</p>
+
+*The whole machine.* Every call from the phone goes through one door, the database's own API, where row-level security knows who is asking and a SQL function does the work; an insert reaches every phone allowed to see it over Realtime; pg_cron calls functions on its own clock; and for the few things SQL cannot do, the database calls a Deno Edge Function, such as send-push handing a notification to APNs.
+
+<p align="center">
   <a href="docs/figures/last-spot/index-light.html"><img src="docs/figures/last-spot/last-spot.png" width="620" alt="An isometric drawing of a booking tray with two seats at the end of a rail. One player token sits in a seat, a flag stands up behind the tray and a lamp is lit green; two more tokens wait on the rail behind a spring bolt, and a dial with five-minute ticks stands at the front."></a>
 </p>
 

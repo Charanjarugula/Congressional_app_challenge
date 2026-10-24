@@ -88,6 +88,16 @@ The app uses SwiftUI, shared design components, and observable session/store sta
 
 Some source folders retain earlier names: `Features/Play` implements Explore and `Features/You` implements Settings.
 
+### How it works, drawn
+
+[`docs/figures`](docs/figures/README.md) holds interactive figures of the mechanisms that are hardest to see from the screens. Each is a small machine whose motion is the mechanism, with every number taken from the code it names.
+
+<p align="center">
+  <a href="docs/figures/last-spot/index-light.html"><img src="docs/figures/last-spot/last-spot.png" width="620" alt="An isometric drawing of a booking tray with two seats at the end of a rail. One player token sits in a seat, a flag stands up behind the tray and a lamp is lit green; two more tokens wait on the rail behind a spring bolt, and a dial with five-minute ticks stands at the front."></a>
+</p>
+
+*The last spot.* Accepting a player locks the hit's row first, so two accepts at the same moment take turns; the first player confirms the hit and opens its chat in the same transaction; a full hit turns the rest away; the scheduler ticks every five minutes and sends each reminder once.
+
 ## Contributing and releases
 
 Branch from `main` and open a focused pull request. Describe the behavior change and how it was tested. Keep database migrations append-only, and add regression coverage for changes to application rules.

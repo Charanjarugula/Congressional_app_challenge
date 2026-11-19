@@ -12,7 +12,24 @@ final class HitStatesTests: XCTestCase {
             entry.tap()
             XCTAssertTrue(app.staticTexts["Who’s playing"].waitForExistence(timeout: 5))
             if state == "Open" { XCTAssertTrue(app.buttons["Ask to join"].exists) }
-            if state == "Host" { XCTAssertTrue(app.buttons["Edit"].exists) }
+            if state == "Host" {
+                // One pinned action; editing and the rest live behind More.
+                XCTAssertTrue(app.buttons["Invite"].exists)
+                app.buttons["More"].tap()
+                XCTAssertTrue(app.buttons["Edit hit"].waitForExistence(timeout: 5))
+                XCTAssertTrue(app.buttons["Cancel hit"].exists)
+                app.buttons["Edit hit"].tap()
+                XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
+                app.buttons["Cancel"].firstMatch.tap()
+                app.buttons["Invite"].tap()
+                XCTAssertTrue(app.buttons["Copy link"].waitForExistence(timeout: 5))
+                XCTAssertTrue(app.buttons["More"].exists)
+                let sheet = XCTAttachment(screenshot: app.screenshot())
+                sheet.name = "Hit - Invite sheet"
+                sheet.lifetime = .keepAlways
+                add(sheet)
+                app.buttons["Done"].tap()
+            }
             if state == "Invited" { XCTAssertTrue(app.buttons["I’m in"].exists) }
             if state == "Pending" { XCTAssertFalse(app.buttons["Ask to join"].exists) }
             if state == "Cancelled" || state == "Played" {

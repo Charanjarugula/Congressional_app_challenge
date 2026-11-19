@@ -68,3 +68,11 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertNil(DeepLinkCenter.chatID(in: ["deep_link": "courtly://hit/\(hitID.uuidString)"]))
     }
 }
+
+/// The website's /hit page turns a shared link's id into this deep link (site/hit.js).
+final class SharedHitLinkTests: XCTestCase {
+    func testTheLinkTheSitePageBuildsOpensThatHit() {
+        let id = UUID()
+        XCTAssertEqual(DeepLink(string: "courtly://hit/\(id.uuidString.lowercased())"), .hit(id))
+    }
+}

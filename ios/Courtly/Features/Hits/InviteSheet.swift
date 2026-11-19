@@ -1,6 +1,8 @@
+import MessageUI
 import SwiftUI
 
-/// Offer a hit's open spots to friends or a group chat. The first to accept takes the spot.
+/// Fill a hit's open spots. On top, friends and groups on Courtly: one tap sends the invite. Along the
+/// bottom, ways to reach anyone else: copy the link, Messages, WhatsApp when installed, or the system sheet.
 struct InviteSheet: View {
     let hit: Hit
 
@@ -13,8 +15,21 @@ struct InviteSheet: View {
     @State private var sent: Set<UUID> = []
     @State private var sending: UUID?
     @State private var errorMessage: String?
+    @State private var query = ""
+    @State private var copied = false
+    @State private var showsMessages = false
 
     private var me: UUID? { session.profile?.id }
+
+    private var matchingGroups: [Chat] {
+        let text = query.trimmingCharacters(in: .whitespaces)
+        return text.isEmpty ? groups : groups.filter { $0.title.localizedCaseInsensitiveContains(text) }
+    }
+
+    private var matchingFriends: [Friend] {
+        let text = query.trimmingCharacters(in: .whitespaces)
+        return text.isEmpty ? friends : friends.filter { $0.card.displayName.localizedCaseInsensitiveContains(text) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -23,144 +38,191 @@ struct InviteSheet: View {
                 .frame(width: 36, height: 5)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 10)
-                .padding(.bottom, 18)
-            Text("Invite")
-                .font(.largeTitle.bold())
-                .tracking(-0.4)
-                .foregroundStyle(CourtlyColor.ink)
-            Text("Share it anywhere, or send it to friends on Courtly. First to accept takes the spot.")
+                .padding(.bottom, 14)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Invite")
+                    .font(.title.bold())
+                    .foregroundStyle(CourtlyColor.ink)
+                Spacer()
+                Button("Done") { dismiss() }
+                    .font(CourtlyFont.bodySemibold)
+                    .foregroundStyle(CourtlyColor.blue)
+                    .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+            }
+            .padding(.horizontal, 24)
+            Text("\(hit.format.shortTitle) · \(hit.shortTimeLabel) · \(hit.court.shortName). First to accept takes the spot.")
                 .font(CourtlyFont.secondary)
                 .foregroundStyle(CourtlyColor.secondary)
-                .padding(.top, 4)
+                .padding(.horizontal, 24)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    shareRow
-                        .padding(.bottom, 16)
+                VStack(alignment: .leading, spacing: 16) {
                     if isLoading {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 40)
                     } else if loadFailed {
                         VStack(spacing: 12) {
-                            QuietCard(title: "Couldn’t load your friends", detail: "Check your connection and try again.")
+                            QuietCard(title: "Couldn’t load your friends", detail: "Check your connection and try again. You can still share the link below.")
                             Button("Try again") { Task { await load() } }
                                 .font(CourtlyFont.secondarySemibold)
                                 .foregroundStyle(CourtlyColor.blue)
                         }
                     } else if groups.isEmpty && friends.isEmpty {
-                        QuietCard(title: "No friends on Courtly yet", detail: "Share the link. They can ask to join once they’re in.")
+                        QuietCard(title: "No friends on Courtly yet", detail: "Share the link below. They can ask to join once they’re in.")
                     } else {
-                        if !groups.isEmpty {
-                            SectionHeader(title: "Groups")
-                            CardRows(items: groups, radius: 22) { group in groupRow(group) }
-                        }
-                        if !friends.isEmpty {
-                            SectionHeader(title: "Friends")
-                            CardRows(items: friends, radius: 22) { friend in friendRow(friend) }
+                        if groups.count + friends.count > 6 { searchField }
+                        if matchingGroups.isEmpty && matchingFriends.isEmpty {
+                            QuietCard(title: "No one by that name", detail: "Try another name, or share the link below.")
+                        } else {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3), spacing: 20) {
+                                ForEach(matchingGroups) { group in
+                                    tile(name: group.title, chatID: group.id, targetUserID: nil) { ChatAvatar(chat: group, me: me, size: 68) }
+                                }
+                                ForEach(matchingFriends) { friend in
+                                    tile(name: friend.card.displayName, chatID: friend.dmChatId, targetUserID: friend.card.id) {
+                                        PlayerAvatar(card: friend.card, size: 68)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                .padding(.top, 16)
+                .padding(.horizontal, 24)
+                .padding(.top, 18)
+                .padding(.bottom, 16)
             }
 
-            PrimaryButton(title: "Done", style: .blue, compact: true) { dismiss() }
-                .padding(.vertical, 16)
+            shareBar
         }
-        .padding(.horizontal, 24)
         .background(CourtlyColor.surface.ignoresSafeArea())
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(20)
         .task { await load() }
+        .sheet(isPresented: $showsMessages) {
+            MessageComposer(body: hit.shareText).ignoresSafeArea()
+        }
         .errorAlert($errorMessage, title: "Couldn’t send the invite")
     }
 
-    // MARK: - Rows
+    // MARK: - People on Courtly
 
-    /// Works with no friends on Courtly yet: the hit as a message for Messages, WhatsApp, anywhere.
-    private var shareRow: some View {
-        ShareLink(item: hit.shareText) {
-            HStack(spacing: 14) {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(CourtlyColor.ink)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(CourtlyColor.lime))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Share this hit")
-                        .font(CourtlyFont.bodySemibold)
-                        .foregroundStyle(CourtlyColor.ink)
-                    Text("Messages, WhatsApp, anywhere")
-                        .font(CourtlyFont.caption)
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(CourtlyColor.secondary)
+            TextField("Search", text: $query)
+                .font(CourtlyFont.body)
+                .foregroundStyle(CourtlyColor.ink)
+                .autocorrectionDisabled()
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(CourtlyColor.card))
+    }
+
+    /// One person or group: tap to send, and the photo turns into a tick. A friend with no chat yet can't be sent to.
+    private func tile<Avatar: View>(name: String, chatID: UUID?, targetUserID: UUID?, @ViewBuilder avatar: () -> Avatar) -> some View {
+        let isSent = chatID.map(sent.contains) ?? false
+        let isSending = chatID != nil && sending == chatID
+        return Button {
+            if let chatID { send(chatID: chatID, targetUserID: targetUserID) }
+        } label: {
+            VStack(spacing: 8) {
+                avatar()
+                    .frame(width: 68, height: 68)
+                    .overlay {
+                        if isSent {
+                            Circle().fill(CourtlyColor.blue.opacity(0.88))
+                            Image(systemName: "checkmark").font(.system(size: 22, weight: .bold)).foregroundStyle(.white)
+                        } else if isSending {
+                            Circle().fill(Color.black.opacity(0.35))
+                            ProgressView().tint(.white)
+                        }
+                    }
+                    .clipShape(Circle())
+                Text(isSent ? "Sent" : name)
+                    .font(CourtlyFont.captionSemibold)
+                    .foregroundStyle(isSent ? CourtlyColor.blue : CourtlyColor.ink)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                if chatID == nil {
+                    Text("Message first")
+                        .font(.caption2)
                         .foregroundStyle(CourtlyColor.secondary)
                 }
-                Spacer(minLength: 8)
-                ChevronMark()
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(CourtlyColor.card))
+            .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
+            .opacity(chatID == nil ? 0.5 : 1)
         }
         .buttonStyle(.plain)
+        .disabled(chatID == nil || isSent || sending != nil)
+        .accessibilityLabel(isSent ? "\(name), invite sent" : "Invite \(name)")
     }
 
-    private func groupRow(_ group: Chat) -> some View {
-        HStack(spacing: 14) {
-            ChatAvatar(chat: group, me: me, size: 44)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(group.title)
-                    .font(CourtlyFont.bodySemibold)
-                    .foregroundStyle(CourtlyColor.ink)
-                    .lineLimit(1)
-                Text(group.subtitle(me: me))
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.secondary)
+    // MARK: - Everyone else
+
+    /// Pinned along the bottom, the way share sheets in other apps are: the link reaches people who aren't on Courtly.
+    private var shareBar: some View {
+        VStack(spacing: 0) {
+            HairlineSeparator()
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 18) {
+                    Button {
+                        UIPasteboard.general.string = hit.shareURL.absoluteString
+                        copied = true
+                        Task { try? await Task.sleep(for: .seconds(2)); copied = false }
+                    } label: {
+                        target(copied ? "Copied" : "Copy link", systemImage: copied ? "checkmark" : "link", fill: CourtlyColor.card, tint: CourtlyColor.ink)
+                    }
+                    .accessibilityLabel("Copy link")
+                    if MFMessageComposeViewController.canSendText() {
+                        Button { showsMessages = true } label: {
+                            target("Messages", systemImage: "message.fill", fill: Color(hex: 0x34C759), tint: .white)
+                        }
+                    }
+                    if let whatsApp = Self.whatsAppURL(text: hit.shareText), UIApplication.shared.canOpenURL(URL(string: "whatsapp://")!) {
+                        Button { UIApplication.shared.open(whatsApp) } label: {
+                            target("WhatsApp", systemImage: "phone.bubble.fill", fill: Color(hex: 0x25D366), tint: .white)
+                        }
+                    }
+                    ShareLink(item: hit.shareURL, message: Text(hit.shareText)) {
+                        target("More", systemImage: "square.and.arrow.up", fill: CourtlyColor.card, tint: CourtlyColor.ink)
+                    }
+                    .accessibilityLabel("More")
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 24)
+                .padding(.top, 14)
+                .padding(.bottom, 10)
             }
-            Spacer(minLength: 8)
-            sendButton(chatID: group.id, targetUserID: nil)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 16)
+        .background(CourtlyColor.surface)
     }
 
-    private func friendRow(_ friend: Friend) -> some View {
-        HStack(spacing: 14) {
-            PlayerAvatar(card: friend.card, size: 44)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(friend.card.displayName)
-                    .font(CourtlyFont.bodySemibold)
-                    .foregroundStyle(CourtlyColor.ink)
-                    .lineLimit(1)
-                Text(friendDetail(friend.card))
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            if let chatID = friend.dmChatId {
-                sendButton(chatID: chatID, targetUserID: friend.card.id)
-            } else {
-                Text("Message them first")
-                    .font(CourtlyFont.caption)
-                    .foregroundStyle(CourtlyColor.secondary)
-            }
+    private func target(_ title: String, systemImage: String, fill: Color, tint: Color) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 60, height: 60)
+                .background(Circle().fill(fill))
+                .overlay(Circle().strokeBorder(CourtlyColor.line, lineWidth: fill == CourtlyColor.card ? 1 : 0))
+            Text(title)
+                .font(CourtlyFont.caption)
+                .foregroundStyle(CourtlyColor.ink)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 16)
+        .frame(minWidth: 68)
+        .contentShape(Rectangle())
     }
 
-    private func sendButton(chatID: UUID, targetUserID: UUID?) -> some View {
-        PillButton(
-            title: sent.contains(chatID) ? "Sent" : (sending == chatID ? "Sending…" : "Send"),
-            style: sent.contains(chatID) ? .tint : .filled,
-            showsCheck: sent.contains(chatID)
-        ) {
-            send(chatID: chatID, targetUserID: targetUserID)
-        }
-        .disabled(sent.contains(chatID) || sending != nil)
+    private static func whatsAppURL(text: String) -> URL? {
+        var parts = URLComponents(string: "whatsapp://send")
+        parts?.queryItems = [URLQueryItem(name: "text", value: text)]
+        return parts?.url
     }
 
     /// "Free Sunday" when the hit lands in a block they marked free, otherwise their level.
@@ -179,6 +241,16 @@ struct InviteSheet: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
+        #if DEBUG && targetEnvironment(simulator)
+        if ProcessInfo.processInfo.arguments.contains("--hits-ui-checks") {
+            friends = ["Ana Ruiz", "Luis Morales", "Priya Shah", "Marcus Lee", "Dev Patel"].enumerated().compactMap { index, name in
+                let parts = name.split(separator: " ")
+                let json = "{\"id\":\"\(UUID().uuidString)\",\"first_name\":\"\(parts[0])\",\"last_initial\":\"\(parts[1].prefix(1))\",\"hits_played\":3,\"formats\":[],\"level\":\"intermediate\"\(index == 4 ? "" : ",\"dm_chat_id\":\"\(UUID().uuidString)\"")}"
+                return try? JSONCoding.decoder.decode(Friend.self, from: Data(json.utf8))
+            }
+            return
+        }
+        #endif
         async let friendList = API.People.friends()
         async let inbox = API.Chats.inbox()
         do {
@@ -202,6 +274,32 @@ struct InviteSheet: View {
                 errorMessage = error.localizedDescription
             }
             sending = nil
+        }
+    }
+}
+
+/// The system's own Messages composer, with the invitation already written.
+private struct MessageComposer: UIViewControllerRepresentable {
+    let body: String
+    @Environment(\.dismiss) private var dismiss
+
+    func makeCoordinator() -> Coordinator { Coordinator(dismiss: dismiss) }
+
+    func makeUIViewController(context: Context) -> MFMessageComposeViewController {
+        let controller = MFMessageComposeViewController()
+        controller.body = body
+        controller.messageComposeDelegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ controller: MFMessageComposeViewController, context: Context) {}
+
+    final class Coordinator: NSObject, MFMessageComposeViewControllerDelegate {
+        let dismiss: DismissAction
+        init(dismiss: DismissAction) { self.dismiss = dismiss }
+
+        func messageComposeViewController(_ controller: MFMessageComposeViewController, didFinishWith result: MessageComposeResult) {
+            dismiss()
         }
     }
 }

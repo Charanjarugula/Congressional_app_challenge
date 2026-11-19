@@ -225,10 +225,15 @@ struct Hit: Codable, Identifiable, Equatable {
 
     var spotsLabel: String { spotsOpen == 1 ? "1 spot" : "\(spotsOpen) spots" }
 
-    /// What goes out when a hit is shared outside the app: the court's own day and time, and where to get Courtly.
+    /// The link people outside the app get: a page that opens this hit in Courtly.
+    var shareURL: URL {
+        AppConfig.siteURL.appending(path: "hit").appending(queryItems: [URLQueryItem(name: "id", value: id.uuidString.lowercased())])
+    }
+
+    /// The message that goes with it: the court's own day and time, then the link.
     var shareText: String {
         let open = spotsOpen > 0 ? " \(spotsLabel.capitalizedFirst) open." : ""
-        return "\(format.title) \(dayText) \(clockText) at \(court.name).\(open) Join me on Courtly: \(AppConfig.siteURL.absoluteString)"
+        return "\(format.title) \(dayText) \(clockText) at \(court.name).\(open) Join me on Courtly: \(shareURL.absoluteString)"
     }
 
     /// "Hannah C. · Casual"

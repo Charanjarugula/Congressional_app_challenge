@@ -34,6 +34,8 @@ struct HitDetailView: View {
     @State private var answering: UUID?   // the join request being accepted or declined
 
     private var me: UUID? { session.profile?.id }
+    /// Opened straight from posting: say it worked and give a clear way to finish.
+    private var justPosted: Bool { hits.justPostedID == hitID }
 
     var body: some View {
         ScrollView {
@@ -60,15 +62,15 @@ struct HitDetailView: View {
             }
         }
         .background(CourtlyColor.surface.ignoresSafeArea())
-        .plainBackButton()
+        .plainBackButton(hidden: justPosted)
         .navigationTitle(hit?.viewer.isHost == true ? "Your hit" : "Hit")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            if let hit, hit.viewer.isHost, hit.isLive {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Edit") { showsEdit = true }
-                        .font(CourtlyFont.body)
+            if justPosted {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { navigate.pop() }
+                        .font(CourtlyFont.bodySemibold)
                         .foregroundStyle(CourtlyColor.blue)
                 }
             }
@@ -76,6 +78,7 @@ struct HitDetailView: View {
                 ToolbarItem(placement: .topBarTrailing) { moreMenu(hit) }
             }
         }
+        .onDisappear { if justPosted && !showsInvite && !showsEdit { hits.justPostedID = nil } }
         .safeAreaInset(edge: .bottom) {
             if let hit { bottomAction(hit) }
         }
@@ -136,7 +139,9 @@ struct HitDetailView: View {
     /// What changed for the viewer, said once at the top.
     @ViewBuilder
     private func banner(_ hit: Hit) -> some View {
-        if hit.status == .cancelled {
+        if justPosted && hit.isLive {
+            QuietCard(title: "Your hit is posted", detail: hit.spotsOpen > 0 ? "Invite someone or share it to fill the spot." : "You’re all set.")
+        } else if hit.status == .cancelled {
             QuietCard(title: "This hit was cancelled", detail: "It’s off. Other open hits are on Explore.")
         } else if hit.status == .expired {
             QuietCard(title: "This hit has expired", detail: "It didn’t fill before the start time.")
@@ -295,6 +300,9 @@ struct HitDetailView: View {
     /// Everything that isn't the one main action: calendar, sharing, and the ways out.
     private func moreMenu(_ hit: Hit) -> some View {
         Menu {
+            if hit.viewer.isHost {
+                Button("Edit hit", systemImage: "pencil") { showsEdit = true }
+            }
             if hit.startTimeOnly != true {
                 Button("Add to calendar", systemImage: "calendar.badge.plus") { showsCalendar = true }
             }

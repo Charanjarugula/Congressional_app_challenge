@@ -7,6 +7,8 @@ import UserNotifications
 @Observable
 final class HitsStore {
     private(set) var feed: PlayFeed?
+    /// The hit the player posted a moment ago: its screen says so and offers Done.
+    var justPostedID: UUID?
     private(set) var myHits: MyHits?
     private(set) var isLoadingFeed = false
     private(set) var isLoadingMyHits = false

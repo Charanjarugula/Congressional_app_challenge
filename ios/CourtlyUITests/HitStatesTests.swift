@@ -14,6 +14,8 @@ final class HitStatesTests: XCTestCase {
             if state == "Open" {
                 XCTAssertTrue(app.buttons["Ask to join"].exists)
                 // Someone who isn't the host can still send the hit to a friend.
+                app.buttons["More"].tap()
+                XCTAssertTrue(app.buttons["Share"].waitForExistence(timeout: 5))
                 app.buttons["Share"].tap()
                 XCTAssertTrue(app.staticTexts["Share"].waitForExistence(timeout: 5))
                 XCTAssertTrue(app.buttons["Copy link"].exists)
@@ -27,6 +29,8 @@ final class HitStatesTests: XCTestCase {
                 app.buttons["Edit hit"].tap()
                 XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
                 app.buttons["Cancel"].firstMatch.tap()
+                app.buttons["More"].tap()
+                XCTAssertTrue(app.buttons["Invite"].waitForExistence(timeout: 5))
                 app.buttons["Invite"].tap()
                 XCTAssertTrue(app.buttons["Copy link"].waitForExistence(timeout: 5))
                 XCTAssertTrue(app.buttons["More"].exists)

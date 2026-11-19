@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One hit: when, who, where, and the one thing to do next. Every fact has a single home:
 /// time, format and who can join in the summary; host, players and open spots in "Who's playing";
-/// the court in its own card. One pinned action per state, a send arrow for everyone, and the rest in •••.
+/// the court in its own card. One pinned action per state; sharing and everything else sit in •••.
 struct HitDetailView: View {
     let hitID: UUID
 
@@ -67,20 +67,7 @@ struct HitDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            // Anyone can send a hit to a friend, the way anyone can send a post; only the host's send is an invite.
             if let hit, hit.isLive {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showsInvite = true } label: {
-                        Image(systemName: "paperplane")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(CourtlyColor.blue)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel(hit.viewer.isHost && hit.spotsOpen > 0 ? "Invite" : "Share")
-                }
-            }
-            if let hit, hit.isMember, hit.isLive {
                 ToolbarItem(placement: .topBarTrailing) { moreMenu(hit) }
             }
         }
@@ -304,10 +291,12 @@ struct HitDetailView: View {
     /// Everything that isn't the one main action: calendar, sharing, and the ways out.
     private func moreMenu(_ hit: Hit) -> some View {
         Menu {
+            // Anyone can send a hit to a friend, the way anyone can send a post; only the host's send is an invite.
+            Button(hit.viewer.isHost && hit.spotsOpen > 0 ? "Invite" : "Share", systemImage: "paperplane") { showsInvite = true }
             if hit.viewer.isHost {
                 Button("Edit hit", systemImage: "pencil") { showsEdit = true }
             }
-            if hit.startTimeOnly != true {
+            if hit.isMember && hit.startTimeOnly != true {
                 Button("Add to calendar", systemImage: "calendar.badge.plus") { showsCalendar = true }
             }
             if hit.viewer.isPlayer || (hit.viewer.isHost && !hit.players.isEmpty) {
@@ -371,7 +360,7 @@ struct HitDetailView: View {
                 PrimaryButton(title: chatTitle, style: hit.isLive ? .lime : .blue, compact: true) { navigate(.chat(chatID)) }
                     .accessibilityLabel(hit.unreadMessages > 0 ? "Chat, \(hit.unreadMessages) unread" : "Chat")
             } else if justPosted {
-                // Posting is finished; inviting is the open spot row or the arrow up top.
+                // Posting is finished; inviting is the open spot row or the ••• menu.
                 PrimaryButton(title: "Done", style: .blue, compact: true) { navigate.pop() }
             } else if hit.isLive && !hit.isMember {
                 if let invite = hit.openInvite {

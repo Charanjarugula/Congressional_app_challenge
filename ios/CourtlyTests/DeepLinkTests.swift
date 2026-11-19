@@ -76,3 +76,14 @@ final class SharedHitLinkTests: XCTestCase {
         XCTAssertEqual(DeepLink(string: "courtly://hit/\(id.uuidString.lowercased())"), .hit(id))
     }
 }
+
+final class SharedHitMessageTests: XCTestCase {
+    func testAMessageWithAHitLinkYieldsItsHitAndReadsWithoutTheLink() {
+        let id = UUID()
+        let body = "Casual hitting Thu 6:30 PM at Boca Raton Tennis Center. 1 spot open. Join me on Courtly: https://courtly-sage.vercel.app/hit?id=\(id.uuidString.lowercased())"
+        XCTAssertEqual(Hit.sharedHitID(in: body), id)
+        XCTAssertEqual(Hit.textWithoutHitLink(body), "Casual hitting Thu 6:30 PM at Boca Raton Tennis Center. 1 spot open.")
+        XCTAssertNil(Hit.sharedHitID(in: "See you Thursday"))
+        XCTAssertEqual(Hit.textWithoutHitLink("See you Thursday"), "See you Thursday")
+    }
+}

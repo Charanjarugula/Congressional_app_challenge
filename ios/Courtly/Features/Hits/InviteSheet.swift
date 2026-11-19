@@ -1,7 +1,8 @@
 import MessageUI
 import SwiftUI
 
-/// Fill a hit's open spots. On top, friends and groups on Courtly: one tap sends the invite. Along the
+/// Send a hit to people. The host with spots open invites (the first to accept takes the spot); anyone
+/// else shares it, and the friend gets the hit as a message they can open and ask to join. On top, friends and groups on Courtly: one tap sends the invite. Along the
 /// bottom, ways to reach anyone else: copy the link, Messages, WhatsApp when installed, or the system sheet.
 struct InviteSheet: View {
     let hit: Hit
@@ -20,6 +21,8 @@ struct InviteSheet: View {
     @State private var showsMessages = false
 
     private var me: UUID? { session.profile?.id }
+    /// Only the host hands out spots; everyone else is passing the hit along.
+    private var invites: Bool { hit.viewer.isHost && hit.isLive && hit.spotsOpen > 0 }
 
     private var matchingGroups: [Chat] {
         let text = query.trimmingCharacters(in: .whitespaces)
@@ -40,7 +43,7 @@ struct InviteSheet: View {
                 .padding(.top, 10)
                 .padding(.bottom, 14)
             HStack(alignment: .firstTextBaseline) {
-                Text("Invite")
+                Text(invites ? "Invite" : "Share")
                     .font(.title.bold())
                     .foregroundStyle(CourtlyColor.ink)
                 Spacer()
@@ -50,7 +53,7 @@ struct InviteSheet: View {
                     .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
             }
             .padding(.horizontal, 24)
-            Text("\(hit.format.shortTitle) · \(hit.shortTimeLabel) · \(hit.court.shortName). First to accept takes the spot.")
+            Text("\(hit.format.shortTitle) · \(hit.shortTimeLabel) · \(hit.court.shortName). \(invites ? "First to accept takes the spot." : "They can open it and ask to join.")")
                 .font(CourtlyFont.secondary)
                 .foregroundStyle(CourtlyColor.secondary)
                 .padding(.horizontal, 24)
@@ -103,7 +106,7 @@ struct InviteSheet: View {
         .sheet(isPresented: $showsMessages) {
             MessageComposer(body: hit.shareText).ignoresSafeArea()
         }
-        .errorAlert($errorMessage, title: "Couldn’t send the invite")
+        .errorAlert($errorMessage, title: invites ? "Couldn’t send the invite" : "Couldn’t share the hit")
     }
 
     // MARK: - People on Courtly
@@ -160,7 +163,7 @@ struct InviteSheet: View {
         }
         .buttonStyle(.plain)
         .disabled(chatID == nil || isSent || sending != nil)
-        .accessibilityLabel(isSent ? "\(name), invite sent" : "Invite \(name)")
+        .accessibilityLabel(isSent ? "\(name), sent" : "Send to \(name)")
     }
 
     // MARK: - Everyone else
@@ -254,7 +257,7 @@ struct InviteSheet: View {
         async let friendList = API.People.friends()
         async let inbox = API.Chats.inbox()
         do {
-            // Friends already in the hit can't be invited to it.
+            // Friends already in the hit don't need it sent to them.
             let inHit = Set(hit.everyone.map(\.id))
             friends = try await friendList.filter { !inHit.contains($0.id) }
             groups = try await inbox.filter { $0.type == .group }
@@ -268,7 +271,11 @@ struct InviteSheet: View {
         sending = chatID
         Task { @MainActor in
             do {
-                _ = try await API.Hits.sendInvite(hitID: hit.id, chatID: chatID, targetUserID: targetUserID)
+                if invites {
+                    _ = try await API.Hits.sendInvite(hitID: hit.id, chatID: chatID, targetUserID: targetUserID)
+                } else {
+                    _ = try await API.Chats.send(chatID: chatID, clientID: UUID(), body: hit.shareText)
+                }
                 sent.insert(chatID)
             } catch {
                 errorMessage = error.localizedDescription

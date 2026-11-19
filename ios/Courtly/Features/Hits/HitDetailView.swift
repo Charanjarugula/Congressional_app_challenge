@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One hit: when, who, where, and the one thing to do next. Every fact has a single home:
 /// time, format and who can join in the summary; host, players and open spots in "Who's playing";
-/// the court in its own card. One pinned action per state; the rest sits in the ••• menu.
+/// the court in its own card. One pinned action per state, a send arrow for everyone, and the rest in •••.
 struct HitDetailView: View {
     let hitID: UUID
 
@@ -62,16 +62,22 @@ struct HitDetailView: View {
             }
         }
         .background(CourtlyColor.surface.ignoresSafeArea())
-        .plainBackButton(hidden: justPosted)
+        .plainBackButton()
         .navigationTitle(hit?.viewer.isHost == true ? "Your hit" : "Hit")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            if justPosted {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Done") { navigate.pop() }
-                        .font(CourtlyFont.bodySemibold)
-                        .foregroundStyle(CourtlyColor.blue)
+            // Anyone can send a hit to a friend, the way anyone can send a post; only the host's send is an invite.
+            if let hit, hit.isLive {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showsInvite = true } label: {
+                        Image(systemName: "paperplane")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(CourtlyColor.blue)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(hit.viewer.isHost && hit.spotsOpen > 0 ? "Invite" : "Share")
                 }
             }
             if let hit, hit.isMember, hit.isLive {
@@ -139,9 +145,7 @@ struct HitDetailView: View {
     /// What changed for the viewer, said once at the top.
     @ViewBuilder
     private func banner(_ hit: Hit) -> some View {
-        if justPosted && hit.isLive {
-            QuietCard(title: "Your hit is posted", detail: hit.spotsOpen > 0 ? "Invite someone or share it to fill the spot." : "You’re all set.")
-        } else if hit.status == .cancelled {
+        if hit.status == .cancelled {
             QuietCard(title: "This hit was cancelled", detail: "It’s off. Other open hits are on Explore.")
         } else if hit.status == .expired {
             QuietCard(title: "This hit has expired", detail: "It didn’t fill before the start time.")
@@ -306,7 +310,6 @@ struct HitDetailView: View {
             if hit.startTimeOnly != true {
                 Button("Add to calendar", systemImage: "calendar.badge.plus") { showsCalendar = true }
             }
-            ShareLink(item: hit.shareText) { Label("Share hit", systemImage: "square.and.arrow.up") }
             if hit.viewer.isPlayer || (hit.viewer.isHost && !hit.players.isEmpty) {
                 Button("Leave hit", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) { showsLeaveAlert = true }
             }
@@ -365,16 +368,11 @@ struct HitDetailView: View {
         Group {
             if hit.isMember, let chatID = hit.chatId, chatOpen {
                 let chatTitle = hit.unreadMessages > 0 ? "Chat · \(hit.unreadMessages)" : "Chat"
-                HStack(spacing: 8) {
-                    if hit.viewer.isHost && hit.isLive && hit.spotsOpen > 0 {
-                        ActionButton(title: "Invite", style: .quiet, height: 48, radius: 16) { showsInvite = true }
-                            .frame(maxWidth: 120)
-                    }
-                    PrimaryButton(title: chatTitle, style: hit.isLive ? .lime : .blue, compact: true) { navigate(.chat(chatID)) }
-                        .accessibilityLabel(hit.unreadMessages > 0 ? "Chat, \(hit.unreadMessages) unread" : "Chat")
-                }
-            } else if hit.viewer.isHost && hit.isLive && hit.spotsOpen > 0 {
-                PrimaryButton(title: "Invite", style: .lime, compact: true) { showsInvite = true }
+                PrimaryButton(title: chatTitle, style: hit.isLive ? .lime : .blue, compact: true) { navigate(.chat(chatID)) }
+                    .accessibilityLabel(hit.unreadMessages > 0 ? "Chat, \(hit.unreadMessages) unread" : "Chat")
+            } else if justPosted {
+                // Posting is finished; inviting is the open spot row or the arrow up top.
+                PrimaryButton(title: "Done", style: .blue, compact: true) { navigate.pop() }
             } else if hit.isLive && !hit.isMember {
                 if let invite = hit.openInvite {
                     PrimaryButton(title: "I’m in", style: .lime, compact: true, isLoading: isWorking) {

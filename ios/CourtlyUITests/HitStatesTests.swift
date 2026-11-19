@@ -11,10 +11,16 @@ final class HitStatesTests: XCTestCase {
             XCTAssertTrue(entry.waitForExistence(timeout: 10))
             entry.tap()
             XCTAssertTrue(app.staticTexts["Who’s playing"].waitForExistence(timeout: 5))
-            if state == "Open" { XCTAssertTrue(app.buttons["Ask to join"].exists) }
+            if state == "Open" {
+                XCTAssertTrue(app.buttons["Ask to join"].exists)
+                // Someone who isn't the host can still send the hit to a friend.
+                app.buttons["Share"].tap()
+                XCTAssertTrue(app.staticTexts["Share"].waitForExistence(timeout: 5))
+                XCTAssertTrue(app.buttons["Copy link"].exists)
+                app.buttons["Done"].tap()
+            }
             if state == "Host" {
                 // One pinned action; editing and the rest live behind More.
-                XCTAssertTrue(app.buttons["Invite"].exists)
                 app.buttons["More"].tap()
                 XCTAssertTrue(app.buttons["Edit hit"].waitForExistence(timeout: 5))
                 XCTAssertTrue(app.buttons["Cancel hit"].exists)

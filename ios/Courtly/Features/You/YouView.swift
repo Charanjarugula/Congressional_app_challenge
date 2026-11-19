@@ -30,7 +30,7 @@ struct YouView: View {
                 }
             }
             .padding(.horizontal, 24)
-            .padding(.bottom, 24)
+            .padding(.bottom, 40)
         }
         .background(CourtlyColor.surface.ignoresSafeArea())
         .navigationTitle("Settings")
@@ -80,9 +80,9 @@ struct YouView: View {
 
     @ViewBuilder
     private func content(_ profile: Profile) -> some View {
-        Card(padding: 18, radius: 22) {
+        Card(padding: 20, radius: 22) {
             HStack(spacing: 16) {
-                ProfilePhotoButton(card: profile.card, size: 64)
+                ProfilePhotoButton(card: profile.card, size: 68)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(profile.firstName) \(profile.lastName)")
                         .font(.title2.weight(.bold))
@@ -96,20 +96,20 @@ struct YouView: View {
         }
         .padding(.top, 8)
 
-        group {
+        group(top: Self.relatedGap) {
             SettingsRow(title: "Name", value: profile.displayName.isEmpty ? "Add" : "\(profile.firstName) \(profile.lastName)") { sheet = .name }
-            HairlineSeparator()
+            divider
             // The sign-in address: shown, not editable.
             ValueRow(title: "Email", value: email ?? "—")
         }
 
         group(label: "Tennis") {
             SettingsRow(title: "Level", value: profile.level?.title ?? "Not set") { sheet = .level }
-            HairlineSeparator()
+            divider
             SettingsRow(title: "Plays", value: profile.formats.isEmpty ? "Not set" : profile.formats.map(\.shortTitle).joined(separator: ", ")) { sheet = .formats }
-            HairlineSeparator()
+            divider
             SettingsRow(title: "Area", value: areaValue(profile)) { sheet = .area }
-            HairlineSeparator()
+            divider
             SettingsRow(title: "Availability", value: profile.availability.isEmpty ? "Not set" : nil) { sheet = .availability }
         }
 
@@ -129,7 +129,7 @@ struct YouView: View {
             .contentShape(Rectangle())
             .onTapGesture { setNotifications(!notificationsOn) }   // the whole row flips it, not only the switch
             .accessibilityElement(children: .combine)
-            HairlineSeparator()
+            divider
             Menu {
                 Button("Anyone") { setVisibility("anyone") }
                 Button("Friends only") { setVisibility("friends") }
@@ -148,21 +148,21 @@ struct YouView: View {
                 .frame(minHeight: 50)
                 .contentShape(Rectangle())
             }
-            HairlineSeparator()
+            divider
             SettingsRow(title: "Blocked players", value: String(profile.blockedCount)) { navigate(.blockedPlayers) }
         }
 
         group(label: "Help") {
             SettingsRow(title: "Contact support") { contactSupport() }
-            HairlineSeparator()
+            divider
             SettingsRow(title: "Privacy Policy") { UIApplication.shared.open(AppConfig.privacyURL) }
-            HairlineSeparator()
+            divider
             SettingsRow(title: "Terms of Service") { UIApplication.shared.open(AppConfig.termsURL) }
         }
 
         group {
             SettingsRow(title: isSigningOut ? "Signing out…" : "Sign out", showsChevron: false) { signOut() }
-            HairlineSeparator()
+            divider
             SettingsRow(title: "Delete account", titleColor: CourtlyColor.red, showsChevron: false) { showsDeleteAlert = true }
         }
 
@@ -170,25 +170,36 @@ struct YouView: View {
             .font(CourtlyFont.caption)
             .foregroundStyle(CourtlyColor.secondary)
             .frame(maxWidth: .infinity)
-            .padding(.top, 16)
+            .padding(.top, 24)
     }
+
+    // One rhythm for the whole page: the same gap above every section, a small one between a label
+    // and its card, and labels and dividers on the same left edge as the row text.
+    private static let sectionGap: CGFloat = 32
+    private static let relatedGap: CGFloat = 12
+    private static let rowInset: CGFloat = 16
 
     /// One card of rows, with a small grey label above it when it has one.
     @ViewBuilder
-    private func group<Rows: View>(label: String? = nil, @ViewBuilder rows: () -> Rows) -> some View {
+    private func group<Rows: View>(label: String? = nil, top: CGFloat = YouView.sectionGap, @ViewBuilder rows: () -> Rows) -> some View {
         let built = rows()
         if let label {
             Text(label)
                 .font(CourtlyFont.captionSemibold)
                 .foregroundStyle(CourtlyColor.secondary)
-                .padding(.horizontal, 4)
-                .padding(.top, 22)
+                .padding(.horizontal, Self.rowInset)
+                .padding(.top, top)
                 .padding(.bottom, 8)
         }
         Card(radius: 22) {
             VStack(spacing: 0) { built }
         }
-        .padding(.top, label == nil ? 16 : 0)
+        .padding(.top, label == nil ? top : 0)
+    }
+
+    /// Dividers start where the row text starts, as in iOS lists.
+    private var divider: some View {
+        HairlineSeparator().padding(.leading, Self.rowInset)
     }
 
     private func areaValue(_ profile: Profile) -> String {

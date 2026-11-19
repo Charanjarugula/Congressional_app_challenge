@@ -8,6 +8,9 @@ struct ProfilePhotoButton: View {
     let card: PlayerCard
     var size: CGFloat = 96
 
+    /// A third of the photo, never smaller than a comfortable glyph.
+    private var badge: CGFloat { max(24, size * 0.34) }
+
     @State private var showsPicker = false
     @State private var pickerItem: PhotosPickerItem?
     @State private var photoToCrop: CropTarget?
@@ -34,11 +37,12 @@ struct ProfilePhotoButton: View {
                     }
                 }
                 Image(systemName: "camera.fill")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: badge * 0.42, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: badge, height: badge)
                     .background(Circle().fill(CourtlyColor.blue))
-                    .overlay(Circle().stroke(CourtlyColor.groupedBackground, lineWidth: 3))
+                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                    .offset(x: badge * 0.18, y: badge * 0.18)   // on the rim, clear of the initials
             }
         }
         .buttonStyle(.plain)

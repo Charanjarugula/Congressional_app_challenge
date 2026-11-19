@@ -31,6 +31,10 @@ xcodebuild archive -project ios/Courtly.xcodeproj -scheme Courtly -configuration
 if [ "${1:-}" = "--archive-only" ]; then echo "archive at $OUT/Courtly.xcarchive"; exit 0; fi
 
 echo "== export and upload"
+# The grep only trims the log; the upload's own result decides. A refused upload (an expired Apple
+# agreement, a rejected signature) used to fall through to the success line below.
 xcodebuild -exportArchive -archivePath "$OUT/Courtly.xcarchive" -exportOptionsPlist ios/ExportOptions.plist \
-  -exportPath "$OUT/export" "${AUTH[@]}" | grep -E '^(\*\*|error:|.*: error:|EXPORT|Upload)' || true
+  -exportPath "$OUT/export" "${AUTH[@]}" > "$OUT/export.log" 2>&1 || true
+grep -E '^(\*\*|error:|.*: error:|EXPORT|Upload)' "$OUT/export.log" || true
+grep -q "EXPORT SUCCEEDED" "$OUT/export.log" || { echo "upload failed for build $BUILD_NUMBER; full log: $OUT/export.log" >&2; exit 1; }
 echo "uploaded build $BUILD_NUMBER; it shows under TestFlight in App Store Connect once Apple has processed it (a few minutes)."

@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// One hit: time, status, who's in, where, and what you can do about it.
-/// Members see Chat, Add to calendar and the details; everyone else sees the host and Ask to join.
+/// One hit: when, who, where, and the one thing to do next. Every fact has a single home:
+/// time, format and who can join in the summary; host, players and open spots in "Who's playing";
+/// the court in its own card. One pinned action per state; the rest sits in the ••• menu.
 struct HitDetailView: View {
     let hitID: UUID
 
@@ -29,25 +30,26 @@ struct HitDetailView: View {
     @State private var attendance: [UUID: Bool] = [:]
     @State private var standings: [UUID: Relationship] = [:]   // friend adds made on this screen
     @State private var errorMessage: String?
+    @ScaledMetric(relativeTo: .title) private var timeSize = 30
+    @State private var answering: UUID?   // the join request being accepted or declined
 
     private var me: UUID? { session.profile?.id }
 
     var body: some View {
         ScrollView {
             if let hit {
-                VStack(alignment: .leading, spacing: 0) {
-                    summaryCard(hit)
+                VStack(alignment: .leading, spacing: 16) {
+                    banner(hit)
                     if hit.status == .played && hit.isMember && hit.needsAttendance != false {
                         attendanceSections(hit)
                     }
-                    if hit.isMember {
-                        detailsSection(hit)
-                    } else {
-                        hostSection(hit)
-                    }
-                    footer(hit)
+                    summaryCard(hit)
+                    if hit.viewer.isHost && hit.isLive { requestsSection(hit) }
+                    playersSection(hit)
+                    courtCard(hit)
                 }
                 .padding(.horizontal, 24)
+                .padding(.top, 4)
                 .padding(.bottom, 24)
             } else if loadFailed {
                 QuietCard(title: "This hit isn’t available", detail: "It may have been cancelled, or it has filled up.")
@@ -69,6 +71,9 @@ struct HitDetailView: View {
                         .font(CourtlyFont.body)
                         .foregroundStyle(CourtlyColor.blue)
                 }
+            }
+            if let hit, hit.isMember, hit.isLive {
+                ToolbarItem(placement: .topBarTrailing) { moreMenu(hit) }
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -128,119 +133,193 @@ struct HitDetailView: View {
 
     // MARK: - Sections
 
-    private func summaryCard(_ hit: Hit) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Card(padding: 18, radius: 22) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HitSummary(hit: hit)
-                    if let note = hit.yourTimeNote {
-                        Text(note).font(.footnote).foregroundStyle(CourtlyColor.secondary)
-                    }
-                }
-            }
+    /// What changed for the viewer, said once at the top.
+    @ViewBuilder
+    private func banner(_ hit: Hit) -> some View {
+        if hit.status == .cancelled {
+            QuietCard(title: "This hit was cancelled", detail: "It’s off. Other open hits are on Explore.")
+        } else if hit.status == .expired {
+            QuietCard(title: "This hit has expired", detail: "It didn’t fill before the start time.")
+        } else if hit.isLive && !hit.isMember {
             if hit.hasPendingRequest {
-                QuietCard(title: "You’ve asked to join", detail: "\(hit.host.firstName) can accept your request until the hit starts.")
-            } else if hit.openInvite != nil && !hit.isMember {
+                QuietCard(title: "You’ve asked to join", detail: "\(hit.host.firstName) can accept until the hit starts.")
+            } else if hit.openInvite != nil {
                 QuietCard(title: "\(hit.host.firstName) invited you", detail: "First to accept takes the spot.")
-            }
-            Text("Who’s playing")
-                .font(.headline).foregroundStyle(CourtlyColor.ink)
-                .accessibilityAddTraits(.isHeader)
-            HitPlayerRows(hit: hit, me: me)
-            Card(padding: 16, radius: 22) {
-                VStack(alignment: .leading, spacing: 10) {
-                    CourtMap(court: hit.court, height: 126)
-                    Text(hit.court.name).font(.headline).foregroundStyle(CourtlyColor.ink)
-                    if let address = hit.court.address {
-                        Text(address).font(.footnote).foregroundStyle(CourtlyColor.secondary)
-                    }
-                    if let detail = hit.court.detailLine {
-                        Text(detail).font(.footnote).foregroundStyle(CourtlyColor.secondary)
-                    }
-                }
-            }
-            // The chat outlives the start time (running late, a thank-you after); inviting and the calendar don't.
-            let chatStaysOpen = hit.chatId != nil && hit.status != .cancelled && hit.status != .expired
-            if hit.isMember && (hit.isLive || chatStaysOpen) {
-                HStack(spacing: 8) {
-                    if let chatID = hit.chatId {
-                        ActionButton(title: hit.unreadMessages > 0 ? "Chat · \(hit.unreadMessages)" : "Chat", style: .lime, height: 48, radius: 16) {
-                            navigate(.chat(chatID))
-                        }
-                    } else if hit.isLive && hit.viewer.isHost {
-                        ActionButton(title: "Invite", style: .lime, height: 48, radius: 16) { showsInvite = true }
-                    }
-                    if hit.isLive && hit.startTimeOnly != true {
-                        ActionButton(title: "Add to calendar", style: .grouped) { showsCalendar = true }
-                    }
-                }
+            } else if hit.wasDeclined {
+                QuietCard(title: "\(hit.host.firstName) passed on this one", detail: "Other open hits are on Explore.")
             }
         }
+    }
 
+    /// When and what. Players, spots and the court each have their own card below.
+    private func summaryCard(_ hit: Hit) -> some View {
+        Card(padding: 18, radius: 22) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(hit.dateText.uppercased())
+                            .font(.caption2.bold())
+                            .foregroundStyle(CourtlyColor.blue)
+                        Text(hit.clockText)
+                            .font(.system(size: timeSize, weight: .bold))
+                            .foregroundStyle(CourtlyColor.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                    Spacer(minLength: 0)
+                    StatusPill(kind: pill(hit))
+                }
+                Text(hit.status == .played ? headline(hit) : hit.format.title)
+                    .font(.headline)
+                    .foregroundStyle(CourtlyColor.ink)
+                Text([hit.durationLabel, hit.isLive ? whoCanJoin(hit) : nil].compactMap { $0 }.joined(separator: " · "))
+                    .font(.subheadline)
+                    .foregroundStyle(CourtlyColor.secondary)
+                if let note = hit.yourTimeNote {
+                    Text(note).font(.footnote).foregroundStyle(CourtlyColor.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// The pill says only the state; how many spots are open is in "Who's playing".
+    private func pill(_ hit: Hit) -> HitStatusKind {
+        if case .open = hit.statusKind { return .open(hit.isFull ? "Full" : "Open") }
+        return hit.statusKind
+    }
+
+    private func whoCanJoin(_ hit: Hit) -> String {
+        switch hit.visibility {
+        case .anyone: "Anyone can join"
+        case .friends: "Friends only"
+        case .inviteOnly: "Invite only"
+        }
     }
 
     private func headline(_ hit: Hit) -> String {
         let others = hit.others(than: me).map(\.displayName)
-        if hit.status == .played, !others.isEmpty {
-            return "\(hit.format.title) with \(others.joined(separator: ", "))"
-        }
-        return hit.formatLine
+        return others.isEmpty ? hit.format.title : "\(hit.format.title) with \(others.joined(separator: ", "))"
     }
 
-    private func detailsSection(_ hit: Hit) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionHeader(title: "Details", top: 24)
-            Card(radius: 22) {
-                VStack(spacing: 0) {
-                    DetailRow(title: "Court", value: hit.court.detailLine ?? hit.court.name)
-                    HairlineSeparator()
-                    DetailRow(title: "Address", value: hit.court.address ?? hit.court.shortName)
-                    HairlineSeparator()
-                    DetailRow(title: "Who can join", value: hit.visibility.title)
-                }
-            }
-        }
-    }
-
-    private func hostSection(_ hit: Hit) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionHeader(title: "Host", top: 24)
-            Card(radius: 22) {
-                Button {
-                    navigate(.player(hit.host.id, hitID: hit.id))
-                } label: {
-                    HStack(spacing: 14) {
-                        PlayerAvatar(card: hit.host, size: 48)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(hit.host.displayName)
-                                .font(CourtlyFont.bodySemibold)
-                                .foregroundStyle(CourtlyColor.ink)
-                            Text(hostDetail(hit.host))
-                                .font(CourtlyFont.secondary)
-                                .foregroundStyle(CourtlyColor.secondary)
+    /// The host answers join requests right here, without going back to Explore.
+    @ViewBuilder
+    private func requestsSection(_ hit: Hit) -> some View {
+        let requests = (hits.feed?.needsReply ?? []).filter { $0.kind == .joinRequest && $0.hit.id == hit.id && $0.requestId != nil }
+        if !requests.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                sectionTitle("Asked to join", trailing: "\(requests.count)")
+                ForEach(requests) { item in
+                    Card(padding: 14, radius: 22) {
+                        VStack(spacing: 12) {
+                            Button {
+                                if let id = item.requestId { navigate(.request(id)) }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    PlayerAvatar(card: item.person, size: 44)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.person.displayName).font(.body.weight(.semibold)).foregroundStyle(CourtlyColor.ink)
+                                        Text(playerDetail(item.person)).font(.caption).foregroundStyle(CourtlyColor.secondary)
+                                    }
+                                    Spacer(minLength: 8)
+                                    ChevronMark()
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            HStack(spacing: 8) {
+                                ActionButton(title: "Accept", style: .blue, height: 44, radius: 14, isLoading: answering == item.requestId) {
+                                    respond(item, accept: true)
+                                }
+                                ActionButton(title: "Decline", style: .quiet, height: 44, radius: 14) { respond(item, accept: false) }
+                            }
+                            .disabled(answering != nil)
                         }
-                        Spacer(minLength: 8)
-                        ChevronMark()
                     }
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 16)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+            }
+        } else if hit.pendingRequestCount > 0 {
+            QuietCard(
+                title: hit.pendingRequestCount == 1 ? "1 player asked to join" : "\(hit.pendingRequestCount) players asked to join",
+                detail: "Answer from Explore, under Needs your reply."
+            )
+        }
+    }
+
+    private func playerDetail(_ card: PlayerCard) -> String {
+        let played = card.hitsPlayed == 1 ? "1 hit played" : "\(card.hitsPlayed) hits played"
+        return [card.level?.title, played].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private func playersSection(_ hit: Hit) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("Who’s playing", trailing: hit.isLive ? "\(hit.everyone.count) of \(hit.everyone.count + max(hit.spotsOpen, 0))" : nil)
+            HitPlayerRows(hit: hit, me: me, onInvite: hit.viewer.isHost && hit.isLive ? { showsInvite = true } : nil)
+        }
+    }
+
+    private func sectionTitle(_ title: String, trailing: String?) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.headline).foregroundStyle(CourtlyColor.ink)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            if let trailing {
+                Text(trailing).font(.subheadline).foregroundStyle(CourtlyColor.secondary)
+                    .accessibilityLabel(title == "Who’s playing" ? "\(trailing) spots filled" : "\(trailing) waiting")
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    /// The only place the court appears: map, name, address, surface. Distance is for people deciding to come.
+    private func courtCard(_ hit: Hit) -> some View {
+        Card(padding: 16, radius: 22) {
+            VStack(alignment: .leading, spacing: 10) {
+                CourtMap(court: hit.court, height: 126)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(hit.court.name).font(.headline).foregroundStyle(CourtlyColor.ink)
+                    if let address = hit.court.address, !address.isEmpty {
+                        Text(address).font(.subheadline).foregroundStyle(CourtlyColor.secondary)
+                            .textSelection(.enabled)
+                    }
+                    let extras = [hit.court.detailLine, hit.isMember ? nil : hit.milesLabel.map { "\($0) away" }].compactMap { $0 }
+                    if !extras.isEmpty {
+                        Text(extras.joined(separator: " · ")).font(.footnote).foregroundStyle(CourtlyColor.secondary)
+                    }
+                }
             }
         }
     }
 
-    private func hostDetail(_ host: PlayerCard) -> String {
-        let played = host.hitsPlayed == 1 ? "1 hit played" : "\(host.hitsPlayed) hits played"
-        return [host.level?.title, played].compactMap { $0 }.joined(separator: " · ")
+    /// Everything that isn't the one main action: calendar, sharing, and the ways out.
+    private func moreMenu(_ hit: Hit) -> some View {
+        Menu {
+            if hit.startTimeOnly != true {
+                Button("Add to calendar", systemImage: "calendar.badge.plus") { showsCalendar = true }
+            }
+            ShareLink(item: hit.shareText) { Label("Share hit", systemImage: "square.and.arrow.up") }
+            if hit.viewer.isPlayer || (hit.viewer.isHost && !hit.players.isEmpty) {
+                Button("Leave hit", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) { showsLeaveAlert = true }
+            }
+            if hit.viewer.isHost {
+                Button("Cancel hit", systemImage: "xmark.circle", role: .destructive) { showsCancelAlert = true }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(CourtlyColor.blue)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("More")
     }
 
     /// Day-after check: one "Did X show up?" per other player.
     private func attendanceSections(_ hit: Hit) -> some View {
         ForEach(hit.others(than: me)) { player in
             VStack(alignment: .leading, spacing: 8) {
-                SectionHeader(title: "Did \(player.firstName) show up?", top: 24)
+                SectionHeader(title: "Did \(player.firstName) show up?", top: 0)
                 HStack(spacing: 8) {
                     ActionButton(title: "No", style: attendance[player.id] == false ? .blue : .grouped) {
                         answer(player, showedUp: false, hit: hit)
@@ -271,67 +350,41 @@ struct HitDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private func footer(_ hit: Hit) -> some View {
-        if hit.isLive {
-            if hit.viewer.isHost && hit.spotsOpen > 0 {   // only the host can send invites
-                ActionButton(title: "Invite friends", style: .lime, height: 48, radius: 16) { showsInvite = true }
-                    .padding(.top, 20)
-            }
-            if hit.viewer.isHost {
-                if !hit.players.isEmpty {
-                    DestructiveTextButton(title: "Leave hit") { showsLeaveAlert = true }
-                        .padding(.top, 8)
-                }
-                DestructiveTextButton(title: "Cancel hit") { showsCancelAlert = true }
-                    .padding(.top, 8)
-            } else if hit.viewer.isPlayer {
-                DestructiveTextButton(title: "Leave hit") { showsLeaveAlert = true }
-                    .padding(.top, 8)
-            } else if hit.hasPendingRequest, let request = hit.viewer.request {
-                VStack(spacing: 4) {
-                    Text("Requested. \(hit.host.firstName) can say yes until the hit starts.")
-                        .font(CourtlyFont.secondary)
-                        .foregroundStyle(CourtlyColor.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 20)
-                    DestructiveTextButton(title: "Cancel request") {
-                        Task { await cancelRequest(request.id) }
-                    }
-                }
-            }
-        }
-    }
-
+    /// One pinned action per state. Lime is the single thing to do next; anything else is quieter.
     @ViewBuilder
     private func bottomAction(_ hit: Hit) -> some View {
-        if hit.isLive && !hit.isMember && hit.wasDeclined && hit.openInvite == nil {
-            Text("\(hit.host.firstName) passed on this one.")
-                .font(CourtlyFont.secondary)
-                .foregroundStyle(CourtlyColor.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(CourtlyColor.surface)
-        } else if hit.isLive && !hit.isMember && !hit.hasPendingRequest {
-            Group {
+        let chatOpen = hit.chatId != nil && hit.status != .cancelled && hit.status != .expired
+        Group {
+            if hit.isMember, let chatID = hit.chatId, chatOpen {
+                let chatTitle = hit.unreadMessages > 0 ? "Chat · \(hit.unreadMessages)" : "Chat"
+                HStack(spacing: 8) {
+                    if hit.viewer.isHost && hit.isLive && hit.spotsOpen > 0 {
+                        ActionButton(title: "Invite", style: .quiet, height: 48, radius: 16) { showsInvite = true }
+                            .frame(maxWidth: 120)
+                    }
+                    PrimaryButton(title: chatTitle, style: hit.isLive ? .lime : .blue, compact: true) { navigate(.chat(chatID)) }
+                        .accessibilityLabel(hit.unreadMessages > 0 ? "Chat, \(hit.unreadMessages) unread" : "Chat")
+                }
+            } else if hit.viewer.isHost && hit.isLive && hit.spotsOpen > 0 {
+                PrimaryButton(title: "Invite", style: .lime, compact: true) { showsInvite = true }
+            } else if hit.isLive && !hit.isMember {
                 if let invite = hit.openInvite {
                     PrimaryButton(title: "I’m in", style: .lime, compact: true, isLoading: isWorking) {
                         Task { await perform { try await hits.claimInvite(invite.id) } }
                     }
-                } else {
-                    VStack(spacing: 8) {
-                        PrimaryButton(title: hit.isFull ? "Full" : "Ask to join", style: .lime, compact: true, isEnabled: !hit.isFull, isLoading: isWorking) {
-                            Task { await perform { try await hits.requestToJoin(hit.id) } }
-                        }
+                } else if hit.hasPendingRequest, let request = hit.viewer.request {
+                    DestructiveTextButton(title: "Cancel request") { Task { await cancelRequest(request.id) } }
+                } else if !hit.wasDeclined {
+                    PrimaryButton(title: hit.isFull ? "Full" : "Ask to join", style: .lime, compact: true, isEnabled: !hit.isFull, isLoading: isWorking) {
+                        Task { await perform { try await hits.requestToJoin(hit.id) } }
                     }
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
-            .background(CourtlyColor.surface)
         }
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+        .background(CourtlyColor.surface)
     }
 
     // MARK: - Actions
@@ -373,6 +426,16 @@ struct HitDetailView: View {
         }
     }
 
+    /// Accept or decline from the hit itself; the hit updates in place.
+    private func respond(_ item: NeedsReplyItem, accept: Bool) {
+        guard let requestID = item.requestId, answering == nil else { return }
+        answering = requestID
+        Task { @MainActor in
+            await perform { try await hits.respond(requestID: requestID, accept: accept) }
+            answering = nil
+        }
+    }
+
     @MainActor
     private func cancelRequest(_ requestID: UUID) async {
         isWorking = true
@@ -409,30 +472,5 @@ struct HitDetailView: View {
                 errorMessage = error.localizedDescription
             }
         }
-    }
-}
-
-/// "Court — Hard · Lights" style row, 50pt tall.
-private struct DetailRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        // Long addresses and court names wrap instead of being cut, so they can always be read.
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(title)
-                .font(CourtlyFont.body)
-                .foregroundStyle(CourtlyColor.ink)
-            Spacer(minLength: 12)
-            Text(value)
-                .font(CourtlyFont.secondary)
-                .foregroundStyle(CourtlyColor.secondary)
-                .multilineTextAlignment(.trailing)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(minHeight: 50)
     }
 }

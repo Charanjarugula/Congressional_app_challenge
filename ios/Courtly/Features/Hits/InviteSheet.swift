@@ -28,14 +28,14 @@ struct InviteSheet: View {
                 .font(.largeTitle.bold())
                 .tracking(-0.4)
                 .foregroundStyle(CourtlyColor.ink)
-            Text("Friends or a group chat. First to accept takes the spot.")
+            Text("Share it anywhere, or send it to friends on Courtly. First to accept takes the spot.")
                 .font(CourtlyFont.secondary)
                 .foregroundStyle(CourtlyColor.secondary)
                 .padding(.top, 4)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Card(padding: 18, radius: 22) { HitSummary(hit: hit, showsHost: false) }
+                    shareRow
                         .padding(.bottom, 16)
                     if isLoading {
                         ProgressView()
@@ -49,7 +49,7 @@ struct InviteSheet: View {
                                 .foregroundStyle(CourtlyColor.blue)
                         }
                     } else if groups.isEmpty && friends.isEmpty {
-                        QuietCard(title: "No one to invite yet", detail: "Add friends from People and they’ll show up here.")
+                        QuietCard(title: "No friends on Courtly yet", detail: "Share the link. They can ask to join once they’re in.")
                     } else {
                         if !groups.isEmpty {
                             SectionHeader(title: "Groups")
@@ -64,7 +64,7 @@ struct InviteSheet: View {
                 .padding(.top, 16)
             }
 
-            PrimaryButton(title: "Done", style: .lime, compact: true) { dismiss() }
+            PrimaryButton(title: "Done", style: .blue, compact: true) { dismiss() }
                 .padding(.vertical, 16)
         }
         .padding(.horizontal, 24)
@@ -77,6 +77,35 @@ struct InviteSheet: View {
     }
 
     // MARK: - Rows
+
+    /// Works with no friends on Courtly yet: the hit as a message for Messages, WhatsApp, anywhere.
+    private var shareRow: some View {
+        ShareLink(item: hit.shareText) {
+            HStack(spacing: 14) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(CourtlyColor.ink)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(CourtlyColor.lime))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Share this hit")
+                        .font(CourtlyFont.bodySemibold)
+                        .foregroundStyle(CourtlyColor.ink)
+                    Text("Messages, WhatsApp, anywhere")
+                        .font(CourtlyFont.caption)
+                        .foregroundStyle(CourtlyColor.secondary)
+                }
+                Spacer(minLength: 8)
+                ChevronMark()
+            }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(CourtlyColor.card))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
 
     private func groupRow(_ group: Chat) -> some View {
         HStack(spacing: 14) {

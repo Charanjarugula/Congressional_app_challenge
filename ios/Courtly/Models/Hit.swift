@@ -225,6 +225,12 @@ struct Hit: Codable, Identifiable, Equatable {
 
     var spotsLabel: String { spotsOpen == 1 ? "1 spot" : "\(spotsOpen) spots" }
 
+    /// What goes out when a hit is shared outside the app: the court's own day and time, and where to get Courtly.
+    var shareText: String {
+        let open = spotsOpen > 0 ? " \(spotsLabel.capitalizedFirst) open." : ""
+        return "\(format.title) \(dayText) \(clockText) at \(court.name).\(open) Join me on Courtly: \(AppConfig.siteURL.absoluteString)"
+    }
+
     /// "Hannah C. · Casual"
     var feedTitle: String { "\(host.displayName) · \(format.shortTitle)" }
 
@@ -309,4 +315,8 @@ enum HitFormatting {
         formatter.dateFormat = format
         return formatter
     }
+}
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }

@@ -6,15 +6,15 @@ do $$
 declare v_pw text := nullif(current_setting('courtly.demo_password', true), ''); e record; v_id uuid;
 begin
   for e in select * from (values
-    ('demo.ana@courtly.app',    'Ana',    'Ruiz',    date '1994-05-12', 'woman'::public.gender, 'intermediate'::public.player_level,
+    ('demo.ana@courtly.app',    'Ana',    'Ruiz',    'woman'::public.gender, 'intermediate'::public.player_level,
      '{casual,singles}'::public.play_format[], '33414', 'Wellington, FL',         -80.2416, 26.6618, 10, (1<<2)|(1<<11)|(1<<15)|(1<<16)|(1<<18)|(1<<19)),
-    ('demo.luis@courtly.app',   'Luis',   'Morales', date '1990-09-03', 'man',   'advanced',
+    ('demo.luis@courtly.app',   'Luis',   'Morales', 'man',   'advanced',
      '{drills,doubles}',  '33411', 'Royal Palm Beach, FL',   -80.2284, 26.7084, 15, (1<<0)|(1<<9)|(1<<15)|(1<<17)|(1<<18)),
-    ('demo.priya@courtly.app',  'Priya',  'Shah',    date '1997-11-20', 'woman', 'intermediate',
+    ('demo.priya@courtly.app',  'Priya',  'Shah',    'woman', 'intermediate',
      '{singles,casual}',  '33433', 'Boca Raton, FL',         -80.1570, 26.3480, 15, (1<<1)|(1<<5)|(1<<8)|(1<<15)|(1<<16)|(1<<18)),
-    ('demo.marcus@courtly.app', 'Marcus', 'Lee',     date '1988-02-27', 'man',   'advanced',
+    ('demo.marcus@courtly.app', 'Marcus', 'Lee',     'man',   'advanced',
      '{doubles,casual}',  '33410', 'Palm Beach Gardens, FL', -80.1172, 26.8234, 15, (1<<2)|(1<<8)|(1<<14)|(1<<15)|(1<<17)|(1<<19))
-  ) as t(email, first_name, last_name, birthday, gender, level, formats, zip, area_label, lng, lat, radius_mi, mask) loop
+  ) as t(email, first_name, last_name, gender, level, formats, zip, area_label, lng, lat, radius_mi, mask) loop
     select id into v_id from auth.users where email = e.email;
     if v_id is null then
       v_id := gen_random_uuid();
@@ -29,7 +29,7 @@ begin
       update auth.users set encrypted_password = extensions.crypt(v_pw, extensions.gen_salt('bf')), updated_at = now() where id = v_id;
     end if;
     -- The sign-up trigger made the profile row; this fills it in.
-    update public.profiles set first_name = e.first_name, last_name = e.last_name, birthday = e.birthday, gender = e.gender, level = e.level,
+    update public.profiles set first_name = e.first_name, last_name = e.last_name, gender = e.gender, level = e.level,
       formats = e.formats, zip = e.zip, area_label = e.area_label,
       home_point = extensions.st_setsrid(extensions.st_makepoint(e.lng, e.lat), 4326)::extensions.geography,
       radius_mi = e.radius_mi, availability_mask = e.mask, hit_visibility = 'anyone', busy_mask_week = null,

@@ -18,7 +18,7 @@ begin
   else
     update auth.users set encrypted_password = extensions.crypt(v_pw, extensions.gen_salt('bf')), updated_at = now() where id = v_id;
   end if;
-  update public.profiles set first_name = 'App', last_name = 'Reviewer', birthday = '1990-01-01', level = 'intermediate', formats = '{casual}',
+  update public.profiles set first_name = 'App', last_name = 'Reviewer', level = 'intermediate', formats = '{casual}',
     zip = '33414', area_label = 'Wellington, FL',
     home_point = extensions.st_setsrid(extensions.st_makepoint(-80.2416, 26.6618), 4326)::extensions.geography,
     radius_mi = 15, availability_mask = 2097151, onboarding_completed_at = coalesce(onboarding_completed_at, now()), coach_marks_done = true

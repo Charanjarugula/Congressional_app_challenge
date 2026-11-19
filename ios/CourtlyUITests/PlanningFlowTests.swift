@@ -10,11 +10,11 @@ final class PlanningFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Plan a hit"].waitForExistence(timeout: 10))
         let day = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Day'")).firstMatch
         day.tap()
-        XCTAssertTrue(app.datePickers.firstMatch.exists)
+        XCTAssertTrue(app.datePickers.firstMatch.waitForExistence(timeout: 5))
         day.tap()
         let time = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Start time'")).firstMatch
         time.tap()
-        XCTAssertTrue(app.datePickers.firstMatch.exists)
+        XCTAssertTrue(app.datePickers.firstMatch.waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["60 min"].exists)
         XCTAssertFalse(app.buttons["90 min"].exists)
         XCTAssertFalse(app.buttons["120 min"].exists)

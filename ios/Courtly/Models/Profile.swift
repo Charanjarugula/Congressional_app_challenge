@@ -6,7 +6,6 @@ struct Profile: Codable, Equatable {
     var firstName: String
     var lastName: String
     var photoPath: String?
-    var birthday: String?          // yyyy-MM-dd
     var gender: Gender?
     var level: PlayerLevel?
     var formats: [PlayFormat]

@@ -67,6 +67,7 @@ struct MainTabView: View {
         }
         .sheet(isPresented: $isPlanning) {
             PlanHitView { hit in
+                hits.justPostedID = hit.id
                 selected = .myHits
                 paths[.myHits] = [.hit(hit.id)]
             }

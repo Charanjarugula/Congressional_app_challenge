@@ -225,6 +225,32 @@ struct Hit: Codable, Identifiable, Equatable {
 
     var spotsLabel: String { spotsOpen == 1 ? "1 spot" : "\(spotsOpen) spots" }
 
+    /// The link people outside the app get: a page that opens this hit in Courtly.
+    var shareURL: URL {
+        AppConfig.siteURL.appending(path: "hit").appending(queryItems: [URLQueryItem(name: "id", value: id.uuidString.lowercased())])
+    }
+
+    /// The hit a chat message points at, when it carries a shared hit link ("…/hit?id=<uuid>").
+    static func sharedHitID(in text: String) -> UUID? {
+        guard let range = text.range(of: "/hit?id=") else { return nil }
+        return UUID(uuidString: String(text[range.upperBound...].prefix(36)))
+    }
+
+    /// The message without its link, for showing beside a "View hit" button.
+    static func textWithoutHitLink(_ text: String) -> String {
+        guard let range = text.range(of: "/hit?id="),
+              let start = text[..<range.lowerBound].range(of: "http", options: .backwards)?.lowerBound else { return text }
+        let end = text.index(range.upperBound, offsetBy: 36, limitedBy: text.endIndex) ?? text.endIndex
+        return (text[..<start] + text[end...]).replacingOccurrences(of: "Join me on Courtly:", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The message that goes with it: the court's own day and time, then the link.
+    var shareText: String {
+        let open = spotsOpen > 0 ? " \(spotsLabel.capitalizedFirst) open." : ""
+        return "\(format.title) \(dayText) \(clockText) at \(court.name).\(open) Join me on Courtly: \(shareURL.absoluteString)"
+    }
+
     /// "Hannah C. · Casual"
     var feedTitle: String { "\(host.displayName) · \(format.shortTitle)" }
 
@@ -309,4 +335,8 @@ enum HitFormatting {
         formatter.dateFormat = format
         return formatter
     }
+}
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }

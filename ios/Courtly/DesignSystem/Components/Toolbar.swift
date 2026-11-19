@@ -18,10 +18,12 @@ struct PlainToolbarItem<Content: View>: ToolbarContent {
 
 extension View {
     /// A back chevron with nothing drawn around it, in place of the system button.
-    func plainBackButton() -> some View { modifier(PlainBackButton()) }
+    /// `hidden` leaves the bar's leading side to the screen (a Done button, say).
+    func plainBackButton(hidden: Bool = false) -> some View { modifier(PlainBackButton(hidden: hidden)) }
 }
 
 private struct PlainBackButton: ViewModifier {
+    var hidden = false
     @Environment(\.dismiss) private var dismiss
 
     func body(content: Content) -> some View {
@@ -29,17 +31,19 @@ private struct PlainBackButton: ViewModifier {
             .background(PopGestureEnabler().frame(width: 0, height: 0))
             .navigationBarBackButtonHidden(true)
             .toolbar {
-                PlainToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(CourtlyColor.ink)
-                            .frame(width: 32, height: 44, alignment: .leading)
-                            .contentShape(Rectangle())
+                if !hidden {
+                    PlainToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(CourtlyColor.ink)
+                                .frame(width: 32, height: 44, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("Back")
                     }
-                    .accessibilityLabel("Back")
                 }
             }
     }

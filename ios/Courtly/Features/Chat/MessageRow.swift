@@ -9,6 +9,7 @@ struct MessageRow: View {
     var startsRun = true
     var onOpenSender: (UUID) -> Void = { _ in }
     var onReport: () -> Void = {}
+    @Environment(\.navigate) private var navigate
 
     var body: some View {
         switch message.type {
@@ -62,7 +63,37 @@ struct MessageRow: View {
             }
     }
 
+    /// A hit someone shared reads as their words plus a button into the hit, not a raw link.
+    @ViewBuilder
     private var textBubble: some View {
+        if let hitID = Hit.sharedHitID(in: message.body) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(Hit.textWithoutHitLink(message.body))
+                    .font(CourtlyFont.body)
+                    .foregroundStyle(isMine ? .white : CourtlyColor.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button { navigate(.hit(hitID)) } label: {
+                    Text("View hit")
+                        .font(CourtlyFont.secondarySemibold)
+                        .foregroundStyle(CourtlyColor.ink)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(CourtlyColor.lime))
+                }
+                .buttonStyle(PressableButtonStyle())
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(isMine ? CourtlyColor.blue : Color.white)
+            )
+            .frame(maxWidth: 260, alignment: isMine ? .trailing : .leading)
+        } else {
+            plainBubble
+        }
+    }
+
+    private var plainBubble: some View {
         Text(message.body)
             .font(CourtlyFont.body)
             .foregroundStyle(isMine ? .white : CourtlyColor.ink)

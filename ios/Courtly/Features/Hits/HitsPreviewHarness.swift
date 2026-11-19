@@ -3,11 +3,14 @@ import SwiftUI
 
 struct HitsPreviewHarness: View {
     @State private var hits = HitsStore(account: nil)
-    private let states = ["Open", "Host", "Pending", "Invited", "Confirmed", "Cancelled", "Played"]
+    private let states = ["Open", "Host", "Posted", "Pending", "Invited", "Confirmed", "Cancelled", "Played"]
     var body: some View {
         NavigationStack {
             List(states, id: \.self) { state in
-                NavigationLink(state) { HitDetailView(preview: example(state)) }
+                NavigationLink(state) {
+                    let hit = example(state)
+                    HitDetailView(preview: hit).onAppear { if state == "Posted" { hits.justPostedID = hit.id } }
+                }
             }
             .navigationTitle("Hit state checks")
         }
@@ -17,7 +20,7 @@ struct HitsPreviewHarness: View {
     private func example(_ state: String) -> Hit {
         var hit = ExplorePreviewHarness.exampleHit
         switch state {
-        case "Host": hit.viewer.isHost = true
+        case "Host", "Posted": hit.viewer.isHost = true
         case "Pending": hit.viewer.request = .init(id: UUID(), status: .pending, seen: true)
         case "Invited": hit.viewer.invite = .init(id: UUID(), status: .open, expiresAt: .now.addingTimeInterval(3600))
         case "Confirmed": hit.status = .confirmed; hit.spotsOpen = 0; hit.viewer.isPlayer = true; hit.chatId = UUID()

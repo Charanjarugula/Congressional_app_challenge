@@ -31,6 +31,10 @@ struct CourtlyApp: App {
                 #endif
             }
             .environment(session)
+            // A shared hit link (courtly://hit/<id>, reached from the website's /hit page) opens that hit.
+            .onOpenURL { url in
+                if let link = DeepLink(string: url.absoluteString) { DeepLinkCenter.shared.open(link) }
+            }
         }
     }
 }

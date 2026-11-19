@@ -45,7 +45,7 @@ All categories below are linked to the account and are not used for advertising 
 | Emails or text messages | Direct, group, and hit chat content. |
 | Customer support | Reports and information submitted for assistance. |
 | Other user content | Hit details and other player-authored content. |
-| Other data | Birthday/age eligibility, tennis preferences, availability, and optional free/busy flags. |
+| Other data | Tennis preferences, availability, and optional free/busy flags. No date of birth (removed for App Review 5.1.1(v), November 2026). |
 | User ID | Account identity, relationships, access controls. |
 | Device ID | Push notification token, linked to the signed-in account. |
 

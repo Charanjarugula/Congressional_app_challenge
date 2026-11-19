@@ -43,6 +43,14 @@ struct LocationView: View {
         } footer: {
             if draft.homeArea != nil {
                 PrimaryButton(title: "Continue", style: .lime, compact: true, action: onContinue)
+            } else if hasTypedPlace {
+                // Something typed: Continue finds it and moves on, so nobody has to know to press Return
+                // or pick a suggestion first. Location stays one tap away.
+                VStack(spacing: 4) {
+                    PrimaryButton(title: "Continue", style: .lime, compact: true, isLoading: isSearching, action: continueWithTypedPlace)
+                    TextActionButton(title: isLocating ? "Finding your location…" : "Use my location", color: .white, action: useMyLocation)
+                        .disabled(isLocating || isSearching)
+                }
             } else {
                 VStack(spacing: 4) {
                     PrimaryButton(title: "Use my location", style: .lime, compact: true, isLoading: isLocating, action: useMyLocation)
@@ -147,7 +155,20 @@ struct LocationView: View {
         }
     }
 
+    private var hasTypedPlace: Bool {
+        !query.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
     // MARK: - Actions
+
+    /// Continue with a typed city or ZIP: the top suggestion if there is one, otherwise what was typed.
+    private func continueWithTypedPlace() {
+        if let first = completer.suggestions.first {
+            select(first, then: onContinue)
+        } else {
+            lookUpTypedQuery(then: onContinue)
+        }
+    }
 
     private func useMyLocation() {
         guard !isLocating else { return }
@@ -175,7 +196,7 @@ struct LocationView: View {
         }
     }
 
-    private func select(_ suggestion: PlaceSearchCompleter.Suggestion) {
+    private func select(_ suggestion: PlaceSearchCompleter.Suggestion, then next: (() -> Void)? = nil) {
         guard !isSearching else { return }
         isSearching = true
         isEditing = false
@@ -184,6 +205,7 @@ struct LocationView: View {
             do {
                 draft.homeArea = try await PlaceSearchCompleter.resolve(suggestion.completion)
                 completer.clear()
+                next?()
             } catch {
                 errorMessage = "Couldn’t find that place. Try a ZIP code."
             }
@@ -191,7 +213,7 @@ struct LocationView: View {
         }
     }
 
-    private func lookUpTypedQuery() {
+    private func lookUpTypedQuery(then next: (() -> Void)? = nil) {
         guard !isSearching, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         isSearching = true
         isEditing = false
@@ -200,6 +222,7 @@ struct LocationView: View {
             do {
                 draft.homeArea = try await LocationService.area(matching: query)
                 completer.clear()
+                next?()
             } catch {
                 errorMessage = "Couldn’t find that place. Try a ZIP code."
             }

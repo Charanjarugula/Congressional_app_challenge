@@ -86,7 +86,8 @@ final class RemainingFlowsTests: XCTestCase {
                 field.tap()
                 field.typeText(" Wellington, FL")
                 XCTAssertTrue((field.value as? String ?? "").contains("Wellington"))
-                XCTAssertFalse(app.buttons["Save"].isEnabled)
+                // A typed city is enough: Save finds the area itself, no "Find area" tap needed.
+                XCTAssertTrue(app.buttons["Save"].isEnabled)
             }
             capture(app, "Settings - " + title)
             app.buttons["Cancel"].tap()

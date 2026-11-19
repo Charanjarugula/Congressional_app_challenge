@@ -14,7 +14,7 @@ struct AreaSheet: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        SheetScaffold(title: "Area", canSave: area != nil && !isLookingUp, isSaving: isSaving, onSave: save) {
+        SheetScaffold(title: "Area", canSave: (area != nil || typedQuery.count >= 2) && !isLookingUp, isSaving: isSaving, onSave: save) {
             SectionLabel(title: "City or ZIP code")
                 .padding(.bottom, 8)
             HStack(spacing: 12) {
@@ -103,11 +103,26 @@ struct AreaSheet: View {
         }
     }
 
+    private var typedQuery: String {
+        zip.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Save works straight from what was typed: no need to tap "Find area" first.
     private func save() {
-        guard let area, !isLookingUp, !isSaving else { return }
+        guard !isLookingUp, !isSaving else { return }
         isSaving = true
         Task { @MainActor in
             do {
+                if area == nil {
+                    lookupTask?.cancel()
+                    guard let found = try? await LocationService.area(matching: typedQuery) else {
+                        errorMessage = "We couldn’t find that area. Try a city and state or a ZIP code."
+                        isSaving = false
+                        return
+                    }
+                    area = found
+                }
+                guard let area else { isSaving = false; return }
                 var patch: [String: Any] = [
                     "area_label": area.label,
                     "home_lat": area.latitude,

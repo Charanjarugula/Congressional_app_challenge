@@ -9,7 +9,7 @@ enum OnboardingRoute: Hashable {
     case createAccount(AccountMode)
     case emailCode(String)
     case name
-    case birthday
+    case ageCheck(AgeAssurance.Result)
     case level
     case formats
     case location
@@ -25,6 +25,7 @@ struct OnboardingFlow: View {
     @Environment(AppSession.self) private var session
     @State private var draft = OnboardingDraft()
     @State private var path: [OnboardingRoute]
+    @State private var isCheckingAge = false
 
     private let resumeProfile: Bool
 
@@ -43,6 +44,19 @@ struct OnboardingFlow: View {
     private func save(then route: OnboardingRoute) {
         session.saveDraft(draft)
         push(route)
+    }
+
+    /// After the name: Apple's age range check, which asks nothing except where the law requires it.
+    /// No date of birth is ever asked for. Only a "not 18+" or unanswered check shows a screen.
+    private func continueAfterName() {
+        session.saveDraft(draft)
+        guard !isCheckingAge else { return }
+        isCheckingAge = true
+        Task { @MainActor in
+            let result = await AgeAssurance.check()
+            isCheckingAge = false
+            push(result.letsThrough ? .level : .ageCheck(result))
+        }
     }
 
     var body: some View {
@@ -94,9 +108,9 @@ struct OnboardingFlow: View {
         case let .emailCode(email):
             EmailCodeView(email: email, onSignedIn: { await continueAfterSignIn(name: nil) })
         case .name:
-            NameView(draft: draft) { save(then: .birthday) }
-        case .birthday:
-            BirthdayView(draft: draft) { save(then: .level) }
+            NameView(draft: draft) { continueAfterName() }
+        case let .ageCheck(result):
+            AgeCheckView(result: result) { push(.level) }
         case .level:
             LevelView(draft: draft) { save(then: .formats) }
         case .formats:

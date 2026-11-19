@@ -261,17 +261,10 @@ begin
   if jsonb_array_length(v_feed) <> 1 or (v_feed->0->'player'->>'id')::uuid <> a
      or v_feed->0->>'hash' <> public.contact_hash('maya@example.org') then raise exception 'match_contacts: %', v_feed; end if;
   if v_feed->0->>'relationship' is null then raise exception 'match_contacts lost the relationship: %', v_feed; end if;
-  -- Back to mid-onboarding for this check: an onboarded profile can't take an under-18 birthday (0023).
-  update public.profiles set birthday = current_date - interval '12 years', onboarding_completed_at = null where id = b;
-  begin
-    perform public.complete_onboarding();
-    raise exception 'underage accepted';
-  exception when others then
-    if sqlerrm <> 'underage' then raise; end if;
-  end;
-  if (select underage_at from public.profiles where id = b) is null then raise exception 'under-18 birthday not remembered'; end if;
-  update public.profiles set underage_at = null where id = b;   -- a moderator clearing it; players can't
-  update public.profiles set birthday = '1994-05-02', onboarding_completed_at = now() where id = b;
+  -- No date of birth is kept (0033): one written by anyone, an older app included, is dropped.
+  update public.profiles set birthday = '1994-05-02' where id = b;
+  if (select birthday from public.profiles where id = b) is not null then raise exception 'a birthday was stored'; end if;
+  if public.profile_json(b) ? 'birthday' then raise exception 'profile_json still returns a birthday'; end if;
 
   -- Row-level security as the app's role: Alex sees only hits visible to him, never Maya's profile row.
   execute 'set local role authenticated';
@@ -934,7 +927,7 @@ begin
     exception when others then
       if sqlerrm <> 'invalid_photo' then raise; end if;
     end;
-    -- A photo has to be in the player's own folder; a later birthday change can't make them under 18.
+    -- A photo has to be in the player's own folder; a birthday sent by an older app is ignored.
     begin
       perform public.update_profile(jsonb_build_object('photo_path', a::text || '/avatar-1.jpg'));
       raise exception 'pointed a profile at someone else''s photo';
@@ -942,12 +935,8 @@ begin
       if sqlerrm <> 'invalid_photo' then raise; end if;
     end;
     perform public.update_profile(jsonb_build_object('photo_path', v_new::text || '/avatar-1.jpg'));
-    begin
-      perform public.update_profile(jsonb_build_object('birthday', (current_date - interval '17 years')::date));
-      raise exception 'changed birthday to under 18 after onboarding';
-    exception when others then
-      if sqlerrm <> 'underage' then raise; end if;
-    end;
+    perform public.update_profile(jsonb_build_object('birthday', (current_date - interval '17 years')::date));
+    if (select birthday from public.profiles where id = v_new) is not null then raise exception 'update_profile stored a birthday'; end if;
     v_pulse := public.get_area_pulse();
     if (v_pulse->>'players')::int < 1 or (v_pulse->>'courts')::int < 1 or (v_pulse->>'radius_mi')::int < 25 then
       raise exception 'area pulse: %', v_pulse;
@@ -1038,19 +1027,12 @@ begin
     if sqlerrm <> 'not_a_member' then raise; end if;
   end;
   perform public.post_report_email(gen_random_uuid());   -- no functions url in tests: a quiet no-op
-  -- 17 can't finish onboarding; 18 can.
-  update public.profiles set birthday = current_date - interval '17 years', onboarding_completed_at = null where id = v_pat2;
+  -- Someone known to be under 18 can't finish onboarding or use social features; clearing it lets them in.
+  update public.profiles set underage_at = now(), onboarding_completed_at = null where id = v_pat2;
   perform set_config('request.jwt.claims', json_build_object('sub', v_pat2, 'role', 'authenticated')::text, true);
   begin
     perform public.complete_onboarding();
-    raise exception 'a 17-year-old finished onboarding';
-  exception when others then
-    if sqlerrm <> 'underage' then raise; end if;
-  end;
-  -- The player can't just change the birthday back: the under-18 answer is remembered.
-  begin
-    perform public.update_profile(jsonb_build_object('birthday', (current_date - interval '30 years')::date));
-    raise exception 'changed an under-18 birthday after being told no';
+    raise exception 'an under-18 sign-up finished onboarding';
   exception when others then
     if sqlerrm <> 'underage' then raise; end if;
   end;
@@ -1061,20 +1043,12 @@ begin
     if sqlerrm <> 'underage' then raise; end if;
   end;
   update public.profiles set underage_at = null where id = v_pat2;   -- a moderator clearing a mistake
-  update public.profiles set birthday = current_date - interval '18 years' where id = v_pat2;
-  perform public.complete_onboarding();
+  perform public.complete_onboarding();   -- no birthday needed (0033)
 
   -- Underage deletion removes a half-onboarded account outright, with the friend request and DM it opened.
   insert into public.profiles (id, first_name, last_name) values (d, 'Sam', 'Lee');
   perform set_config('request.jwt.claims', json_build_object('sub', d, 'role', 'authenticated')::text, true);
-  -- No birthday yet: nothing social works (0024).
-  begin
-    perform public.add_friend(a);
-    raise exception 'a sign-up without a birthday added a friend';
-  exception when others then
-    if sqlerrm <> 'age_required' then raise; end if;
-  end;
-  update public.profiles set birthday = current_date - interval '20 years' where id = d;
+  -- No date of birth is needed for anything social (0033).
   v_friend := public.add_friend(a);
   perform public.internal_delete_account(d, 'underage');
   if exists (select 1 from public.profiles where id = d) then raise exception 'underage profile kept'; end if;

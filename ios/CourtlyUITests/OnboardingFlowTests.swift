@@ -69,18 +69,34 @@ final class OnboardingFlowTests: XCTestCase {
     }
 
     func testRemainingScreenLayouts() {
-        for screen in ["Birthday", "Location", "Players", "Notifications", "Done"] {
+        for screen in ["Age check", "Location", "Players", "Notifications", "Done"] {
             let app = open(screen)
-            let next = app.buttons[screen == "Done" ? "Let’s hit" : screen == "Location" ? "Use my location" : "Continue"]
+            let next = app.buttons[screen == "Done" ? "Let’s hit" : screen == "Location" ? "Use my location" : screen == "Age check" ? "Try again" : "Continue"]
             XCTAssertTrue(next.waitForExistence(timeout: 15), "Missing primary action on \(screen)")
             XCTAssertTrue(next.isHittable)
             capture(app, screen)
-            if screen == "Birthday" { XCTAssertFalse(next.isEnabled) }
             if screen == "Done" {
                 next.tap()
                 XCTAssertTrue(app.staticTexts["Advanced"].waitForExistence(timeout: 5))
             }
         }
+    }
+
+    /// Typing a city or ZIP brings up Continue, so nobody is left with only the Back button.
+    func testLocationShowsContinueOnceAPlaceIsTyped() {
+        let app = open("Location")
+        let field = app.textFields["City or ZIP code"]
+        XCTAssertTrue(field.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["Continue"].exists)
+        field.tap()
+        let keyboardIntro = app.otherElements["UIContinuousPathIntroductionView"].buttons["Continue"]
+        if keyboardIntro.exists { keyboardIntro.tap() }
+        field.typeText("33414")
+        let next = app.buttons["Continue"]
+        XCTAssertTrue(next.waitForExistence(timeout: 5), "Continue should appear once a place is typed")
+        XCTAssertTrue(next.isHittable)
+        XCTAssertTrue(app.buttons["Use my location"].exists)
+        capture(app, "Location typed")
     }
 
     private func capture(_ app: XCUIApplication, _ name: String) {

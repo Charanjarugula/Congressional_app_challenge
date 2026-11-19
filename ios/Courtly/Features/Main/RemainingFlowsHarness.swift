@@ -80,7 +80,7 @@ struct RemainingFlowsHarness: View {
 
     static var profile: Profile {
         Profile(id: UUID(uuidString: "00000000-0000-0000-0000-000000000010")!, firstName: "Sam", lastName: "Taylor",
-                photoPath: nil, birthday: "1998-01-01", gender: nil, level: .intermediate,
+                photoPath: nil, gender: nil, level: .intermediate,
                 formats: [.casual, .singles], zip: "33411", areaLabel: "Wellington, FL", homeLat: 26.66, homeLng: -80.24,
                 radiusMi: 10, availabilityMask: 0, busyMask: 0, busyMaskWeek: 0, calendarProvider: .none,
                 hitVisibility: "anyone", hitsPlayed: 4, coachMarksDone: true, onboardingCompletedAt: .now, blockedCount: 0)

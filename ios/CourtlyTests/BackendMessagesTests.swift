@@ -11,7 +11,7 @@ final class BackendMessagesTests: XCTestCase {
     }
 
     func testProfileCodesAllAskToFinishSettingUp() {
-        for code in ["onboarding_incomplete", "missing_birthday", "missing_level", "missing_formats", "missing_location"] {
+        for code in ["onboarding_incomplete", "missing_level", "missing_formats", "missing_location"] {
             XCTAssertEqual(BackendMessages.text(for: code), "Finish setting up your profile first.", code)
         }
     }
